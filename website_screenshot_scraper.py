@@ -55,62 +55,24 @@ class WebsiteScraper:
         base_domain = urllib.parse.urlparse(base_url).netloc
         check_domain = urllib.parse.urlparse(url_to_check).netloc
         return base_domain == check_domain
-        
-    def is_processable_url(self, url):
-        """Check if URL should be processed (exclude PDFs, documents, etc.)"""
-        # Get file extension if present
-        parsed = urllib.parse.urlparse(url)
-        path = parsed.path.lower()
-        
-        # Define excluded file extensions
-        excluded_extensions = [
-            '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
-            '.zip', '.rar', '.tar', '.gz', '.7z', '.mp3', '.mp4', '.avi',
-            '.mov', '.wmv', '.flv', '.ogg', '.wav', '.csv', '.json'
-        ]
-        
-        # Check if URL has an excluded extension
-        for ext in excluded_extensions:
-            if path.endswith(ext):
-                print(f"Skipping non-HTML file: {url}")
-                return False
-                
-        return True
 
     def normalize_url(self, url):
         """Normalize URLs to avoid duplicates with trailing slashes, etc."""
         parsed = urllib.parse.urlparse(url)
-        
-        # Convert to lowercase for consistent comparison
-        netloc = parsed.netloc.lower()
-        
-        # Remove 'www.' prefix if present for consistent matching
-        if netloc.startswith('www.'):
-            netloc = netloc[4:]
-        
-        # Remove trailing slash from path
+        # Remove trailing slash
         path = parsed.path
         if path.endswith("/") and len(path) > 1:
             path = path[:-1]
-            
-        # Sort query parameters for consistent ordering
-        if parsed.query:
-            query_params = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-            query_params.sort()
-            query = urllib.parse.urlencode(query_params)
-        else:
-            query = parsed.query
         
         # Reconstruct URL without fragments
         normalized = urllib.parse.urlunparse((
             parsed.scheme,
-            netloc,
+            parsed.netloc,
             path,
             parsed.params,
-            query,
+            parsed.query,
             ""  # Remove fragment
         ))
-        
         return normalized
 
     def extract_links(self, page, base_url):
@@ -128,10 +90,6 @@ class WebsiteScraper:
                 
             # Skip external links
             if not self.is_same_domain(base_url, link):
-                continue
-            
-            # Skip non-processable file types
-            if not self.is_processable_url(link):
                 continue
                 
             # Normalize and add if not visited
@@ -268,9 +226,6 @@ class WebsiteScraper:
         start_url = self.normalize_url(start_url)
         self.urls_to_visit.append(start_url)
         
-        # Track redirected URLs to avoid duplicates
-        self.redirected_urls = {}
-        
         with sync_playwright() as playwright:
             # Launch the browser
             browser = playwright.chromium.launch(headless=True)
@@ -279,15 +234,7 @@ class WebsiteScraper:
             while self.urls_to_visit and page_count < self.max_pages:
                 # Get the next URL to visit
                 current_url = self.urls_to_visit.pop(0)
-                
-                # Skip if we've already visited this URL
                 if current_url in self.visited_urls:
-                    print(f"Skipping already visited URL: {current_url}")
-                    continue
-                
-                # Skip non-HTML files
-                if not self.is_processable_url(current_url):
-                    self.visited_urls.add(current_url)  # Mark as visited so we don't try again
                     continue
                 
                 print(f"\nProcessing page {page_count + 1}/{self.max_pages}: {current_url}")
@@ -297,9 +244,6 @@ class WebsiteScraper:
                 page = context.new_page()
                 
                 try:
-                    # Mark as visited before we even start to prevent duplicates in the queue
-                    self.visited_urls.add(current_url)
-                    
                     # Navigate to the page
                     response = page.goto(current_url, timeout=self.timeout, wait_until="networkidle")
                     
@@ -307,27 +251,6 @@ class WebsiteScraper:
                         print(f"Failed to load {current_url}: Status code {response.status if response else 'unknown'}")
                         context.close()
                         continue
-                    
-                    # Check for redirects and handle them
-                    final_url = page.url
-                    if final_url != current_url:
-                        print(f"Redirect detected: {current_url} → {final_url}")
-                        normalized_final_url = self.normalize_url(final_url)
-                        
-                        # Store the redirect relationship
-                        self.redirected_urls[current_url] = normalized_final_url
-                        
-                        # If the destination URL has already been visited, skip
-                        if normalized_final_url in self.visited_urls and normalized_final_url != current_url:
-                            print(f"Skipping already visited redirect destination: {normalized_final_url}")
-                            context.close()
-                            continue
-                        
-                        # Mark the final URL as visited
-                        self.visited_urls.add(normalized_final_url)
-                        
-                        # Use the final URL for filenames and reporting
-                        current_url = normalized_final_url
                     
                     # Wait for additional time to ensure page is fully loaded
                     page.wait_for_timeout(self.wait_time * 1000)
@@ -345,27 +268,17 @@ class WebsiteScraper:
                     if screenshots_successful:
                         # Extract links for further crawling
                         new_links = self.extract_links(page, start_url)
-                        
-                        # Filter out any links we've already visited or queued
-                        filtered_links = []
-                        for link in new_links:
-                            if link not in self.visited_urls and link not in self.urls_to_visit:
-                                filtered_links.append(link)
-                        
-                        # Add the filtered links to our queue
-                        self.urls_to_visit.extend(filtered_links)
-                        print(f"Found {len(filtered_links)} new links to crawl (from {len(new_links)} total links)")
+                        self.urls_to_visit.extend(new_links)
+                        print(f"Found {len(new_links)} new links on this page")
                     
+                    # Mark as visited
+                    self.visited_urls.add(current_url)
                     page_count += 1
                     
                 except PlaywrightTimeoutError:
                     print(f"Timeout while loading {current_url}")
                 except Exception as e:
                     print(f"Error processing {current_url}: {e}")
-                    print(f"Call log:")
-                    # Add more debug information
-                    import traceback
-                    print(traceback.format_exc())
                 finally:
                     context.close()
                     
