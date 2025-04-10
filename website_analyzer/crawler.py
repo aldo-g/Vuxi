@@ -61,12 +61,28 @@ class WebCrawler:
             if utils.is_downloadable_file(link):
                 continue
                 
-            # Normalize and add if not visited
+            # Add normalized link
             normalized_link = utils.normalize_url(link)
-            if normalized_link not in self.visited_urls and normalized_link not in self.urls_to_visit:
-                valid_links.append(normalized_link)
+            valid_links.append(normalized_link)
                 
         return valid_links
+    
+    def url_in_list(self, url, url_list):
+        """
+        Check if a normalized URL is in a list of URLs.
+        
+        Args:
+            url (str): URL to check
+            url_list (list): List of URLs
+            
+        Returns:
+            bool: True if URL is in list, False otherwise
+        """
+        normalized_url = utils.normalize_url(url)
+        for list_url in url_list:
+            if utils.normalize_url(list_url) == normalized_url:
+                return True
+        return False
     
     def crawl(self, start_url, screenshot_capturer=None, lighthouse_auditor=None):
         """
@@ -87,6 +103,9 @@ class WebCrawler:
         start_url = utils.normalize_url(start_url)
         self.urls_to_visit.append(start_url)
         
+        # Print all normalized URLs for debugging
+        print(f"Normalized start URL: {start_url}")
+        
         crawl_stats = {
             'start_time': start_time,
             'start_url': start_url,
@@ -102,23 +121,30 @@ class WebCrawler:
             while self.urls_to_visit and page_count < self.max_pages:
                 # Get the next URL to visit
                 current_url = self.urls_to_visit.pop(0)
-                if current_url in self.visited_urls:
+                
+                # Normalize the URL again for consistency
+                normalized_url = utils.normalize_url(current_url)
+                
+                # Skip if already visited
+                if normalized_url in self.visited_urls:
                     continue
+                
+                # Mark as visited immediately to prevent duplicates in the queue
+                self.visited_urls.add(normalized_url)
                 
                 # Skip downloadable files
-                if utils.is_downloadable_file(current_url):
-                    print(f"Skipping downloadable file: {current_url}")
-                    self.visited_urls.add(current_url)  # Mark as visited so we don't try again
+                if utils.is_downloadable_file(normalized_url):
+                    print(f"Skipping downloadable file: {normalized_url}")
                     continue
                 
-                print(f"\nProcessing page {page_count + 1}/{self.max_pages}: {current_url}")
+                print(f"\nProcessing page {page_count + 1}/{self.max_pages}: {normalized_url}")
                 
                 # Create a new page context
                 context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
                 page = context.new_page()
                 
                 page_info = {
-                    'url': current_url,
+                    'url': normalized_url,
                     'number': page_count,
                     'screenshots': [],
                     'lighthouse': None
@@ -126,10 +152,10 @@ class WebCrawler:
                 
                 try:
                     # Navigate to the page
-                    response = page.goto(current_url, timeout=self.timeout, wait_until="networkidle")
+                    response = page.goto(normalized_url, timeout=self.timeout, wait_until="networkidle")
                     
                     if not response or response.status >= 400:
-                        print(f"Failed to load {current_url}: Status code {response.status if response else 'unknown'}")
+                        print(f"Failed to load {normalized_url}: Status code {response.status if response else 'unknown'}")
                         context.close()
                         continue
                     
@@ -138,26 +164,39 @@ class WebCrawler:
                     
                     # Capture screenshots if a capturer is provided
                     if screenshot_capturer:
-                        page_info['screenshots'] = screenshot_capturer.capture(page, current_url, page_count)
+                        page_info['screenshots'] = screenshot_capturer.capture(page, normalized_url, page_count)
                     
                     # Run Lighthouse audit if an auditor is provided
                     if lighthouse_auditor:
-                        page_info['lighthouse'] = lighthouse_auditor.audit(current_url, page_count)
+                        page_info['lighthouse'] = lighthouse_auditor.audit(normalized_url, page_count)
                     
                     # Extract links for further crawling
                     new_links = self.extract_links(page, start_url)
-                    self.urls_to_visit.extend(new_links)
-                    print(f"Found {len(new_links)} new links on this page")
                     
-                    # Mark as visited
-                    self.visited_urls.add(current_url)
+                    # Count how many new links were added
+                    new_links_added = 0
+                    for link in new_links:
+                        normalized_link = utils.normalize_url(link)
+                        
+                        # Debug output for homepage links
+                        if normalized_link.endswith('/') and not '/' in normalized_link[8:-1]:
+                            print(f"Found homepage link: {normalized_link}")
+                        
+                        # Check if URL is already visited or in queue
+                        if normalized_link not in self.visited_urls and not self.url_in_list(normalized_link, self.urls_to_visit):
+                            self.urls_to_visit.append(normalized_link)
+                            new_links_added += 1
+                    
+                    print(f"Found {len(new_links)} links on this page, added {new_links_added} new ones to the queue")
+                    
+                    # Add page info to crawl stats
                     crawl_stats['pages'].append(page_info)
                     page_count += 1
                     
                 except PlaywrightTimeoutError:
-                    print(f"Timeout while loading {current_url}")
+                    print(f"Timeout while loading {normalized_url}")
                 except Exception as e:
-                    print(f"Error processing {current_url}: {e}")
+                    print(f"Error processing {normalized_url}: {e}")
                 finally:
                     context.close()
                     

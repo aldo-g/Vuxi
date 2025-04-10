@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Command-line interface for the website analyzer.
 
@@ -10,7 +11,7 @@ import sys
 
 from . import crawler
 from . import screenshot
-from . import lighthouse_auditor as lh_auditor
+from . import lighthouse_auditor as lh_auditor  # Renamed to avoid conflict
 from . import report_generator
 
 
