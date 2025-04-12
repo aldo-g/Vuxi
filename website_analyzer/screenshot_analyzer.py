@@ -126,10 +126,10 @@ Format your analysis as a comprehensive report with distinct sections addressing
     
     def get_individual_page_analysis_prompt(self, page_type: str, context: Optional[Dict[str, Any]] = None) -> str:
         """
-        Get the prompt for analyzing an individual page screenshot.
+        Get the prompt for analyzing an individual page screenshot with a critical eye.
         
         Args:
-            page_type (str): Type of page being analyzed (e.g., "home page", "store page")
+            page_type (str): Type of page being analyzed (e.g., "home page", "contact page")
             context (Dict[str, Any], optional): Additional context for the prompt
             
         Returns:
@@ -141,57 +141,44 @@ Format your analysis as a comprehensive report with distinct sections addressing
         
         org_name = context.get('org_name', 'the Edinburgh Peace Institute')
         
-        return f"""You are a UX/UI design expert analyzing a website screenshot. Your task is to provide a detailed visual analysis of this webpage based on design best practices and research evidence. User Context: I have a Charity called {org_name}. I want a website that encourages people to donate and sign up for trainings.
-This is the {page_type}
+        return f"""You are a brutally honest UX/UI design critic analyzing a {page_type} for {org_name}, a charity. I need specific, actionable critique that identifies real problems - NOT generic or overly positive feedback. The organization needs a website that effectively encourages donations and training signups.
 
-Focus your analysis on the following key areas:
+    IMPORTANT: Focus on what's actually WRONG with the design rather than providing generic assessments. Be direct, specific, and reference exact elements from the screenshot.
 
-1. First Impression & Visual Appeal
-   - Overall aesthetic quality and immediate impression
-   - Visual credibility signals
-   - Emotional response evoked by the design
+    Analyze the following areas with a critical eye:
 
-2. Layout & Information Architecture
-   - Content organization and F-pattern alignment
-   - Use of whitespace and content density
-   - Visual hierarchy effectiveness
-   - Content prioritization relative to stated goals
+    1. CRITICAL FLAWS (Start here)
+    - Identify the 3-5 most significant problems that actively harm the user experience
+    - Rate each issue's severity (High/Medium/Low)
+    - Explain exactly how each issue impacts the donation/signup goals
+    
+    2. VISUAL COHESION & HIERARCHY
+    - Are visual elements competing or disconnected from each other?
+    - Is important content being obscured or minimized?
+    - Are there awkward crops, alignments, or spacing issues?
+    - Is the brand identity consistent and professional?
 
-3. Typography & Readability
-   - Font choices, sizes, and pairing
-   - Text contrast and legibility
-   - Line spacing and paragraph structure
-   - Readability on different device sizes
+    3. USABILITY BARRIERS
+    - What specific elements would confuse users or create friction?
+    - Are there accessibility issues that would prevent users from donating?
+    - Is the navigation clear and intuitive for first-time visitors?
+    - Are CTAs prominent and compelling enough to drive action?
 
-4. Color Usage & Accessibility
-   - Color scheme appropriateness for brand/purpose
-   - Color contrast and accessibility compliance
-   - Emotional impact of color choices
-   - Strategic use of color for guiding attention
+    4. TECHNICAL IMPLEMENTATION
+    - Identify any apparent technical issues (cutoff elements, overlapping content)
+    - Note any responsive design problems visible in this view
+    - Are there inconsistencies in implementation quality?
 
-5. Navigation & User Journey
-   - Clarity of navigation elements
-   - Visual cues for interactive elements
-   - Call-to-action visibility and effectiveness
-   - User path clarity toward primary goals
+    5. ACTIONABLE RECOMMENDATIONS
+    - Provide 3-5 SPECIFIC changes (not generic advice)
+    - For each recommendation:
+        * Describe exactly what should change (with specific elements)
+        * Explain precisely how it should be changed
+        * Detail how this would improve conversions
+    - Prioritize these by impact (High/Medium/Low)
 
-6. Responsiveness & Mobile Experience
-   - Element scaling and reorganization across devices
-   - Touch-friendly design for mobile users
-   - Content prioritization on smaller screens
-
-7. Visual Elements & Media
-   - Image quality and relevance
-   - Visual consistency of icons and graphics
-   - Balance between text and visual elements
-
-8. Actionable Recommendations
-   - Provide 3-5 specific, practical design improvements
-   - Prioritize recommendations by potential impact
-   - Reference specific elements in the screenshot
-
-Format your analysis as a structured report with clear headings and concise, evidence-based observations. Use objective language while acknowledging the subjective nature of some design aspects. Where possible, reference relevant design principles and research.
-"""
+    Do NOT use templated, generic language or vague compliments. Be precise and critical, pointing out exactly what isn't working and why. Focus on CONCRETE ISSUES visible in this specific design rather than theoretical best practices.
+    """
     
     def analyze_desktop_screenshots(self, org_name: str = "the Edinburgh Peace Institute",
                                   save_format: str = "html") -> str:

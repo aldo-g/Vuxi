@@ -9,12 +9,11 @@ import os
 import argparse
 import sys
 
-from . import crawler
-from . import screenshot
-from . import lighthouse_auditor as lh_auditor  # Renamed to avoid conflict
-from . import report_generator
-from . import screenshot_analyzer
-
+from website_analyzer.crawler import WebCrawler
+from website_analyzer.crawler.screenshot_capturer import ScreenshotCapturer
+from website_analyzer.lighthouse import LighthouseAuditor
+from website_analyzer.reporting import ReportGenerator
+from website_analyzer.screenshot_analyzer import ScreenshotAnalyzer
 
 def main():
     """Main entry point for the command-line interface."""
@@ -38,6 +37,11 @@ def main():
     add_analyze_pages_arguments(analyze_pages_parser)
     analyze_pages_parser.set_defaults(func=analyze_pages_command)
     
+    # Analyze single file command
+    analyze_file_parser = subparsers.add_parser('analyze-file', help='Analyze a single screenshot file')
+    add_analyze_file_arguments(analyze_file_parser)
+    analyze_file_parser.set_defaults(func=analyze_file_command)
+    
     # Parse arguments
     args = parser.parse_args()
     
@@ -59,8 +63,7 @@ def main():
         else:
             parser.print_help(sys.stderr)
             return 1
-
-
+        
 def add_crawl_arguments(parser):
     """Add arguments for the crawl command."""
     parser.add_argument("url", help="Starting URL to crawl")
@@ -94,7 +97,7 @@ def crawl_command(args):
     os.makedirs(args.output, exist_ok=True)
     
     # Initialize components
-    web_crawler = crawler.WebCrawler(
+    web_crawler = WebCrawler(
         max_pages=args.max_pages,
         timeout=args.timeout,
         wait_time=args.wait
@@ -103,15 +106,15 @@ def crawl_command(args):
     # Initialize screenshot capturer if needed
     screenshot_capturer = None
     if not args.no_screenshots:
-        screenshot_capturer = screenshot.ScreenshotCapturer(args.output)
+        screenshot_capturer = ScreenshotCapturer(args.output)
     
     # Initialize lighthouse auditor if needed
     lighthouse_auditor = None
     if not args.no_lighthouse:
-        lighthouse_auditor = lh_auditor.LighthouseAuditor(args.output)
+        lighthouse_auditor = LighthouseAuditor(args.output)
     
     # Initialize report generator
-    report_gen = report_generator.ReportGenerator(
+    report_gen = ReportGenerator(
         args.output,
         screenshot_capturer=screenshot_capturer,
         lighthouse_auditor=lighthouse_auditor
@@ -147,7 +150,7 @@ def analyze_command(args):
             return 1
         
         # Initialize screenshot analyzer
-        analyzer = screenshot_analyzer.ScreenshotAnalyzer(args.input_dir)
+        analyzer = ScreenshotAnalyzer(args.input_dir)
         
         if not args.all_devices:  # Desktop is the default
             # Analyze desktop screenshots
@@ -182,7 +185,7 @@ def analyze_pages_command(args):
             return 1
         
         # Initialize screenshot analyzer
-        analyzer = screenshot_analyzer.ScreenshotAnalyzer(args.input_dir)
+        analyzer = ScreenshotAnalyzer(args.input_dir)
         
         # Analyze individual pages
         output_paths = analyzer.analyze_individual_pages(
@@ -321,6 +324,53 @@ def create_pages_index(input_dir, output_paths):
         f.write(html_content)
     
     return index_path
+
+def add_analyze_file_arguments(parser):
+    """Add arguments for the analyze-file command."""
+    parser.add_argument("file_path", help="Path to the screenshot file to analyze")
+    parser.add_argument("--output-format", "-f", choices=["json", "html"], default="html", help="Output format for analysis results")
+    parser.add_argument("--output-dir", "-d", help="Output directory for analysis (defaults to parent directory of screenshot)")
+    parser.add_argument("--org-name", default="Edinburgh Peace Institute", help="Organization name for context")
+
+def analyze_file_command(args):
+    try:
+        # Check if the file exists
+        if not os.path.exists(args.file_path):
+            print(f"File does not exist: {args.file_path}")
+            return 1
+        
+        # Initialize screenshot analyzer
+        # If --output-dir is provided, use it; otherwise extract from file path
+        if hasattr(args, 'output_dir') and args.output_dir:
+            output_dir = args.output_dir
+        else:
+            # Default to the root directory of the analysis, not under screenshots
+            file_dir = os.path.dirname(args.file_path)
+            if "screenshots" in file_dir:
+                # Navigate up to the main analysis folder by removing "screenshots" and anything after
+                output_dir = file_dir.split("screenshots")[0].rstrip("/")
+            else:
+                output_dir = os.path.dirname(file_dir) if os.path.dirname(file_dir) else "website_analysis"
+        
+        analyzer = ScreenshotAnalyzer(output_dir)
+        
+        # Analyze single file
+        output_path = analyzer.analyze_single_file(
+            args.file_path,
+            org_name=args.org_name,
+            save_format=args.output_format
+        )
+        
+        if output_path:
+            print(f"Single file analysis saved to: {os.path.abspath(output_path)}")
+            return 0
+        else:
+            print("Single file analysis failed")
+            return 1
+        
+    except Exception as e:
+        print(f"Error during single file analysis: {e}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

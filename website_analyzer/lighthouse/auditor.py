@@ -7,7 +7,7 @@ This module provides functionality for running Google Lighthouse audits on web p
 import os
 import json
 import subprocess
-from . import utils
+from ..common.utils import create_filename_from_url
 
 
 class LighthouseAuditor:
@@ -40,7 +40,7 @@ class LighthouseAuditor:
             dict: Audit results or None if failed
         """
         try:
-            filename = utils.create_filename_from_url(url, page_number)
+            filename = create_filename_from_url(url, page_number)
             html_report_path = os.path.join(self.lighthouse_dir, f"{filename}.html")
             json_report_path = os.path.join(self.lighthouse_dir, f"{filename}.json")
             

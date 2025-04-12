@@ -6,7 +6,7 @@ This module provides functionality for creating HTML reports from crawl data.
 
 import os
 from datetime import datetime
-from . import utils
+from ..common.utils import get_score_class
 
 
 class ReportGenerator:
@@ -186,10 +186,10 @@ class ReportGenerator:
 """
         
         for report in lighthouse_reports:
-            performance_class = utils.get_score_class(report['performance'])
-            accessibility_class = utils.get_score_class(report['accessibility'])
-            best_practices_class = utils.get_score_class(report['best_practices'])
-            seo_class = utils.get_score_class(report['seo'])
+            performance_class = get_score_class(report['performance'])
+            accessibility_class = get_score_class(report['accessibility'])
+            best_practices_class = get_score_class(report['best_practices'])
+            seo_class = get_score_class(report['seo'])
             
             result += f"""
                     <tr>

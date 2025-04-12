@@ -5,7 +5,7 @@ This module provides functionality for capturing screenshots at multiple viewpor
 """
 
 import os
-from . import utils
+from ..common.utils import create_filename_from_url
 
 
 class ScreenshotCapturer:
@@ -51,7 +51,7 @@ class ScreenshotCapturer:
         # Set the viewport
         page.set_viewport_size({"width": viewport["width"], "height": viewport["height"]})
         
-        filename = utils.create_filename_from_url(url, page_number)
+        filename = create_filename_from_url(url, page_number)
         filepath = os.path.join(self.screenshots_dir, viewport["name"], f"{filename}.png")
         
         # Take full page screenshot

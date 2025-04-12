@@ -4,3 +4,4 @@ website_analysis/
 venv/
 .compile-context/
 website_analyzer/constants.py
+my_analysis/

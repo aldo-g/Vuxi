@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-from . import utils
+from ..common.utils import is_same_domain, normalize_url, is_downloadable_file 
 
 
 class WebCrawler:
@@ -54,15 +54,15 @@ class WebCrawler:
                 continue
                 
             # Skip external links
-            if not utils.is_same_domain(base_url, link):
+            if not is_same_domain(base_url, link):
                 continue
             
             # Skip downloadable files
-            if utils.is_downloadable_file(link):
+            if is_downloadable_file(link):
                 continue
                 
             # Add normalized link
-            normalized_link = utils.normalize_url(link)
+            normalized_link = normalize_url(link)
             valid_links.append(normalized_link)
                 
         return valid_links
@@ -78,9 +78,9 @@ class WebCrawler:
         Returns:
             bool: True if URL is in list, False otherwise
         """
-        normalized_url = utils.normalize_url(url)
+        normalized_url = normalize_url(url)
         for list_url in url_list:
-            if utils.normalize_url(list_url) == normalized_url:
+            if normalize_url(list_url) == normalized_url:
                 return True
         return False
     
@@ -100,7 +100,7 @@ class WebCrawler:
         print(f"Starting crawl of {start_url} at {start_time}")
         
         # Normalize and add the start URL
-        start_url = utils.normalize_url(start_url)
+        start_url = normalize_url(start_url)
         self.urls_to_visit.append(start_url)
         
         # Print all normalized URLs for debugging
@@ -123,7 +123,7 @@ class WebCrawler:
                 current_url = self.urls_to_visit.pop(0)
                 
                 # Normalize the URL again for consistency
-                normalized_url = utils.normalize_url(current_url)
+                normalized_url = normalize_url(current_url)
                 
                 # Skip if already visited
                 if normalized_url in self.visited_urls:
@@ -133,7 +133,7 @@ class WebCrawler:
                 self.visited_urls.add(normalized_url)
                 
                 # Skip downloadable files
-                if utils.is_downloadable_file(normalized_url):
+                if is_downloadable_file(normalized_url):
                     print(f"Skipping downloadable file: {normalized_url}")
                     continue
                 
@@ -176,7 +176,7 @@ class WebCrawler:
                     # Count how many new links were added
                     new_links_added = 0
                     for link in new_links:
-                        normalized_link = utils.normalize_url(link)
+                        normalized_link = normalize_url(link)
                         
                         # Debug output for homepage links
                         if normalized_link.endswith('/') and not '/' in normalized_link[8:-1]:
