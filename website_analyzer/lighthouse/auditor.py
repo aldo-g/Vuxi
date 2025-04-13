@@ -7,7 +7,7 @@ This module provides functionality for running Google Lighthouse audits on web p
 import os
 import json
 import subprocess
-from ..common.utils import create_filename_from_url
+from ..common.url_utils import create_filename_from_url
 
 
 class LighthouseAuditor:

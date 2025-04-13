@@ -6,7 +6,7 @@ This module provides functionality for creating HTML reports from crawl data.
 
 import os
 from datetime import datetime
-from ..common.utils import get_score_class
+from ..common.url_utils import get_score_class
 
 
 class ReportGenerator:

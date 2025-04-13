@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-from ..common.utils import is_same_domain, normalize_url, is_downloadable_file 
+from ..common.url_utils import is_same_domain, normalize_url, is_downloadable_file 
 
 
 class WebCrawler:

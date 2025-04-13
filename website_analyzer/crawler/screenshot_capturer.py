@@ -5,7 +5,7 @@ This module provides functionality for capturing screenshots at multiple viewpor
 """
 
 import os
-from ..common.utils import create_filename_from_url
+from ..common.url_utils import create_filename_from_url
 
 
 class ScreenshotCapturer:
