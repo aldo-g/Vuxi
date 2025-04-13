@@ -198,10 +198,6 @@ class ScreenshotAnalyzer:
             "organization": org_name
         })
         
-        # Save results
-        # CHANGE THIS LINE:
-        # page_name = f"single_{os.path.splitext(os.path.basename(file_path))[0]}"
-        # TO THIS:
         page_name = page_type.lower().replace(" ", "_")
         
         output_path = save_page_analysis_results(
