@@ -42,21 +42,3 @@ def parse_lighthouse_report(report_path: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         print(f"Error parsing Lighthouse report {report_path}: {e}")
         return None
-
-
-def get_score_class(score: float) -> str:
-    """
-    Get CSS class based on Lighthouse score value.
-    
-    Args:
-        score (float): The score value (0-100)
-        
-    Returns:
-        str: CSS class name representing the score quality
-    """
-    if score >= 90:
-        return "good"
-    elif score >= 50:
-        return "average"
-    else:
-        return "poor"

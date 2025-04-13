@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Individual Page Analyses{% endblock %}
+{% block heading %}Individual Page Analyses{% endblock %}
+
+{% block content %}
+    <div class="section">
+        <h2>Available Page Analyses</h2>
+        <ul>
+            {% for page in pages %}
+            <li>
+                <a href="{{ page.filename }}">{{ page.name }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    
+    <div class="navigation">
+        <p><a href="../desktop_screenshot_analysis.html">← Back to Overall Analysis</a></p>
+    </div>
+{% endblock %}

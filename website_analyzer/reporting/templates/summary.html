@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Website Analysis Summary{% endblock %}
+{% block heading %}Website Analysis Summary{% endblock %}
+
+{% block content %}
+    <div class="section">
+        <h2>Crawl Information</h2>
+        <p><strong>Website:</strong> {{ start_url }}</p>
+        <p><strong>Date:</strong> {{ analysis_date }}</p>
+        <p><strong>Pages Crawled:</strong> {{ pages_crawled }}</p>
+        <p><strong>Duration:</strong> {{ duration|round(2) }} seconds</p>
+    </div>
+    
+    {% if lighthouse_reports %}
+    <div class="section">
+        <h2>Lighthouse Audit Results</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Page</th>
+                    <th>Performance</th>
+                    <th>Accessibility</th>
+                    <th>Best Practices</th>
+                    <th>SEO</th>
+                    <th>Report</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in lighthouse_reports %}
+                <tr>
+                    <td>{{ report.url }}</td>
+                    <td class="score {{ get_score_class(report.performance) }}">{{ report.performance|round(1) }}%</td>
+                    <td class="score {{ get_score_class(report.accessibility) }}">{{ report.accessibility|round(1) }}%</td>
+                    <td class="score {{ get_score_class(report.best_practices) }}">{{ report.best_practices|round(1) }}%</td>
+                    <td class="score {{ get_score_class(report.seo) }}">{{ report.seo|round(1) }}%</td>
+                    <td><a href="lighthouse/{{ report.html_report }}" target="_blank">View Report</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <h2>Screenshot Preview</h2>
+    
+    {% for device in devices %}
+    <h3>{{ device.name|title }} View</h3>
+    <div class="screenshot-gallery">
+        {% for screenshot in device.screenshots[:6] %}
+        <div class="screenshot-item">
+            <img src="{{ screenshot.path }}" alt="{{ device.name|title }} screenshot {{ loop.index }}">
+            <div class="screenshot-caption">{{ screenshot.filename }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+{% endblock %}
