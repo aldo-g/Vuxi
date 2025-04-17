@@ -35,19 +35,27 @@ class ScreenshotAnalyzer:
     
     def analyze_desktop_screenshots(
         self, 
-        org_name: str = "the Edinburgh Peace Institute",
+        context: Dict[str, Any] = None,
         save_format: str = "html"
     ) -> str:
         """
         Analyze desktop screenshots for UX/UI design issues.
         
         Args:
-            org_name (str): Name of the organization for context
+            context (Dict[str, Any]): Context information about the organization
             save_format (str): Format to save results (json or html)
             
         Returns:
             str: Path to the analysis results file
         """
+        # Default context if none provided
+        if context is None:
+            context = {
+                "org_name": "Edinburgh Peace Institute",
+                "org_type": "non-profit",
+                "org_purpose": "To encourage donations and sign-ups for trainings"
+            }
+        
         # Collect desktop screenshots
         screenshots = collect_desktop_screenshots(self.screenshots_dir)
         if not screenshots:
@@ -57,7 +65,7 @@ class ScreenshotAnalyzer:
         print(f"Analyzing {len(screenshots)} desktop screenshots...")
         
         # Get prompt with context
-        prompt = get_desktop_analysis_prompt({"org_name": org_name})
+        prompt = get_desktop_analysis_prompt(context)
         
         # Get the API client
         api_client = get_api_client()
@@ -69,7 +77,9 @@ class ScreenshotAnalyzer:
         results.update({
             "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "screenshots_analyzed": len(screenshots),
-            "organization": org_name
+            "organization": context.get("org_name", "Unknown Organization"),
+            "org_type": context.get("org_type", "Unknown Type"),
+            "org_purpose": context.get("org_purpose", "Unknown Purpose")
         })
         
         # Save results

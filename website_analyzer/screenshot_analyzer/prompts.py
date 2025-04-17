@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 
 def get_desktop_analysis_prompt(context: Optional[Dict[str, Any]] = None) -> str:
     """
-    Get the prompt for desktop screenshot analysis.
+    Get the prompt for desktop screenshot analysis with a focus on thematic elements.
     
     Args:
         context (Dict[str, Any], optional): Additional context for the prompt
@@ -19,65 +19,80 @@ def get_desktop_analysis_prompt(context: Optional[Dict[str, Any]] = None) -> str
         context = {}
     
     org_name = context.get('org_name', 'the organization')
+    org_type = context.get('org_type', 'non-profit')
+    org_purpose = context.get('org_purpose', 'to encourage donations and sign-ups for trainings')
     
-    return f"""You are a UX/UI design expert analyzing multiple screenshots of a website. Your task is to evaluate visual consistency and thematic elements across all pages to assess the overall brand coherence and user experience continuity. User Context: I have a charity called {org_name}. I would like users to donate and sign up for trainings.
-These pages are for the desktop version of the site.
+    return f"""You are a UX/UI design expert analyzing multiple screenshots of a website for {org_name}, a {org_type} organization. 
+    
+WEBSITE PURPOSE: {org_purpose}
 
-Analyze the following aspects across all provided screenshots:
+Provide a comprehensive thematic analysis focusing on overall design patterns and consistency rather than page-specific issues. Evaluate how well the website aligns with the organization's goals and purpose.
 
-1. Brand Identity & Visual Language
-   - Consistency of logo placement and usage
-   - Brand color application across pages
-   - Typography system consistency
-   - Visual style and imagery cohesion
+Analyze and rate (1-10 scale) the following key areas:
 
-2. Layout Patterns & Structural Consistency
-   - Grid system and alignment patterns
-   - Header and footer consistency
-   - Whitespace usage patterns
-   - Content organization similarities/differences
+1. BRAND IDENTITY (Score: ?/10)
+   - How consistently and effectively is the brand identity expressed across pages?
+   - Are there clear visual signatures that build brand recognition?
+   - Is there a cohesive color palette aligned with the organization's mission?
+   - Does typography reinforce the organization's identity and values?
+   - EVIDENCE: Cite specific examples from the screenshots
 
-3. Navigation & Wayfinding
-   - Navigation element consistency
-   - Current state indicators
-   - Information architecture coherence
-   - Breadcrumb and contextual navigation
+2. INFORMATION ARCHITECTURE (Score: ?/10)
+   - How well-organized is the content across the site?
+   - Is navigation consistent and intuitive for the target audience?
+   - How well does the hierarchy emphasize the most important content and actions?
+   - Would a visitor easily understand what the organization does and how to engage?
+   - EVIDENCE: Cite specific examples from the screenshots
 
-4. Design System Implementation
-   - Component reuse and visual consistency
-   - Button styles and interactive element patterns
-   - Form elements and input styling
-   - Icon system and visual vocabulary
+3. ACTION-ORIENTED DESIGN (Score: ?/10)
+   - How effectively does the design prioritize key actions ({org_purpose})?
+   - Are calls-to-action visually prominent and compelling?
+   - Is there a clear conversion path for visitors?
+   - Does the site create urgency and motivation to engage?
+   - EVIDENCE: Cite specific examples from the screenshots
 
-5. Responsive Design Patterns
-   - Consistent adaptation across device sizes
-   - Breakpoint handling similarities
-   - Mobile-specific pattern consistency
+4. VISUAL STORYTELLING (Score: ?/10)
+   - Does the imagery tell a cohesive story about the organization?
+   - How effectively do visuals communicate the impact and value of the organization?
+   - Do the visuals authentically represent the organization's work and community?
+   - Is there emotional resonance in the visual language?
+   - EVIDENCE: Cite specific examples from the screenshots
 
-6. Content Hierarchy Patterns
-   - Heading structure consistency
-   - Content emphasis techniques
-   - Call-to-action presentation
-   - Information density patterns
+5. COMPONENT CONSISTENCY (Score: ?/10)
+   - Are UI components (buttons, forms, cards, etc.) used consistently?
+   - Is there evidence of a design system or shared component library?
+   - Do recurring elements maintain visual consistency across contexts?
+   - Are interactive elements visually intuitive?
+   - EVIDENCE: Cite specific examples from the screenshots
 
-7. Cross-Page Journey Analysis
-   - Visual continuity between related pages
-   - Context retention between pages
-   - Progressive disclosure patterns
-   - First-time vs. returning user visual cues
+6. RESPONSIVE DESIGN APPROACH (Score: ?/10)
+   - Is there evidence of a cohesive responsive design strategy?
+   - Do layouts adapt thoughtfully to different viewport sizes?
+   - Is content prioritization appropriate across devices?
+   - EVIDENCE: Cite specific examples from the screenshots
 
-8. Theme-Based Analysis
-   - Identify contradictions or inconsistencies in the visual language
-   - Assess how well visual design supports stated site goals
-   - Evaluate visual branding effectiveness and memorability
-   - Analyze visual storytelling across the site journey
+7. AUDIENCE ALIGNMENT (Score: ?/10)
+   - How well does the design appeal to the likely audience of a {org_type}?
+   - Does the visual language match audience expectations and preferences?
+   - Is the tone appropriate for driving the desired actions?
+   - EVIDENCE: Cite specific examples from the screenshots
 
-9. Recommendations
-   - Provide 3-5 specific recommendations for improving visual consistency
-   - Suggest design system refinements or component standardization
-   - Prioritize changes that would improve brand cohesion and user experience
+OVERALL THEME ASSESSMENT:
+- What are the 3-5 defining characteristics of this website's design theme?
+- What emotional response does the design evoke, and is this appropriate?
+- How well does the design theme support the stated purpose: {org_purpose}?
 
-Format your analysis as a comprehensive report with distinct sections addressing each aspect. Focus on patterns rather than individual elements, and provide evidence-based reasoning for your observations. Include specific references to page examples that illustrate your points.
+STRATEGIC RECOMMENDATIONS:
+- Provide 3 high-impact recommendations to strengthen thematic consistency
+- Suggest approaches to better align the design with the organization's purpose
+- Recommend specific visual themes or elements that should be amplified
+
+EFFECTIVENESS SUMMARY:
+- Give an overall effectiveness score (1-10) for how well the current design supports the organization's goals
+- Explain the primary factors influencing this score
+- Identify the single most important area for improvement
+
+Format your analysis as a comprehensive report with distinct sections for each area, including specific examples. Use concrete, evidence-based observations rather than assumptions. Focus on patterns that affect the user's understanding of and engagement with the organization.
 """
 
 

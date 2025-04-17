@@ -82,10 +82,15 @@ class CLI:
         """
         parser.add_argument("--input-dir", "-i", default="website_analysis", help="Directory containing screenshots to analyze")
         parser.add_argument("--output-format", "-f", choices=["json", "html"], default="html", help="Output format for analysis results")
+        
         parser.add_argument("--org-name", default="Edinburgh Peace Institute", help="Organization name for context")
+        parser.add_argument("--org-type", default="non-profit", help="Organization type (non-profit, business, educational, etc.)")
+        parser.add_argument("--org-purpose", default="To encourage donations and sign-ups for trainings", 
+                        help="Main purpose of the website (e.g., drive donations, generate leads, educate visitors)")
+        
         parser.add_argument("--desktop-only", action="store_true", help="Only analyze desktop screenshots (default)")
         parser.add_argument("--all-devices", action="store_true", help="Analyze screenshots for all devices")
-    
+        
     def _add_analyze_pages_arguments(self, parser: argparse.ArgumentParser) -> None:
         """
         Add arguments for the analyze-pages command.
@@ -214,10 +219,17 @@ class CLI:
             # Initialize screenshot analyzer
             analyzer = ScreenshotAnalyzer(args.input_dir)
             
+            # Create the context dictionary with all org-related parameters
+            context = {
+                "org_name": args.org_name,
+                "org_type": args.org_type,
+                "org_purpose": args.org_purpose
+            }
+            
             if not args.all_devices:  # Desktop is the default
                 # Analyze desktop screenshots
                 output_path = analyzer.analyze_desktop_screenshots(
-                    org_name=args.org_name,
+                    context=context,
                     save_format=args.output_format
                 )
                 
