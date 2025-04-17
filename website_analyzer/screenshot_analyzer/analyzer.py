@@ -95,19 +95,27 @@ class ScreenshotAnalyzer:
     
     def analyze_individual_pages(
         self, 
-        org_name: str = "the Edinburgh Peace Institute", 
+        context: Dict[str, Any] = None,
         save_format: str = "html"
     ) -> List[str]:
         """
         Analyze individual page screenshots separately.
         
         Args:
-            org_name (str): Name of the organization for context
+            context (Dict[str, Any]): Context information about the organization
             save_format (str): Format to save results (json or html)
             
         Returns:
             List[str]: List of paths to the analysis results files
         """
+        # Default context if none provided
+        if context is None:
+            context = {
+                "org_name": "Edinburgh Peace Institute",
+                "org_type": "non-profit",
+                "org_purpose": "To encourage donations and sign-ups for trainings"
+            }
+        
         # Collect desktop screenshots
         screenshots = collect_desktop_screenshots(self.screenshots_dir)
         if not screenshots:
@@ -130,7 +138,7 @@ class ScreenshotAnalyzer:
             print(f"Analyzing page {i+1}/{len(screenshots)}: {page_type}")
             
             # Get prompt for individual page
-            prompt = get_individual_page_analysis_prompt(page_type, {"org_name": org_name})
+            prompt = get_individual_page_analysis_prompt(page_type, context)
             
             # Analyze with API
             results = api_client.analyze([screenshot], prompt)
@@ -140,7 +148,9 @@ class ScreenshotAnalyzer:
                 "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "screenshot": screenshot,
                 "page_type": page_type,
-                "organization": org_name
+                "organization": context.get("org_name", "Unknown Organization"),
+                "org_type": context.get("org_type", "Unknown Type"),
+                "org_purpose": context.get("org_purpose", "Unknown Purpose")
             })
             
             # Save results
@@ -156,11 +166,11 @@ class ScreenshotAnalyzer:
             print(f"Page analysis saved to: {output_path}")
         
         return output_paths
-    
+
     def analyze_single_file(
         self, 
         file_path: str,
-        org_name: str = "the Edinburgh Peace Institute", 
+        context: Dict[str, Any] = None,
         save_format: str = "html"
     ) -> str:
         """
@@ -168,12 +178,20 @@ class ScreenshotAnalyzer:
         
         Args:
             file_path (str): Path to the screenshot file
-            org_name (str): Name of the organization for context
+            context (Dict[str, Any]): Context information about the organization
             save_format (str): Format to save results (json or html)
             
         Returns:
             str: Path to the analysis results file
         """
+        # Default context if none provided
+        if context is None:
+            context = {
+                "org_name": "Edinburgh Peace Institute",
+                "org_type": "non-profit",
+                "org_purpose": "To encourage donations and sign-ups for trainings"
+            }
+        
         if not os.path.exists(file_path):
             print(f"File does not exist: {file_path}")
             return ""
@@ -187,7 +205,7 @@ class ScreenshotAnalyzer:
         print(f"Detected page type: {page_type}")
         
         # Get prompt for individual page
-        prompt = get_individual_page_analysis_prompt(page_type, {"org_name": org_name})
+        prompt = get_individual_page_analysis_prompt(page_type, context)
         
         # Get the API client
         api_client = get_api_client()
@@ -200,12 +218,13 @@ class ScreenshotAnalyzer:
         results = api_client.analyze([file_path], prompt)
         
         # Add metadata
-        from datetime import datetime
         results.update({
             "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "screenshot": file_path,
             "page_type": page_type,
-            "organization": org_name
+            "organization": context.get("org_name", "Unknown Organization"),
+            "org_type": context.get("org_type", "Unknown Type"),
+            "org_purpose": context.get("org_purpose", "Unknown Purpose")
         })
         
         page_name = page_type.lower().replace(" ", "_")

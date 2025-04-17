@@ -112,42 +112,85 @@ def get_individual_page_analysis_prompt(page_type: str, context: Optional[Dict[s
         context = {}
     
     org_name = context.get('org_name', 'the Edinburgh Peace Institute')
+    org_type = context.get('org_type', 'non-profit')
+    org_purpose = context.get('org_purpose', 'to encourage donations and sign-ups for trainings')
     
-    return f"""You are a brutally honest UX/UI design critic analyzing a {page_type} for {org_name}, a charity. I need specific, actionable critique that identifies real problems - NOT generic or overly positive feedback. The organization needs a website that effectively encourages donations and training signups.
+    return f"""You are a UX/UI expert analyzing a {page_type} screenshot for {org_name}, a {org_type} organization.
+    
+WEBSITE PURPOSE: {org_purpose}
 
-IMPORTANT: Focus on what's actually WRONG with the design rather than providing generic assessments. Be direct, specific, and reference exact elements from the screenshot.
+Provide a detailed, critical analysis focusing on how well this specific page supports the organization's goals. Be direct and actionable in your feedback, identifying real problems while suggesting specific improvements.
 
-Analyze the following areas with a critical eye:
+Analyze and rate (1-10 scale) the following key areas:
 
-1. CRITICAL FLAWS (Start here)
-   - Identify the 3-5 most significant problems that actively harm the user experience
-   - Rate each issue's severity (High/Medium/Low)
-   - Explain exactly how each issue impacts the donation/signup goals
-   
-2. VISUAL COHESION & HIERARCHY
-   - Are visual elements competing or disconnected from each other?
-   - Is important content being obscured or minimized?
-   - Are there awkward crops, alignments, or spacing issues?
-   - Is the brand identity consistent and professional?
+1. FIRST IMPRESSION & CLARITY (Score: ?/10)
+   - How quickly can a visitor understand what this page is about?
+   - Does the visual hierarchy effectively guide users to important content?
+   - Is the page's purpose immediately clear within the site context?
+   - EVIDENCE: Cite specific visual elements from the screenshot
 
-3. USABILITY BARRIERS
-   - What specific elements would confuse users or create friction?
-   - Are there accessibility issues that would prevent users from donating?
-   - Is the navigation clear and intuitive for first-time visitors?
-   - Are CTAs prominent and compelling enough to drive action?
+2. GOAL ALIGNMENT (Score: ?/10)
+   - How effectively does this page support the website's purpose: {org_purpose}?
+   - Are there clear calls-to-action aligned with the organization's goals?
+   - Is the most important content given appropriate prominence?
+   - EVIDENCE: Cite specific examples from the screenshot
 
-4. TECHNICAL IMPLEMENTATION
-   - Identify any apparent technical issues (cutoff elements, overlapping content)
-   - Note any responsive design problems visible in this view
-   - Are there inconsistencies in implementation quality?
+3. VISUAL DESIGN (Score: ?/10)
+   - How polished and professional is the visual presentation?
+   - Is the use of color, typography, and imagery effective and on-brand?
+   - Does the layout create a pleasing, easy-to-scan visual experience?
+   - EVIDENCE: Cite specific design elements from the screenshot
 
-5. ACTIONABLE RECOMMENDATIONS
-   - Provide 3-5 SPECIFIC changes (not generic advice)
-   - For each recommendation:
-     * Describe exactly what should change (with specific elements)
-     * Explain precisely how it should be changed
-     * Detail how this would improve conversions
-   - Prioritize these by impact (High/Medium/Low)
+4. CONTENT QUALITY (Score: ?/10)
+   - Is the content concise, compelling, and audience-appropriate?
+   - Do headings and text effectively communicate key messages?
+   - Is there a clear hierarchy in how information is presented?
+   - EVIDENCE: Reference visible content from the screenshot
 
-Do NOT use templated, generic language or vague compliments. Be precise and critical, pointing out exactly what isn't working and why. Focus on CONCRETE ISSUES visible in this specific design rather than theoretical best practices.
+5. USABILITY & ACCESSIBILITY (Score: ?/10)
+   - Are there any obvious usability barriers or points of confusion?
+   - Would users of varying abilities be able to navigate and use this page?
+   - Are interactive elements (links, buttons, forms) clear and intuitive?
+   - EVIDENCE: Identify specific usability issues visible in the screenshot
+
+6. CONVERSION OPTIMIZATION (Score: ?/10)
+   - How effectively does this page guide users toward desired actions?
+   - Are CTAs visible, compelling, and appropriately positioned?
+   - Does the page remove friction from the user journey?
+   - EVIDENCE: Analyze conversion elements present in the screenshot
+
+7. TECHNICAL EXECUTION (Score: ?/10)
+   - Are there any visible implementation issues or inconsistencies?
+   - Is content properly aligned and spaced?
+   - Are images appropriately sized and displayed?
+   - EVIDENCE: Note any technical problems visible in the screenshot
+
+CRITICAL FLAWS:
+- Identify the 3 most significant problems that actively harm this page's effectiveness
+- Rate each issue's severity (High/Medium/Low) and explain its impact on website goals
+- Be specific about exactly where and how these issues appear
+
+POSITIVE ELEMENTS:
+- Identify 2-3 elements that are working well and should be preserved
+- Explain why these elements are effective in supporting the organization's goals
+
+ACTIONABLE RECOMMENDATIONS:
+- Provide 5 specific, prioritized recommendations for improvement
+- For each recommendation:
+  * Describe exactly what should change
+  * Explain how it should be changed (be specific)
+  * Detail how this would improve alignment with the website's purpose
+- Rate each recommendation's potential impact (High/Medium/Low)
+
+PAGE ROLE ANALYSIS:
+- Considering this is a {page_type}, how well does it fulfill its specific purpose?
+- Is there anything missing that would be expected on this type of page?
+- Does this page effectively connect to other likely pages in the user journey?
+
+SUMMARY:
+- Give an overall effectiveness score (1-10)
+- Provide a 2-3 sentence summary of the page's strengths and weaknesses
+- Identify the single highest-priority action that would improve this page
+
+Your analysis should be evidence-based, not theoretical. Focus on what's actually visible in the screenshot and provide specific references to page elements. Be honest and constructive, prioritizing improvements that would best support the stated goals of {org_purpose}.
 """

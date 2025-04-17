@@ -90,7 +90,7 @@ class CLI:
         
         parser.add_argument("--desktop-only", action="store_true", help="Only analyze desktop screenshots (default)")
         parser.add_argument("--all-devices", action="store_true", help="Analyze screenshots for all devices")
-        
+            
     def _add_analyze_pages_arguments(self, parser: argparse.ArgumentParser) -> None:
         """
         Add arguments for the analyze-pages command.
@@ -100,8 +100,13 @@ class CLI:
         """
         parser.add_argument("--input-dir", "-i", default="website_analysis", help="Directory containing screenshots to analyze")
         parser.add_argument("--output-format", "-f", choices=["json", "html"], default="html", help="Output format for analysis results")
+        
+        # Organization information
         parser.add_argument("--org-name", default="Edinburgh Peace Institute", help="Organization name for context")
-    
+        parser.add_argument("--org-type", default="non-profit", help="Organization type (non-profit, business, educational, etc.)")
+        parser.add_argument("--org-purpose", default="To encourage donations and sign-ups for trainings", 
+                        help="Main purpose of the website (e.g., drive donations, generate leads, educate visitors)")
+        
     def _add_analyze_file_arguments(self, parser: argparse.ArgumentParser) -> None:
         """
         Add arguments for the analyze-file command.
@@ -112,8 +117,13 @@ class CLI:
         parser.add_argument("file_path", help="Path to the screenshot file to analyze")
         parser.add_argument("--output-format", "-f", choices=["json", "html"], default="html", help="Output format for analysis results")
         parser.add_argument("--output-dir", "-d", help="Output directory for analysis (defaults to parent directory of screenshot)")
+        
+        # Organization information
         parser.add_argument("--org-name", default="Edinburgh Peace Institute", help="Organization name for context")
-    
+        parser.add_argument("--org-type", default="non-profit", help="Organization type (non-profit, business, educational, etc.)")
+        parser.add_argument("--org-purpose", default="To encourage donations and sign-ups for trainings", 
+                        help="Main purpose of the website (e.g., drive donations, generate leads, educate visitors)")
+        
     def run(self) -> int:
         """
         Run the CLI.
@@ -268,9 +278,16 @@ class CLI:
             # Initialize screenshot analyzer
             analyzer = ScreenshotAnalyzer(args.input_dir)
             
+            # Create the context dictionary with all org-related parameters
+            context = {
+                "org_name": args.org_name,
+                "org_type": args.org_type,
+                "org_purpose": args.org_purpose
+            }
+            
             # Analyze individual pages
             output_paths = analyzer.analyze_individual_pages(
-                org_name=args.org_name,
+                context=context,
                 save_format=args.output_format
             )
             
@@ -320,13 +337,32 @@ class CLI:
                 else:
                     output_dir = os.path.dirname(file_dir) if os.path.dirname(file_dir) else "website_analysis"
             
+            # Add org-type and org-purpose arguments
+            parser = self.parser._subparsers._group_actions[0].choices['analyze-file']
+            if not hasattr(args, 'org_type'):
+                parser.add_argument("--org-type", default="non-profit")
+                args = parser.parse_args([], namespace=args)
+                args.org_type = "non-profit"
+                
+            if not hasattr(args, 'org_purpose'):
+                parser.add_argument("--org-purpose", default="To encourage donations and sign-ups for trainings")
+                args = parser.parse_args([], namespace=args)
+                args.org_purpose = "To encourage donations and sign-ups for trainings"
+            
+            # Create context dictionary
+            context = {
+                "org_name": args.org_name,
+                "org_type": args.org_type,
+                "org_purpose": args.org_purpose
+            }
+            
             # Initialize screenshot analyzer
             analyzer = ScreenshotAnalyzer(output_dir)
             
             # Analyze single file
             output_path = analyzer.analyze_single_file(
                 args.file_path,
-                org_name=args.org_name,
+                context=context,
                 save_format=args.output_format
             )
             
@@ -343,7 +379,7 @@ class CLI:
     
     def create_pages_index(self, input_dir: str, output_paths: List[str]) -> str:
         """
-        Create an index HTML file for all individual page analyses.
+        Create an enhanced index HTML file for all individual page analyses.
         
         Args:
             input_dir (str): Input directory
@@ -379,7 +415,48 @@ class CLI:
         from website_analyzer.reporting.template_system import render_template
         
         html_content = render_template('pages_index.html', {
-            'pages': pages
+            'pages': pages,
+            'common_styles': """
+                body {
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 20px;
+                    color: #333;
+                    background-color: #f9f9f9;
+                }
+                .container {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    background-color: #fff;
+                    padding: 30px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                }
+                h1, h2, h3, h4, h5, h6 {
+                    color: #2c3e50;
+                    margin-top: 1.5em;
+                    margin-bottom: 0.5em;
+                    font-weight: 600;
+                }
+                h1 { 
+                    font-size: 2.2em; 
+                    padding-bottom: 10px;
+                    border-bottom: 1px solid #eee;
+                }
+                h2 { 
+                    font-size: 1.8em; 
+                    color: #34495e;
+                }
+                .section {
+                    background-color: #fff;
+                    border-radius: 8px;
+                    padding: 25px;
+                    margin-bottom: 30px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                    border: 1px solid #f0f0f0;
+                }
+            """
         })
         
         # Write the HTML content to the file
