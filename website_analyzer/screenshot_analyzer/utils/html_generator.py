@@ -207,13 +207,18 @@ def save_page_analysis_results(
             (r"USABILITY & ACCESSIBILITY \(Score: (\d+)/10\)", "usability"),
             (r"CONVERSION OPTIMIZATION \(Score: (\d+)/10\)", "conversion"),
             (r"TECHNICAL EXECUTION \(Score: (\d+)/10\)", "technical"),
-            (r"SUMMARY:.*?overall effectiveness score \((\d+)/10\)", "overall")
+            (r"SUMMARY:.*?overall effectiveness score \((\d+)/10\)", "overall"),
+            (r"Overall Effectiveness Score[:\s]+(\d+)/10", "overall")
         ]
         
         for pattern, key in score_patterns:
-            match = re.search(pattern, analysis_text, re.DOTALL)
+            match = re.search(pattern, analysis_text, re.DOTALL | re.IGNORECASE)
             if match:
-                scores[key] = int(match.group(1))
+                try:
+                    scores[key] = int(match.group(1))
+                except (ValueError, IndexError):
+                    # Skip if we can't convert to int
+                    pass
         
         # Generate score visualization HTML if scores were found
         score_html = ""
@@ -262,36 +267,105 @@ def save_page_analysis_results(
             </div>
             """
         
-        # Extract critical flaws section
+        # More robust pattern matching for Critical Flaws section
         critical_flaws_html = ""
-        critical_flaws_match = re.search(r"CRITICAL FLAWS:(.*?)(?:POSITIVE ELEMENTS:|$)", analysis_text, re.DOTALL)
-        if critical_flaws_match:
-            critical_flaws_text = critical_flaws_match.group(1).strip()
-            critical_flaws_html = f"""
-            <div class="section issues-section">
-                <h2>Critical Issues</h2>
-                <div class="issues-content">
-                    {markdown_to_html(critical_flaws_text)}
+        critical_patterns = [
+            r"CRITICAL FLAWS:(.*?)(?:POSITIVE ELEMENTS:|ACTIONABLE RECOMMENDATIONS:|PAGE ROLE ANALYSIS:|SUMMARY:|$)", 
+            r"Critical Flaws:(.*?)(?:Positive Elements:|Actionable Recommendations:|Page Role Analysis:|Summary:|$)",
+            r"Critical Issues:(.*?)(?:Positive Elements:|Actionable Recommendations:|Page Role Analysis:|Summary:|$)",
+            r"\d+\.\s+.*?\(Severity: (?:High|Medium|Low)\)(.*?)(?:\d+\.\s+.*?\(Severity: (?:High|Medium|Low)\)|POSITIVE ELEMENTS:|ACTIONABLE RECOMMENDATIONS:|PAGE ROLE ANALYSIS:|SUMMARY:|$)"
+        ]
+
+        for pattern in critical_patterns:
+            critical_match = re.search(pattern, analysis_text, re.DOTALL | re.IGNORECASE)
+            if critical_match and critical_match.group(1).strip():
+                critical_flaws_text = critical_match.group(1).strip()
+                critical_flaws_html = f"""
+                <div class="section issues-section">
+                    <h2>Critical Issues</h2>
+                    <div class="issues-content">
+                        {markdown_to_html(critical_flaws_text)}
+                    </div>
                 </div>
-            </div>
-            """
+                """
+                break
+
+        # Also, let's add a fallback that looks for numbered lists with "severity" indicators
+        if not critical_flaws_html:
+            # Look for patterns like "1. Issue Name (Severity: High)"
+            severity_pattern = re.findall(r'\d+\.\s+.+?\(Severity:\s+(?:High|Medium|Low)\)', analysis_text, re.IGNORECASE)
+            if severity_pattern:
+                # Find the content after each severity pattern until the next one or end of text
+                critical_content = []
+                for i, match in enumerate(severity_pattern):
+                    start_pos = analysis_text.find(match)
+                    if start_pos != -1:
+                        # Find the end position (next severity pattern or end of text)
+                        if i < len(severity_pattern) - 1:
+                            next_start = analysis_text.find(severity_pattern[i+1])
+                            content = analysis_text[start_pos:next_start].strip()
+                        else:
+                            # Look for the next section heading
+                            next_section = re.search(r'(?:POSITIVE ELEMENTS:|ACTIONABLE RECOMMENDATIONS:|PAGE ROLE ANALYSIS:|SUMMARY:)', 
+                                                    analysis_text[start_pos:], re.IGNORECASE)
+                            if next_section:
+                                end_pos = start_pos + next_section.start()
+                                content = analysis_text[start_pos:end_pos].strip()
+                            else:
+                                # Just take a reasonable chunk
+                                content = analysis_text[start_pos:start_pos+500].strip()
+                        
+                        critical_content.append(content)
+                
+                if critical_content:
+                    combined_content = "\n\n".join(critical_content)
+                    critical_flaws_html = f"""
+                    <div class="section issues-section">
+                        <h2>Critical Issues</h2>
+                        <div class="issues-content">
+                            {markdown_to_html(combined_content)}
+                        </div>
+                    </div>
+                    """
             
-        # Extract recommendations section
+        # More robust pattern matching for Recommendations section
         recommendations_html = ""
-        recommendations_match = re.search(r"ACTIONABLE RECOMMENDATIONS:(.*?)(?:PAGE ROLE ANALYSIS:|$)", analysis_text, re.DOTALL)
-        if recommendations_match:
-            recommendations_text = recommendations_match.group(1).strip()
-            recommendations_html = f"""
-            <div class="section recommendations-section">
-                <h2>Recommendations</h2>
-                <div class="recommendations-content">
-                    {markdown_to_html(recommendations_text)}
+        recommendation_patterns = [
+            r"ACTIONABLE RECOMMENDATIONS:(.*?)(?:PAGE ROLE ANALYSIS:|SUMMARY:|$)",
+            r"Actionable Recommendations:(.*?)(?:Page Role Analysis:|Summary:|$)",
+            r"Recommendations:(.*?)(?:Page Role Analysis:|Summary:|$)",
+            r"\d+\.\s+(?:High|Medium|Low) Impact:.*?((?:\n\s*-.*?){1,10})(?:\d+\.\s+(?:High|Medium|Low) Impact:|PAGE ROLE ANALYSIS:|SUMMARY:|$)"
+        ]
+
+        for pattern in recommendation_patterns:
+            recommendations_match = re.search(pattern, analysis_text, re.DOTALL | re.IGNORECASE)
+            if recommendations_match and recommendations_match.group(1).strip():
+                recommendations_text = recommendations_match.group(1).strip()
+                recommendations_html = f"""
+                <div class="section recommendations-section">
+                    <h2>Recommendations</h2>
+                    <div class="recommendations-content">
+                        {markdown_to_html(recommendations_text)}
+                    </div>
                 </div>
-            </div>
-            """
+                """
+                break
         
         # Convert full markdown to HTML
         analysis_html = markdown_to_html(analysis_text)
+        
+        # Create screenshot HTML (with scrollable container)
+        screenshot_html = f"""
+        <div class="section">
+            <h2>Page Screenshot</h2>
+            <div class="scrollable-screenshot">
+                <div class="screenshot-container">
+                    <img src="{screenshot_rel_path}" alt="{page_type}" class="screenshot">
+                    <div class="screenshot-caption">{page_type}</div>
+                </div>
+            </div>
+        </div>
+        """
         
         # Add error information if status is error
         error_section = ""
@@ -478,26 +552,31 @@ def save_page_analysis_results(
                 .average {{ background-color: #f59e0b; color: #f59e0b; }}
                 .poor {{ background-color: #ef4444; color: #ef4444; }}
                 
-                .screenshot-container {{
-                    background-color: #f8fafc;
-                    padding: 20px;
-                    border-radius: 8px;
-                    margin: 20px 0;
-                    text-align: center;
+                .scrollable-screenshot {{
+                    max-height: 600px;
+                    overflow-y: auto;
                     border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    margin-top: 20px;
+                    background-color: #f8fafc;
+                }}
+                .screenshot-container {{
+                    padding: 20px;
+                    text-align: center;
                 }}
                 .screenshot {{
                     max-width: 100%;
                     display: block;
                     margin: 0 auto;
-                    border: 1px solid #e2e8f0;
                     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
                 }}
                 .screenshot-caption {{
                     margin-top: 10px;
                     font-size: 0.9em;
                     color: #64748b;
+                    padding: 10px;
                 }}
+                
                 .navigation {{
                     margin-top: 30px;
                     padding-top: 20px;
@@ -591,12 +670,6 @@ def save_page_analysis_results(
                     
                     {score_html}
                     
-                    <div class="screenshot-container">
-                        <h2>Page Screenshot</h2>
-                        <img src="{screenshot_rel_path}" alt="{page_type}" class="screenshot">
-                        <div class="screenshot-caption">{page_type}</div>
-                    </div>
-                    
                     {error_section}
                     
                     <div class="tabs">
@@ -621,6 +694,8 @@ def save_page_analysis_results(
                             </div>
                         </div>
                     </div>
+                    
+                    {screenshot_html}
                     
                     <div class="navigation">
                         <a href="../index.html">← Back to All Pages</a>
