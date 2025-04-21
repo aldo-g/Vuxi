@@ -3,5 +3,4 @@ __pycache__/
 website_analysis/
 venv/
 .compile-context/
-website_analyzer/constants.py
-my_analysis/
+website_analyzer/common/constants.py

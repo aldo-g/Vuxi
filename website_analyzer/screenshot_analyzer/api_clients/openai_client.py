@@ -81,7 +81,7 @@ class OpenAIClient(BaseAPIClient):
                         "content": content
                     }
                 ],
-                "max_tokens": 4000
+                "max_completion_tokens": 4000
             }
             
             # Set up headers
