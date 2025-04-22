@@ -5,10 +5,16 @@ import os
 import json
 import base64
 import requests
+import time
 from typing import List, Dict, Any
 from datetime import datetime
 
 from .base_client import BaseAPIClient
+from ...common.logging_utils import (
+    create_log_file_path,
+    log_openai_request,
+    log_openai_response
+)
 
 
 class OpenAIClient(BaseAPIClient):
@@ -55,6 +61,35 @@ class OpenAIClient(BaseAPIClient):
         try:
             print(f"Processing {len(screenshots)} screenshots for OpenAI analysis")
             
+            # Set up logging directory
+            base_output_dir = os.getcwd()  # Default to current directory
+
+            if self.debug_dir:
+                # If a debug directory is specified, use it as the base
+                base_output_dir = self.debug_dir
+            elif screenshots:
+                # Otherwise, use a directory based on the screenshot path
+                screenshot_dir = os.path.dirname(screenshots[0])
+                
+                # If the screenshots are in a screenshots directory, go up one level
+                if "screenshots" in screenshot_dir:
+                    # Go up to the parent directory of screenshots
+                    base_output_dir = os.path.dirname(screenshot_dir)
+                    
+                    # If it's in a subdirectory of screenshots, go up one more level
+                    if os.path.basename(base_output_dir) == "screenshots":
+                        base_output_dir = os.path.dirname(base_output_dir)
+                else:
+                    # If not in a screenshots directory, use the directory containing the screenshot
+                    base_output_dir = screenshot_dir
+
+            log_dir = os.path.join(base_output_dir, "logs")
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # Create log file path based on input files
+            log_path = create_log_file_path(screenshots, log_dir)
+            print(f"Logging OpenAI request and response to: {log_path}")
+            
             # Prepare the content for the API request
             content = [{"type": "text", "text": prompt}]
             
@@ -90,7 +125,30 @@ class OpenAIClient(BaseAPIClient):
                 "Authorization": f"Bearer {self.api_key}"
             }
             
+            # Create a copy of the payload for logging (without full images)
+            logging_payload = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt}
+                        ] + [
+                            {"type": "image_url", "image_url": {"url": "[IMAGE DATA REMOVED FOR LOGGING]"}} 
+                            for _ in range(len(screenshots))
+                        ]
+                    }
+                ],
+                "max_completion_tokens": 4000
+            }
+            
+            # Log the request using the simplified payload
+            log_openai_request(log_path, prompt, screenshots, logging_payload)
+            
             print("Sending request to OpenAI API...")
+            
+            # Record start time for timing the request
+            start_time = time.time()
             
             # Make the API request
             response = requests.post(
@@ -99,15 +157,32 @@ class OpenAIClient(BaseAPIClient):
                 json=payload
             )
             
+            # Calculate elapsed time
+            elapsed_time = time.time() - start_time
+            
+            # Log the response
+            try:
+                response_data = response.json()
+                log_openai_response(log_path, response_data, response.status_code, elapsed_time)
+            except:
+                # If response isn't valid JSON, log the text
+                with open(log_path, 'a') as f:
+                    f.write("=" * 80 + "\n")
+                    f.write(f"OPENAI RESPONSE (ERROR) - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write("=" * 80 + "\n\n")
+                    f.write(f"Status Code: {response.status_code}\n")
+                    f.write(f"Elapsed Time: {elapsed_time:.2f} seconds\n\n")
+                    f.write("RESPONSE CONTENT (RAW):\n")
+                    f.write(response.text)
+                    f.write("\n\n")
+            
             # Save debug information if debug_dir is provided
             if self.debug_dir:
                 os.makedirs(self.debug_dir, exist_ok=True)
                 
                 # Save a simplified version of the payload (without the full base64 images)
                 with open(os.path.join(self.debug_dir, "openai_request.json"), "w") as f:
-                    simplified_payload = payload.copy()
-                    simplified_payload["messages"][0]["content"] = "[CONTENT REMOVED FOR DEBUGGING]"
-                    json.dump(simplified_payload, f, indent=2)
+                    json.dump(logging_payload, f, indent=2)
                 
                 # Save the response
                 with open(os.path.join(self.debug_dir, "openai_response.json"), "w") as f:
