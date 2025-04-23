@@ -4,7 +4,6 @@ Web crawler module for the website analyzer.
 This module provides functionality for crawling websites and extracting links.
 """
 
-import time
 from datetime import datetime
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 

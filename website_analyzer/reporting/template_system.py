@@ -4,7 +4,6 @@ Unified template system for website analyzer reports.
 
 import os
 import jinja2
-from ..common.url_utils import get_score_class
 
 
 # Set up templates directory

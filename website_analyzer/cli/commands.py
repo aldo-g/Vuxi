@@ -7,14 +7,13 @@ argument parsing and command execution.
 import json
 from website_analyzer.lighthouse.report_trimmer import (
     trim_lighthouse_report,
-    format_trimmed_report_for_analysis,
     trim_all_lighthouse_reports
 )
 
 import os
 import sys
 import argparse
-from typing import Dict, Any, Optional, List, Callable
+from typing import List
 
 from website_analyzer.crawler import WebCrawler
 from website_analyzer.crawler.screenshot_capturer import ScreenshotCapturer

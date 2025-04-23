@@ -10,7 +10,6 @@ from .report_trimmer import (
 
 __all__ = [
     'LighthouseAuditor',
-    'parse_lighthouse_report',
     'trim_lighthouse_report',
     'format_trimmed_report_for_analysis',
     'trim_all_lighthouse_reports'

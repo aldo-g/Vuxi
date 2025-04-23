@@ -3,7 +3,7 @@ Core analyzer module for screenshot analysis.
 """
 import os
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from .api_clients import get_api_client
 from .prompts import get_desktop_analysis_prompt, get_individual_page_analysis_prompt

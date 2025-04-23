@@ -3,7 +3,7 @@ Lighthouse report trimming functionality for condensing reports for API analysis
 """
 import json
 import os
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 
 def trim_lighthouse_report(report_path: str) -> Dict[str, Any]:

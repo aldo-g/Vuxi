@@ -22,4 +22,3 @@ class BaseAPIClient(ABC):
         Returns:
             Dict[str, Any]: Analysis results
         """
-        pass
