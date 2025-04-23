@@ -4,6 +4,12 @@ Command-line interface for the website analyzer.
 This module provides a unified approach to the CLI functionality, combining
 argument parsing and command execution.
 """
+import json
+from website_analyzer.lighthouse.report_trimmer import (
+    trim_lighthouse_report,
+    format_trimmed_report_for_analysis,
+    trim_all_lighthouse_reports
+)
 
 import os
 import sys
@@ -55,6 +61,11 @@ class CLI:
         analyze_file_parser = subparsers.add_parser('analyze-file', help='Analyze a single screenshot file')
         self._add_analyze_file_arguments(analyze_file_parser)
         analyze_file_parser.set_defaults(func=self.analyze_file_command)
+
+        # Trim Lighthouse report command
+        trim_lighthouse_parser = subparsers.add_parser('trim-lighthouse', help='Trim Lighthouse reports for API analysis')
+        self._add_trim_lighthouse_arguments(trim_lighthouse_parser)
+        trim_lighthouse_parser.set_defaults(func=self.trim_lighthouse_command)
         
         return parser
     
@@ -464,6 +475,94 @@ class CLI:
             f.write(html_content)
         
         return index_path
+    
+    def _add_trim_lighthouse_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """
+        Add arguments for the trim-lighthouse command.
+        
+        Args:
+            parser (argparse.ArgumentParser): The parser to add arguments to
+        """
+        parser.add_argument("--input-dir", "-i", default="website_analysis/lighthouse", 
+                            help="Directory containing Lighthouse reports")
+        parser.add_argument("--output-dir", "-o", default="website_analysis/lighthouse/trimmed", 
+                            help="Directory to save trimmed reports")
+        parser.add_argument("--file", help="Specific Lighthouse JSON file to trim (if not provided, trims all)")
+        
+    def trim_lighthouse_command(self, args: argparse.Namespace) -> int:
+        """
+        Run the Lighthouse report trimming command.
+        
+        Args:
+            args (argparse.Namespace): Command line arguments
+            
+        Returns:
+            int: Exit code (0 for success, non-zero for failure)
+        """
+        try:
+            # Ensure output directory exists
+            os.makedirs(args.output_dir, exist_ok=True)
+            
+            # If a specific file is specified, trim just that one
+            if args.file:
+                if not os.path.exists(args.file):
+                    print(f"File not found: {args.file}")
+                    return 1
+                
+                print(f"Trimming Lighthouse report: {args.file}")
+                trimmed_report = trim_lighthouse_report(args.file)
+                
+                output_base = os.path.splitext(os.path.basename(args.file))[0]
+                
+                # Save as JSON in the output directory
+                json_output = os.path.join(args.output_dir, f"{output_base}_trimmed.json")
+                with open(json_output, 'w') as f:
+                    json.dump(trimmed_report, f, indent=2)
+                print(f"Trimmed JSON saved to: {json_output}")
+                
+            else:
+                # Trim all reports in the directory
+                if not os.path.exists(args.input_dir):
+                    print(f"Directory not found: {args.input_dir}")
+                    return 1
+                
+                print(f"Trimming all Lighthouse reports in: {args.input_dir}")
+                print(f"Saving trimmed reports to: {args.output_dir}")
+                
+                trimmed_reports = trim_all_lighthouse_reports(args.input_dir)
+                
+                if not trimmed_reports:
+                    print("No Lighthouse JSON reports found")
+                    return 1
+                
+                # Save trimmed reports
+                for i, trimmed_report in enumerate(trimmed_reports):
+                    if "error" in trimmed_report:
+                        print(f"Error processing report {i+1}: {trimmed_report['error']}")
+                        continue
+                    
+                    # Use original filename if available
+                    url = trimmed_report.get('url', '')
+                    if url:
+                        from ..common.url_utils import create_filename_from_url
+                        base_name = create_filename_from_url(url, i)
+                    else:
+                        base_name = f"trimmed_report_{i+1}"
+                    
+                    # Save as JSON in the output directory
+                    json_output = os.path.join(args.output_dir, f"{base_name}_trimmed.json")
+                    with open(json_output, 'w') as f:
+                        json.dump(trimmed_report, f, indent=2)
+                    print(f"Saved trimmed JSON: {json_output}")
+                
+                print(f"\nTrimmed {len(trimmed_reports)} Lighthouse reports successfully")
+                print(f"Trimmed reports saved to: {args.output_dir}")
+            
+            return 0
+            
+        except Exception as e:
+            print(f"Error during Lighthouse report trimming: {e}", file=sys.stderr)
+            return 1
 
 
 def main():
