@@ -39,109 +39,21 @@ def save_analysis_results(results: Dict[str, Any], output_dir: str, format: str 
         # Convert markdown to HTML
         analysis_html = markdown_to_html(analysis_text)
         
-        # Add error information if status is error
-        error_section = ""
-        if status == "error" and "error" in results:
-            error_section = f"""
-            <div class="section error">
-                <h2>Error Information</h2>
-                <p>{results.get("error", "Unknown error")}</p>
-            </div>
-            """
+        # Create template context
+        context = {
+            "organization": results.get('organization', 'Unknown Organization'),
+            "screenshots_analyzed": results.get('screenshots_analyzed', 0),
+            "screenshot_count": results.get('screenshot_count', 0),
+            "analysis_date": results.get('analysis_date', 'Unknown'),
+            "status": status,
+            "error": results.get("error") if status == "error" else None,
+            "analysis_html": analysis_html,
+            "common_styles": ""  # We'll define styles in the template
+        }
         
-        # Create a simple HTML report
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Desktop Screenshot Analysis Report</title>
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    line-height: 1.6;
-                    margin: 0;
-                    padding: 20px;
-                    color: #333;
-                }}
-                .container {{
-                    max-width: 1200px;
-                    margin: 0 auto;
-                }}
-                h1, h2, h3, h4, h5, h6 {{
-                    color: #2c3e50;
-                    margin-top: 1.5em;
-                    margin-bottom: 0.5em;
-                }}
-                h1 {{ font-size: 2em; }}
-                h2 {{ font-size: 1.75em; }}
-                h3 {{ font-size: 1.5em; }}
-                h4 {{ font-size: 1.25em; }}
-                h5 {{ font-size: 1.1em; }}
-                h6 {{ font-size: 1em; }}
-                p {{
-                    margin-bottom: 1em;
-                }}
-                .section {{
-                    background-color: #f8f9fa;
-                    border-radius: 5px;
-                    padding: 20px;
-                    margin-bottom: 20px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                }}
-                .error {{
-                    background-color: #fee;
-                    border-left: 4px solid #c00;
-                }}
-                pre {{
-                    background-color: #f5f5f5;
-                    padding: 10px;
-                    border-radius: 5px;
-                    overflow-x: auto;
-                    white-space: pre-wrap;
-                }}
-                .analysis-result {{
-                    margin-top: 20px;
-                }}
-                li {{
-                    margin-bottom: 0.5em;
-                }}
-                ul, ol {{
-                    padding-left: 2em;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Desktop Screenshot Analysis Report</h1>
-                
-                <div class="section">
-                    <h2>Analysis Summary</h2>
-                    <p><strong>Organization:</strong> {results.get('organization', 'Unknown')}</p>
-                    <p><strong>Screenshots Analyzed:</strong> {results.get('screenshots_analyzed', 0)} of {results.get('screenshot_count', 0)} total</p>
-                    <p><strong>Analysis Date:</strong> {results.get('analysis_date', 'Unknown')}</p>
-                    <p><strong>Status:</strong> {status}</p>
-                </div>
-                
-                {error_section}
-                
-                <div class="section">
-                    <h2>Analysis Results</h2>
-                    <div class="analysis-result">
-                        {analysis_html}
-                    </div>
-                </div>
-                
-                <div class="section">
-                    <h2>Individual Page Analysis</h2>
-                    <p>For detailed analysis of individual pages, use the following command:</p>
-                    <pre>python -m website_analyzer.cli analyze-pages</pre>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
+        # Use the template system
+        from website_analyzer.reporting.template_system import render_template
+        html_content = render_template('desktop_analysis.html', context)
         
         with open(output_path, "w") as f:
             f.write(html_content)

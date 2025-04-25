@@ -3,13 +3,170 @@
 {% block title %}Desktop Screenshot Analysis Report{% endblock %}
 {% block heading %}Desktop Screenshot Analysis Report{% endblock %}
 
+{% block additional_styles %}
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    color: #333;
+    background-color: #f9f9f9;
+}
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+h1, h2, h3, h4, h5, h6 {
+    color: #2c3e50;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+}
+h1 { 
+    font-size: 2.2em; 
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    margin-top: 0;
+}
+h2 { 
+    font-size: 1.8em; 
+    color: #34495e;
+}
+.section {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border: 1px solid #f0f0f0;
+}
+.error {
+    background-color: #fff5f5;
+    border-left: 4px solid #e53e3e;
+}
+.org-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+}
+.org-info-item {
+    background-color: #f8fafc;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+.org-info-label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #64748b;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.org-info-value {
+    font-size: 1.1em;
+    color: #334155;
+}
+.analysis-result {
+    margin-top: 20px;
+    line-height: 1.8;
+}
+.analysis-result h1 {
+    font-size: 1.8em;
+    color: #2c3e50;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-top: 2em;
+}
+.analysis-result h2 {
+    font-size: 1.4em;
+    color: #34495e;
+    margin-top: 1.5em;
+}
+.analysis-result h3 {
+    font-size: 1.2em;
+    color: #3b82f6;
+    margin-top: 1.2em;
+}
+.analysis-result p {
+    margin-bottom: 1em;
+    color: #334155;
+}
+.analysis-result li {
+    margin-bottom: 0.7em;
+    color: #334155;
+}
+.analysis-result ul, .analysis-result ol {
+    padding-left: 2em;
+    margin-bottom: 1.5em;
+}
+.analysis-result strong {
+    color: #2c3e50;
+    font-weight: 600;
+}
+.summary-box {
+    background-color: #f0f9ff;
+    border-left: 4px solid #3b82f6;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 6px;
+}
+.navigation {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+}
+.navigation a {
+    color: #3b82f6;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+.navigation a:hover {
+    text-decoration: underline;
+}
+pre {
+    background-color: #f8fafc;
+    padding: 15px;
+    border-radius: 6px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    font-size: 14px;
+    border: 1px solid #e2e8f0;
+    margin: 15px 0;
+}
+@media (max-width: 800px) {
+    .org-info {
+        grid-template-columns: 1fr;
+    }
+}
+{% endblock %}
+
 {% block content %}
     <div class="section">
         <h2>Analysis Summary</h2>
-        <p><strong>Organization:</strong> {{ organization }}</p>
-        <p><strong>Screenshots Analyzed:</strong> {{ screenshots_analyzed }} of {{ screenshot_count }} total</p>
-        <p><strong>Analysis Date:</strong> {{ analysis_date }}</p>
-        <p><strong>Status:</strong> {{ status }}</p>
+        <div class="org-info">
+            <div class="org-info-item">
+                <div class="org-info-label">Organization</div>
+                <div class="org-info-value">{{ organization }}</div>
+            </div>
+            <div class="org-info-item">
+                <div class="org-info-label">Screenshots Analyzed</div>
+                <div class="org-info-value">{{ screenshots_analyzed }} of {{ screenshot_count }}</div>
+            </div>
+            <div class="org-info-item">
+                <div class="org-info-label">Analysis Date</div>
+                <div class="org-info-value">{{ analysis_date }}</div>
+            </div>
+        </div>
     </div>
     
     {% if status == 'error' and error %}
@@ -26,9 +183,7 @@
         </div>
     </div>
     
-    <div class="section">
-        <h2>Individual Page Analysis</h2>
-        <p>For detailed analysis of individual pages, use the following command:</p>
-        <pre>python -m website_analyzer.cli analyze-pages</pre>
+    <div class="navigation">
+        <a href="analysis/pages/index.html">View Individual Page Analysis →</a>
     </div>
 {% endblock %}
