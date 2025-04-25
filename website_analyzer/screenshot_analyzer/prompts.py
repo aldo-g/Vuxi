@@ -116,38 +116,49 @@ def get_individual_page_analysis_prompt(page_type: str, context: Optional[Dict[s
     
     return f"""You are a UX/UI expert analyzing a {page_type} screenshot for {org_name}, a {org_type}.
     
-PRIMARY TASK: Analyze how well this page fulfills its intended function based on common expectations for a {page_type}.
+PRIMARY TASK: Analyze how well this page fulfills its intended function based on common expectations for a {page_type}, 
+while paying special attention to signs of incomplete development, placeholder content, and unprofessional elements.
 
-Provide a detailed, critical analysis focusing on whether this page effectively serves its purpose. Be direct and actionable in your feedback, identifying real problems while suggesting specific improvements.
+Provide a detailed, critical analysis focusing on whether this page effectively serves its purpose. Be direct and actionable 
+in your feedback, identifying real problems while suggesting specific improvements.
+
+CRITICAL INSPECTION AREAS (Examine these first):
+- Placeholder content (e.g., "New List Item", "Description goes here", "Lorem ipsum", etc.)
+- Incomplete sections or unfinished features
+- Broken layouts or formatting issues
+- Poor contrast between text and background
+- Misaligned elements or inconsistent spacing
+- Unprofessional or clearly unfinished visual elements
+- Technical errors or debugging elements visible to users
 
 Analyze and rate (1-10 scale) the following key areas:
 
 1. FIRST IMPRESSION & CLARITY (Score: ?/10)
+   - Are there any immediate signs of an incomplete or unprofessional page?
    - How quickly can a visitor understand what this page is about?
    - Does the visual hierarchy effectively guide users to the page's main purpose?
-   - Is the page layout intuitive for its intended function?
    - EVIDENCE: Cite specific visual elements from the screenshot
 
 2. FUNCTIONAL EFFECTIVENESS (Score: ?/10)
    - How effectively does this page fulfill what users would expect from a {page_type}?
-   - Are the necessary elements and functionality present for this page type?
+   - Are there any incomplete or placeholder elements that prevent proper functionality?
    - Does the page structure support the user's expected tasks?
    - EVIDENCE: Cite specific functional elements from the screenshot
 
 3. VISUAL DESIGN (Score: ?/10)
    - How polished and professional is the visual presentation?
-   - Is the design appropriate for this type of page?
+   - Are there any glaring visual errors, incomplete styling, or placeholder elements?
    - Does the layout create a pleasing, easy-to-scan visual experience?
    - EVIDENCE: Cite specific design elements from the screenshot
 
 4. CONTENT QUALITY (Score: ?/10)
-   - Is the content appropriate and sufficient for this page type?
+   - Is all content complete and finalized, or are there placeholders?
    - Do headings and text effectively communicate necessary information?
    - Is information organized logically for this page's purpose?
    - EVIDENCE: Reference visible content from the screenshot
 
 5. USABILITY & ACCESSIBILITY (Score: ?/10)
-   - Are there any obvious usability barriers specific to this page type?
+   - Are there any obvious usability barriers, including poor contrast or readability issues?
    - Would users be able to complete expected tasks on this page?
    - Are interactive elements appropriate and clear for this page's function?
    - EVIDENCE: Identify specific usability issues visible in the screenshot
@@ -159,13 +170,14 @@ Analyze and rate (1-10 scale) the following key areas:
    - EVIDENCE: Analyze task-related elements in the screenshot
 
 7. TECHNICAL EXECUTION (Score: ?/10)
-   - Are there any visible implementation issues or inconsistencies?
+   - Are there any visible implementation issues, incomplete features, or debugging elements?
    - Is content properly aligned and spaced?
    - Are images and interactive elements properly implemented?
    - EVIDENCE: Note any technical problems visible in the screenshot
 
 CRITICAL FLAWS:
-- Identify the 3 most significant problems that prevent this page from functioning effectively
+- FIRST, identify any incomplete, placeholder, or unprofessional elements visible in the screenshot
+- Then identify other significant problems that prevent this page from functioning effectively
 - Rate each issue's severity (High/Medium/Low) and explain its impact on page functionality
 - Be specific about exactly where and how these issues appear
 
@@ -175,6 +187,7 @@ POSITIVE ELEMENTS:
 
 ACTIONABLE RECOMMENDATIONS:
 - Provide 5 specific, prioritized recommendations for improvement
+- PRIORITIZE addressing any incomplete or unprofessional elements first
 - For each recommendation:
   * Describe exactly what should change
   * Explain how it should be changed (be specific)
@@ -191,5 +204,7 @@ SUMMARY:
 - Provide a 2-3 sentence summary of how well the page fulfills its expected function
 - Identify the single highest-priority action that would improve this page
 
-Your analysis should focus on how well this page serves its specific function based on common expectations for this type of page. Be evidence-based, focusing on what's actually visible in the screenshot.
+Your analysis should focus on how well this page serves its specific function based on common expectations for this type of page. 
+Be especially vigilant about identifying unprofessional elements, placeholder content, or signs of incomplete development.
+Be evidence-based, focusing on what's actually visible in the screenshot.
 """

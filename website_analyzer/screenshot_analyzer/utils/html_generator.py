@@ -20,6 +20,9 @@ def save_analysis_results(results: Dict[str, Any], output_dir: str, format: str 
     Returns:
         str: Path to the saved file
     """
+    import json
+    import re
+    
     if format == "json":
         # Save to JSON file
         output_path = os.path.join(output_dir, "desktop_screenshot_analysis.json")
@@ -36,7 +39,116 @@ def save_analysis_results(results: Dict[str, Any], output_dir: str, format: str 
         analysis_text = results.get("results", "No results available")
         status = results.get("status", "unknown")
         
-        # Convert markdown to HTML
+        # Extract scores from analysis text
+        scores = {}
+        score_patterns = [
+            (r"BRAND IDENTITY \(Score: (\d+)/10\)", "brand_identity"),
+            (r"INFORMATION ARCHITECTURE \(Score: (\d+)/10\)", "information_architecture"),
+            (r"ACTION-ORIENTED DESIGN \(Score: (\d+)/10\)", "action_oriented"),
+            (r"VISUAL STORYTELLING \(Score: (\d+)/10\)", "visual_storytelling"),
+            (r"COMPONENT CONSISTENCY \(Score: (\d+)/10\)", "component_consistency"),
+            (r"RESPONSIVE DESIGN APPROACH \(Score: (\d+)/10\)", "responsive_design"),
+            (r"AUDIENCE ALIGNMENT \(Score: (\d+)/10\)", "audience_alignment"),
+            (r"overall effectiveness score[:\s]+(\d+)/10", "overall_effectiveness")
+        ]
+        
+        for pattern, key in score_patterns:
+            match = re.search(pattern, analysis_text, re.IGNORECASE)
+            if match:
+                try:
+                    scores[key] = int(match.group(1))
+                except (ValueError, IndexError):
+                    pass
+        
+        # Generate score visualization HTML
+        score_html = ""
+        if scores:
+            score_html = """
+            <div class="section">
+                <h2>Evaluation Scores</h2>
+                <div class="score-container">
+            """
+            
+            score_labels = {
+                "brand_identity": "Brand Identity",
+                "information_architecture": "Information Architecture",
+                "action_oriented": "Action-Oriented Design",
+                "visual_storytelling": "Visual Storytelling",
+                "component_consistency": "Component Consistency",
+                "responsive_design": "Responsive Design Approach",
+                "audience_alignment": "Audience Alignment",
+                "overall_effectiveness": "Overall Effectiveness"
+            }
+            
+            for key, label in score_labels.items():
+                if key in scores:
+                    score = scores[key]
+                    # Determine color based on score
+                    if score >= 8:
+                        color_class = "good"
+                    elif score >= 6:
+                        color_class = "average"
+                    else:
+                        color_class = "poor"
+                        
+                    score_html += f"""
+                    <div class="score-item">
+                        <div class="score-label">{label}</div>
+                        <div class="score-meter">
+                            <div class="score-bar {color_class}" style="width: {score * 10}%"></div>
+                        </div>
+                        <div class="score-value {color_class}">{score}/10</div>
+                    </div>
+                    """
+            
+            score_html += """
+                </div>
+            </div>
+            """
+        
+        # Extract Strategic Recommendations
+        recommendations_html = ""
+        recommendations_patterns = [
+            r"STRATEGIC RECOMMENDATIONS:(.*?)(?:EFFECTIVENESS SUMMARY:|$)",
+            r"Strategic Recommendations:(.*?)(?:Effectiveness Summary:|$)"
+        ]
+        
+        for pattern in recommendations_patterns:
+            match = re.search(pattern, analysis_text, re.DOTALL | re.IGNORECASE)
+            if match and match.group(1).strip():
+                recommendations_text = match.group(1).strip()
+                recommendations_html = f"""
+                <div class="section recommendations-section">
+                    <h2>Strategic Recommendations</h2>
+                    <div class="recommendations-content">
+                        {markdown_to_html(recommendations_text)}
+                    </div>
+                </div>
+                """
+                break
+        
+        # Extract Theme Assessment (equivalent to critical issues)
+        theme_assessment_html = ""
+        theme_patterns = [
+            r"OVERALL THEME ASSESSMENT:(.*?)(?:STRATEGIC RECOMMENDATIONS:|$)",
+            r"Overall Theme Assessment:(.*?)(?:Strategic Recommendations:|$)"
+        ]
+        
+        for pattern in theme_patterns:
+            match = re.search(pattern, analysis_text, re.DOTALL | re.IGNORECASE)
+            if match and match.group(1).strip():
+                theme_text = match.group(1).strip()
+                theme_assessment_html = f"""
+                <div class="section issues-section">
+                    <h2>Theme Assessment</h2>
+                    <div class="issues-content">
+                        {markdown_to_html(theme_text)}
+                    </div>
+                </div>
+                """
+                break
+        
+        # Convert full markdown to HTML
         analysis_html = markdown_to_html(analysis_text)
         
         # Create template context
@@ -48,6 +160,9 @@ def save_analysis_results(results: Dict[str, Any], output_dir: str, format: str 
             "status": status,
             "error": results.get("error") if status == "error" else None,
             "analysis_html": analysis_html,
+            "score_html": score_html,
+            "recommendations_html": recommendations_html,
+            "theme_assessment_html": theme_assessment_html,
             "common_styles": ""  # We'll define styles in the template
         }
         

@@ -48,6 +48,14 @@ h2 {
     background-color: #fff5f5;
     border-left: 4px solid #e53e3e;
 }
+.issues-section {
+    background-color: #fff5f7;
+    border-left: 4px solid #e53e78;
+}
+.recommendations-section {
+    background-color: #f0fdf4;
+    border-left: 4px solid #10b981;
+}
 .org-info {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -71,49 +79,41 @@ h2 {
     font-size: 1.1em;
     color: #334155;
 }
+.score-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+}
+.score-item {
+    display: grid;
+    grid-template-columns: 250px 1fr 50px;
+    align-items: center;
+    gap: 15px;
+}
+.score-label {
+    font-weight: 500;
+    color: #475569;
+}
+.score-meter {
+    height: 12px;
+    background-color: #e2e8f0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.score-bar {
+    height: 100%;
+    border-radius: 6px;
+}
+.score-value {
+    font-weight: bold;
+    text-align: right;
+}
+.good { background-color: #10b981; color: #10b981; }
+.average { background-color: #f59e0b; color: #f59e0b; }
+.poor { background-color: #ef4444; color: #ef4444; }
 .analysis-result {
     margin-top: 20px;
     line-height: 1.8;
-}
-.analysis-result h1 {
-    font-size: 1.8em;
-    color: #2c3e50;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-    margin-top: 2em;
-}
-.analysis-result h2 {
-    font-size: 1.4em;
-    color: #34495e;
-    margin-top: 1.5em;
-}
-.analysis-result h3 {
-    font-size: 1.2em;
-    color: #3b82f6;
-    margin-top: 1.2em;
-}
-.analysis-result p {
-    margin-bottom: 1em;
-    color: #334155;
-}
-.analysis-result li {
-    margin-bottom: 0.7em;
-    color: #334155;
-}
-.analysis-result ul, .analysis-result ol {
-    padding-left: 2em;
-    margin-bottom: 1.5em;
-}
-.analysis-result strong {
-    color: #2c3e50;
-    font-weight: 600;
-}
-.summary-box {
-    background-color: #f0f9ff;
-    border-left: 4px solid #3b82f6;
-    padding: 20px;
-    margin: 20px 0;
-    border-radius: 6px;
 }
 .navigation {
     margin-top: 30px;
@@ -133,19 +133,36 @@ h2 {
 .navigation a:hover {
     text-decoration: underline;
 }
-pre {
-    background-color: #f8fafc;
-    padding: 15px;
-    border-radius: 6px;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    font-size: 14px;
-    border: 1px solid #e2e8f0;
-    margin: 15px 0;
+.tabs {
+    display: flex;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+}
+.tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    font-weight: 500;
+}
+.tab.active {
+    border-bottom-color: #3b82f6;
+    color: #3b82f6;
+}
+.tab-content {
+    display: none;
+}
+.tab-content.active {
+    display: block;
 }
 @media (max-width: 800px) {
     .org-info {
         grid-template-columns: 1fr;
+    }
+    .score-item {
+        grid-template-columns: 1fr;
+    }
+    .score-value {
+        text-align: left;
     }
 }
 {% endblock %}
@@ -176,14 +193,53 @@ pre {
     </div>
     {% endif %}
     
-    <div class="section">
-        <h2>Analysis Results</h2>
-        <div class="analysis-result">
-            {{ analysis_html|safe }}
+    {{ score_html|safe }}
+    
+    <div class="tabs">
+        <div class="tab active" data-tab="tab-assessment">Theme Assessment</div>
+        <div class="tab" data-tab="tab-recommendations">Recommendations</div>
+        <div class="tab" data-tab="tab-full">Full Analysis</div>
+    </div>
+    
+    <div id="tab-assessment" class="tab-content active">
+        {{ theme_assessment_html|safe }}
+    </div>
+    
+    <div id="tab-recommendations" class="tab-content">
+        {{ recommendations_html|safe }}
+    </div>
+    
+    <div id="tab-full" class="tab-content">
+        <div class="section">
+            <h2>Complete Analysis</h2>
+            <div class="analysis-result">
+                {{ analysis_html|safe }}
+            </div>
         </div>
     </div>
     
     <div class="navigation">
         <a href="analysis/pages/index.html">View Individual Page Analysis →</a>
     </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab functionality
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and contents
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab and corresponding content
+                    tab.classList.add('active');
+                    const tabId = tab.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+        });
+    </script>
 {% endblock %}
