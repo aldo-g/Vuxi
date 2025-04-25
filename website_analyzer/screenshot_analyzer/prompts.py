@@ -111,86 +111,85 @@ def get_individual_page_analysis_prompt(page_type: str, context: Optional[Dict[s
     if context is None:
         context = {}
     
-    org_name = context.get('org_name', 'the Edinburgh Peace Institute')
-    org_type = context.get('org_type', 'non-profit')
-    org_purpose = context.get('org_purpose', 'to encourage donations and sign-ups for trainings')
+    org_name = context.get('org_name', 'the organization')
+    org_type = context.get('org_type', 'organization')
     
-    return f"""You are a UX/UI expert analyzing a {page_type} screenshot for {org_name}, a {org_type} organization.
+    return f"""You are a UX/UI expert analyzing a {page_type} screenshot for {org_name}, a {org_type}.
     
-WEBSITE PURPOSE: {org_purpose}
+PRIMARY TASK: Analyze how well this page fulfills its intended function based on common expectations for a {page_type}.
 
-Provide a detailed, critical analysis focusing on how well this specific page supports the organization's goals. Be direct and actionable in your feedback, identifying real problems while suggesting specific improvements.
+Provide a detailed, critical analysis focusing on whether this page effectively serves its purpose. Be direct and actionable in your feedback, identifying real problems while suggesting specific improvements.
 
 Analyze and rate (1-10 scale) the following key areas:
 
 1. FIRST IMPRESSION & CLARITY (Score: ?/10)
    - How quickly can a visitor understand what this page is about?
-   - Does the visual hierarchy effectively guide users to important content?
-   - Is the page's purpose immediately clear within the site context?
+   - Does the visual hierarchy effectively guide users to the page's main purpose?
+   - Is the page layout intuitive for its intended function?
    - EVIDENCE: Cite specific visual elements from the screenshot
 
-2. GOAL ALIGNMENT (Score: ?/10)
-   - How effectively does this page support the website's purpose: {org_purpose}?
-   - Are there clear calls-to-action aligned with the organization's goals?
-   - Is the most important content given appropriate prominence?
-   - EVIDENCE: Cite specific examples from the screenshot
+2. FUNCTIONAL EFFECTIVENESS (Score: ?/10)
+   - How effectively does this page fulfill what users would expect from a {page_type}?
+   - Are the necessary elements and functionality present for this page type?
+   - Does the page structure support the user's expected tasks?
+   - EVIDENCE: Cite specific functional elements from the screenshot
 
 3. VISUAL DESIGN (Score: ?/10)
    - How polished and professional is the visual presentation?
-   - Is the use of color, typography, and imagery effective and on-brand?
+   - Is the design appropriate for this type of page?
    - Does the layout create a pleasing, easy-to-scan visual experience?
    - EVIDENCE: Cite specific design elements from the screenshot
 
 4. CONTENT QUALITY (Score: ?/10)
-   - Is the content concise, compelling, and audience-appropriate?
-   - Do headings and text effectively communicate key messages?
-   - Is there a clear hierarchy in how information is presented?
+   - Is the content appropriate and sufficient for this page type?
+   - Do headings and text effectively communicate necessary information?
+   - Is information organized logically for this page's purpose?
    - EVIDENCE: Reference visible content from the screenshot
 
 5. USABILITY & ACCESSIBILITY (Score: ?/10)
-   - Are there any obvious usability barriers or points of confusion?
-   - Would users of varying abilities be able to navigate and use this page?
-   - Are interactive elements (links, buttons, forms) clear and intuitive?
+   - Are there any obvious usability barriers specific to this page type?
+   - Would users be able to complete expected tasks on this page?
+   - Are interactive elements appropriate and clear for this page's function?
    - EVIDENCE: Identify specific usability issues visible in the screenshot
 
-6. CONVERSION OPTIMIZATION (Score: ?/10)
-   - How effectively does this page guide users toward desired actions?
-   - Are CTAs visible, compelling, and appropriately positioned?
-   - Does the page remove friction from the user journey?
-   - EVIDENCE: Analyze conversion elements present in the screenshot
+6. USER TASK COMPLETION (Score: ?/10)
+   - How easily can users complete expected tasks on this page?
+   - Are necessary actions intuitive and properly prioritized?
+   - Does the page remove friction from user workflows?
+   - EVIDENCE: Analyze task-related elements in the screenshot
 
 7. TECHNICAL EXECUTION (Score: ?/10)
    - Are there any visible implementation issues or inconsistencies?
    - Is content properly aligned and spaced?
-   - Are images appropriately sized and displayed?
+   - Are images and interactive elements properly implemented?
    - EVIDENCE: Note any technical problems visible in the screenshot
 
 CRITICAL FLAWS:
-- Identify the 3 most significant problems that actively harm this page's effectiveness
-- Rate each issue's severity (High/Medium/Low) and explain its impact on website goals
+- Identify the 3 most significant problems that prevent this page from functioning effectively
+- Rate each issue's severity (High/Medium/Low) and explain its impact on page functionality
 - Be specific about exactly where and how these issues appear
 
 POSITIVE ELEMENTS:
-- Identify 2-3 elements that are working well and should be preserved
-- Explain why these elements are effective in supporting the organization's goals
+- Identify 2-3 elements that work well for this page type
+- Explain why these elements effectively support the page's function
 
 ACTIONABLE RECOMMENDATIONS:
 - Provide 5 specific, prioritized recommendations for improvement
 - For each recommendation:
   * Describe exactly what should change
   * Explain how it should be changed (be specific)
-  * Detail how this would improve alignment with the website's purpose
+  * Detail how this would improve the page's primary function
 - Rate each recommendation's potential impact (High/Medium/Low)
 
-PAGE ROLE ANALYSIS:
-- Considering this is a {page_type}, how well does it fulfill its specific purpose?
-- Is there anything missing that would be expected on this type of page?
-- Does this page effectively connect to other likely pages in the user journey?
+PAGE TYPE ANALYSIS:
+- Based on common expectations for a {page_type}, what essential elements are present or missing?
+- Does this page meet standard expectations for its type?
+- What best practices for {page_type}s could be applied here?
 
 SUMMARY:
 - Give an overall effectiveness score (1-10)
-- Provide a 2-3 sentence summary of the page's strengths and weaknesses
+- Provide a 2-3 sentence summary of how well the page fulfills its expected function
 - Identify the single highest-priority action that would improve this page
 
-Your analysis should be evidence-based, not theoretical. Focus on what's actually visible in the screenshot and provide specific references to page elements. Be honest and constructive, prioritizing improvements that would best support the stated goals of {org_purpose}.
+Your analysis should focus on how well this page serves its specific function based on common expectations for this type of page. Be evidence-based, focusing on what's actually visible in the screenshot.
 """
