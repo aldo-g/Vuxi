@@ -6,6 +6,10 @@ setup(
     packages=find_packages(),
     install_requires=[
         "playwright>=1.32.0",
+        "jinja2>=3.0.0",        # Required for templating
+        "anthropic>=0.7.0",     # Required for Claude API
+        "requests>=2.25.0",     # Required for API calls
+        "Pillow>=8.0.0",        # Required for image processing
     ],
     entry_points={
         'console_scripts': [

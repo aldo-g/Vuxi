@@ -4,8 +4,8 @@ Report generation module for the website analyzer.
 
 import os
 from datetime import datetime
-from .template_system import render_template, COMMON_STYLES, get_score_class
-
+from .template_system import render_template, COMMON_STYLES
+from ..common.url_utils import get_score_class
 
 class ReportGenerator:
     """
