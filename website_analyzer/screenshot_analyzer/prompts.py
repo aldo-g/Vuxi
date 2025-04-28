@@ -116,51 +116,48 @@ def get_individual_page_analysis_prompt(page_type: str, context: Optional[Dict[s
     
     return f"""You are a UX/UI expert analyzing a {page_type} screenshot for {org_name}, a {org_type}.
     
-PRIMARY TASK: Analyze how well this page fulfills its intended function based on common expectations for a {page_type}, 
-while paying special attention to signs of incomplete development, placeholder content, and unprofessional elements.
+CRITICAL FIRST STEP: 
+Carefully scan the ENTIRE screenshot for these issues:
+- Placeholder or incomplete content ("New List Item", "Description goes here", "Lorem ipsum")
+- Background elements or decorations that interfere with text readability
+- Poor contrast between text and backgrounds
+- Visual elements that overlap with content
+- Obvious signs of unfinished development
 
-Provide a detailed, critical analysis focusing on whether this page effectively serves its purpose. Be direct and actionable 
-in your feedback, identifying real problems while suggesting specific improvements.
+If ANY of these exist, they MUST be reported as critical flaws.
 
-CRITICAL INSPECTION AREAS (Examine these first):
-- Placeholder content (e.g., "New List Item", "Description goes here", "Lorem ipsum", etc.)
-- Incomplete sections or unfinished features
-- Broken layouts or formatting issues
-- Poor contrast between text and background
-- Misaligned elements or inconsistent spacing
-- Unprofessional or clearly unfinished visual elements
-- Technical errors or debugging elements visible to users
+PRIMARY TASK: Analyze how well this page fulfills its intended function based on common expectations for a {page_type}.
 
 Analyze and rate (1-10 scale) the following key areas:
 
 1. FIRST IMPRESSION & CLARITY (Score: ?/10)
-   - Are there any immediate signs of an incomplete or unprofessional page?
+   - Are there any immediate red flags (placeholder text, readability issues)?
    - How quickly can a visitor understand what this page is about?
    - Does the visual hierarchy effectively guide users to the page's main purpose?
    - EVIDENCE: Cite specific visual elements from the screenshot
 
 2. FUNCTIONAL EFFECTIVENESS (Score: ?/10)
    - How effectively does this page fulfill what users would expect from a {page_type}?
-   - Are there any incomplete or placeholder elements that prevent proper functionality?
+   - Are the necessary elements and functionality present for this page type?
    - Does the page structure support the user's expected tasks?
    - EVIDENCE: Cite specific functional elements from the screenshot
 
 3. VISUAL DESIGN (Score: ?/10)
    - How polished and professional is the visual presentation?
-   - Are there any glaring visual errors, incomplete styling, or placeholder elements?
-   - Does the layout create a pleasing, easy-to-scan visual experience?
+   - Do decorative elements enhance or interfere with content readability?
+   - Is there proper contrast between text and backgrounds?
    - EVIDENCE: Cite specific design elements from the screenshot
 
 4. CONTENT QUALITY (Score: ?/10)
-   - Is all content complete and finalized, or are there placeholders?
-   - Do headings and text effectively communicate necessary information?
+   - Is all content complete and finalized (no placeholders)?
+   - Is all text clearly readable without interference?
    - Is information organized logically for this page's purpose?
    - EVIDENCE: Reference visible content from the screenshot
 
 5. USABILITY & ACCESSIBILITY (Score: ?/10)
-   - Are there any obvious usability barriers, including poor contrast or readability issues?
+   - Are there any readability issues that would affect user experience?
    - Would users be able to complete expected tasks on this page?
-   - Are interactive elements appropriate and clear for this page's function?
+   - Are interactive elements appropriate and clear?
    - EVIDENCE: Identify specific usability issues visible in the screenshot
 
 6. USER TASK COMPLETION (Score: ?/10)
@@ -170,16 +167,17 @@ Analyze and rate (1-10 scale) the following key areas:
    - EVIDENCE: Analyze task-related elements in the screenshot
 
 7. TECHNICAL EXECUTION (Score: ?/10)
-   - Are there any visible implementation issues, incomplete features, or debugging elements?
-   - Is content properly aligned and spaced?
+   - Are there any visible placeholder elements or incomplete features?
+   - Do visual elements properly support rather than interfere with content?
    - Are images and interactive elements properly implemented?
    - EVIDENCE: Note any technical problems visible in the screenshot
 
 CRITICAL FLAWS:
-- FIRST, identify any incomplete, placeholder, or unprofessional elements visible in the screenshot
-- Then identify other significant problems that prevent this page from functioning effectively
-- Rate each issue's severity (High/Medium/Low) and explain its impact on page functionality
-- Be specific about exactly where and how these issues appear
+- Identify any placeholder text or incomplete content
+- List any readability issues where design elements interfere with text
+- Note other significant problems preventing effective function
+- Rate each issue's severity (High/Medium/Low)
+- Explain the impact on user experience
 
 POSITIVE ELEMENTS:
 - Identify 2-3 elements that work well for this page type
@@ -187,24 +185,22 @@ POSITIVE ELEMENTS:
 
 ACTIONABLE RECOMMENDATIONS:
 - Provide 5 specific, prioritized recommendations for improvement
-- PRIORITIZE addressing any incomplete or unprofessional elements first
+- Address critical issues (placeholders, readability) first
 - For each recommendation:
   * Describe exactly what should change
   * Explain how it should be changed (be specific)
-  * Detail how this would improve the page's primary function
+  * Detail how this would improve the page's function
 - Rate each recommendation's potential impact (High/Medium/Low)
 
 PAGE TYPE ANALYSIS:
-- Based on common expectations for a {page_type}, what essential elements are present or missing?
+- What essential elements for a {page_type} are present or missing?
 - Does this page meet standard expectations for its type?
-- What best practices for {page_type}s could be applied here?
+- What best practices could be applied here?
 
 SUMMARY:
 - Give an overall effectiveness score (1-10)
-- Provide a 2-3 sentence summary of how well the page fulfills its expected function
-- Identify the single highest-priority action that would improve this page
+- Provide a 2-3 sentence summary of how well the page functions
+- Identify the single highest-priority action needed
 
-Your analysis should focus on how well this page serves its specific function based on common expectations for this type of page. 
-Be especially vigilant about identifying unprofessional elements, placeholder content, or signs of incomplete development.
-Be evidence-based, focusing on what's actually visible in the screenshot.
+Be thorough and evidence-based. Look carefully for placeholder content and readability issues.
 """
