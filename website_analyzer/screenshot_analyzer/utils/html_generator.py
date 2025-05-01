@@ -3,7 +3,7 @@ HTML generation utilities for screenshot analysis reports.
 """
 import json
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from .markdown_utils import markdown_to_html
 
@@ -183,7 +183,8 @@ def save_page_analysis_results(
     results: Dict[str, Any], 
     page_name: str, 
     output_dir: str, 
-    format: str = "html"
+    format: str = "html",
+    lighthouse_data: Optional[Dict[str, Any]] = None
 ) -> str:
     """
     Save individual page analysis results to a file with enhanced metrics and visualization.
@@ -193,6 +194,7 @@ def save_page_analysis_results(
         page_name (str): Name of the page
         output_dir (str): Output directory
         format (str): Output format (json or html)
+        lighthouse_data (Dict[str, Any], optional): Lighthouse data for this page
         
     Returns:
         str: Path to the saved file
@@ -228,11 +230,11 @@ def save_page_analysis_results(
         scores = {}
         score_patterns = [
             (r"FIRST IMPRESSION & CLARITY \(Score: (\d+)/10\)", "first_impression"),
-            (r"GOAL ALIGNMENT \(Score: (\d+)/10\)", "goal_alignment"),
+            (r"FUNCTIONAL EFFECTIVENESS \(Score: (\d+)/10\)", "functional_effectiveness"),
             (r"VISUAL DESIGN \(Score: (\d+)/10\)", "visual_design"),
             (r"CONTENT QUALITY \(Score: (\d+)/10\)", "content_quality"),
             (r"USABILITY & ACCESSIBILITY \(Score: (\d+)/10\)", "usability"),
-            (r"CONVERSION OPTIMIZATION \(Score: (\d+)/10\)", "conversion"),
+            (r"USER TASK COMPLETION \(Score: (\d+)/10\)", "task_completion"),
             (r"TECHNICAL EXECUTION \(Score: (\d+)/10\)", "technical"),
             (r"SUMMARY:.*?overall effectiveness score \((\d+)/10\)", "overall"),
             (r"Overall Effectiveness Score[:\s]+(\d+)/10", "overall")
@@ -259,11 +261,11 @@ def save_page_analysis_results(
             # Add meter for each score
             score_labels = {
                 "first_impression": "First Impression & Clarity",
-                "goal_alignment": "Goal Alignment",
+                "functional_effectiveness": "Functional Effectiveness",
                 "visual_design": "Visual Design",
                 "content_quality": "Content Quality",
                 "usability": "Usability & Accessibility",
-                "conversion": "Conversion Optimization",
+                "task_completion": "User Task Completion",
                 "technical": "Technical Execution",
                 "overall": "Overall Effectiveness"
             }
@@ -297,10 +299,21 @@ def save_page_analysis_results(
         # More robust pattern matching for Critical Flaws section
         critical_flaws_html = ""
         critical_patterns = [
-            r"CRITICAL FLAWS:(.*?)(?:POSITIVE ELEMENTS:|ACTIONABLE RECOMMENDATIONS:|PAGE ROLE ANALYSIS:|SUMMARY:|$)", 
-            r"Critical Flaws:(.*?)(?:Positive Elements:|Actionable Recommendations:|Page Role Analysis:|Summary:|$)",
-            r"Critical Issues:(.*?)(?:Positive Elements:|Actionable Recommendations:|Page Role Analysis:|Summary:|$)",
-            r"\d+\.\s+.*?\(Severity: (?:High|Medium|Low)\)(.*?)(?:\d+\.\s+.*?\(Severity: (?:High|Medium|Low)\)|POSITIVE ELEMENTS:|ACTIONABLE RECOMMENDATIONS:|PAGE ROLE ANALYSIS:|SUMMARY:|$)"
+            # Standard heading formats
+            r"CRITICAL FLAWS:(.*?)(?:POSITIVE ELEMENTS:|ACTIONABLE RECOMMENDATIONS:|PAGE TYPE ANALYSIS:|SUMMARY:|$)", 
+            r"Critical Flaws:(.*?)(?:Positive Elements:|Actionable Recommendations:|Page Type Analysis:|Summary:|$)",
+            r"Critical Issues:(.*?)(?:Positive Elements:|Actionable Recommendations:|Page Type Analysis:|Summary:|$)",
+            
+            # Markdown heading formats (##, ### etc.)
+            r"##\s*CRITICAL FLAWS\s*(.*?)(?:##\s*POSITIVE ELEMENTS|##\s*ACTIONABLE RECOMMENDATIONS|##\s*PAGE TYPE ANALYSIS|##\s*SUMMARY|$)",
+            r"##\s*Critical Flaws\s*(.*?)(?:##\s*Positive Elements|##\s*Actionable Recommendations|##\s*Page Type Analysis|##\s*Summary|$)",
+            r"##\s*Critical Issues\s*(.*?)(?:##\s*Positive Elements|##\s*Actionable Recommendations|##\s*Page Type Analysis|##\s*Summary|$)",
+            
+            # Alternative format where issues are numbered
+            r"(\d+\.\s+.*?\(Severity:.*?\).*?)(?:\d+\.\s+.*?\(Severity:|POSITIVE ELEMENTS:|ACTIONABLE RECOMMENDATIONS:|PAGE TYPE ANALYSIS:|SUMMARY:|$)",
+            
+            # Look for "I've identified several critical issues" pattern
+            r"I've identified several critical issues.*?(?:1\.|-).*?(.*?)(?:POSITIVE ELEMENTS|Positive Elements|ACTIONABLE RECOMMENDATIONS|Actionable Recommendations|PAGE TYPE ANALYSIS|Page Type Analysis|SUMMARY|Summary|DETAILED ANALYSIS|Detailed Analysis|$)",
         ]
 
         for pattern in critical_patterns:
@@ -316,52 +329,13 @@ def save_page_analysis_results(
                 </div>
                 """
                 break
-
-        # Also, let's add a fallback that looks for numbered lists with "severity" indicators
-        if not critical_flaws_html:
-            # Look for patterns like "1. Issue Name (Severity: High)"
-            severity_pattern = re.findall(r'\d+\.\s+.+?\(Severity:\s+(?:High|Medium|Low)\)', analysis_text, re.IGNORECASE)
-            if severity_pattern:
-                # Find the content after each severity pattern until the next one or end of text
-                critical_content = []
-                for i, match in enumerate(severity_pattern):
-                    start_pos = analysis_text.find(match)
-                    if start_pos != -1:
-                        # Find the end position (next severity pattern or end of text)
-                        if i < len(severity_pattern) - 1:
-                            next_start = analysis_text.find(severity_pattern[i+1])
-                            content = analysis_text[start_pos:next_start].strip()
-                        else:
-                            # Look for the next section heading
-                            next_section = re.search(r'(?:POSITIVE ELEMENTS:|ACTIONABLE RECOMMENDATIONS:|PAGE ROLE ANALYSIS:|SUMMARY:)', 
-                                                    analysis_text[start_pos:], re.IGNORECASE)
-                            if next_section:
-                                end_pos = start_pos + next_section.start()
-                                content = analysis_text[start_pos:end_pos].strip()
-                            else:
-                                # Just take a reasonable chunk
-                                content = analysis_text[start_pos:start_pos+500].strip()
-                        
-                        critical_content.append(content)
-                
-                if critical_content:
-                    combined_content = "\n\n".join(critical_content)
-                    critical_flaws_html = f"""
-                    <div class="section issues-section">
-                        <h2>Critical Issues</h2>
-                        <div class="issues-content">
-                            {markdown_to_html(combined_content)}
-                        </div>
-                    </div>
-                    """
             
         # More robust pattern matching for Recommendations section
         recommendations_html = ""
         recommendation_patterns = [
-            r"ACTIONABLE RECOMMENDATIONS:(.*?)(?:PAGE ROLE ANALYSIS:|SUMMARY:|$)",
-            r"Actionable Recommendations:(.*?)(?:Page Role Analysis:|Summary:|$)",
-            r"Recommendations:(.*?)(?:Page Role Analysis:|Summary:|$)",
-            r"\d+\.\s+(?:High|Medium|Low) Impact:.*?((?:\n\s*-.*?){1,10})(?:\d+\.\s+(?:High|Medium|Low) Impact:|PAGE ROLE ANALYSIS:|SUMMARY:|$)"
+            r"ACTIONABLE RECOMMENDATIONS:(.*?)(?:PAGE TYPE ANALYSIS:|SUMMARY:|$)",
+            r"Actionable Recommendations:(.*?)(?:Page Type Analysis:|Summary:|$)",
+            r"Recommendations:(.*?)(?:Page Type Analysis:|Summary:|$)"
         ]
 
         for pattern in recommendation_patterns:
@@ -378,52 +352,259 @@ def save_page_analysis_results(
                 """
                 break
         
-        # Convert full markdown to HTML
-        analysis_html = markdown_to_html(analysis_text)
-        
-        # Create screenshot HTML (with scrollable container)
-        screenshot_html = f"""
-        <div class="section">
-            <h2>Page Screenshot</h2>
-            <div class="scrollable-screenshot">
-                <div class="screenshot-container">
-                    <img src="{screenshot_rel_path}" alt="{page_type}" class="screenshot">
-                    <div class="screenshot-caption">{page_type}</div>
+        # Add Lighthouse data section if available
+        lighthouse_html = ""
+        if lighthouse_data:
+            try:
+                # Create Lighthouse metrics section
+                lighthouse_html = """
+                <div id="tab-performance" class="tab-content">
+                    <div class="section">
+                        <h2>Performance Metrics</h2>
+                        <div class="lighthouse-summary">
+                """
+                
+                # Add overall scores
+                if "scores" in lighthouse_data and lighthouse_data["scores"]:
+                    lighthouse_html += """
+                    <div class="lighthouse-scores">
+                        <h3>Lighthouse Scores</h3>
+                        <div class="score-container">
+                    """
+                    
+                    for category, data in lighthouse_data["scores"].items():
+                        # Handle potentially None data
+                        if data is None:
+                            continue
+                            
+                        score = data.get("score", 0)
+                        title = data.get("title", category)
+                        
+                        # Ensure score is not None
+                        if score is None:
+                            score = 0
+                        
+                        # Determine color class
+                        if score >= 90:
+                            color_class = "good"
+                        elif score >= 50:
+                            color_class = "average"
+                        else:
+                            color_class = "poor"
+                        
+                        lighthouse_html += f"""
+                        <div class="score-item">
+                            <div class="score-label">{title}</div>
+                            <div class="score-meter">
+                                <div class="score-bar {color_class}" style="width: {score}%"></div>
+                            </div>
+                            <div class="score-value {color_class}">{score:.0f}</div>
+                        </div>
+                        """
+                    
+                    lighthouse_html += """
+                        </div>
+                    </div>
+                    """
+                
+                # Add key metrics if available
+                if "metrics" in lighthouse_data and lighthouse_data["metrics"]:
+                    lighthouse_html += """
+                    <div class="lighthouse-metrics">
+                        <h3>Core Web Vitals</h3>
+                        <div class="metrics-grid">
+                    """
+                    
+                    metrics = lighthouse_data["metrics"]
+                    
+                    # Check for None values and provide defaults
+                    fcp = metrics.get("firstContentfulPaint", 0)
+                    lcp = metrics.get("largestContentfulPaint", 0)
+                    cls = metrics.get("cumulativeLayoutShift", 0)
+                    tbt = metrics.get("totalBlockingTime", 0)
+                    si = metrics.get("speedIndex", 0)
+                    tti = metrics.get("interactive", 0)
+                    
+                    # Safe conversion to seconds - handle None values
+                    fcp = 0 if fcp is None else fcp / 1000
+                    lcp = 0 if lcp is None else lcp / 1000
+                    cls = 0 if cls is None else cls
+                    tbt = 0 if tbt is None else tbt
+                    si = 0 if si is None else si / 1000
+                    tti = 0 if tti is None else tti / 1000
+                    
+                    # Determine performance classes
+                    fcp_class = "good" if fcp < 1.8 else "average" if fcp < 3 else "poor"
+                    lcp_class = "good" if lcp < 2.5 else "average" if lcp < 4 else "poor"
+                    cls_class = "good" if cls < 0.1 else "average" if cls < 0.25 else "poor"
+                    tbt_class = "good" if tbt < 200 else "average" if tbt < 600 else "poor"
+                    si_class = "good" if si < 3.4 else "average" if si < 5.8 else "poor"
+                    tti_class = "good" if tti < 3.8 else "average" if tti < 7.3 else "poor"
+                    
+                    lighthouse_html += f"""
+                        <div class="metric-item">
+                            <div class="metric-name">First Contentful Paint</div>
+                            <div class="metric-value {fcp_class}">{fcp:.1f}s</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-name">Largest Contentful Paint</div>
+                            <div class="metric-value {lcp_class}">{lcp:.1f}s</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-name">Cumulative Layout Shift</div>
+                            <div class="metric-value {cls_class}">{cls:.3f}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-name">Total Blocking Time</div>
+                            <div class="metric-value {tbt_class}">{tbt:.0f}ms</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-name">Speed Index</div>
+                            <div class="metric-value {si_class}">{si:.1f}s</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-name">Time to Interactive</div>
+                            <div class="metric-value {tti_class}">{tti:.1f}s</div>
+                        </div>
+                    """
+                    
+                    lighthouse_html += """
+                        </div>
+                    </div>
+                    """
+                
+                # Add key audits/issues if available
+                if "audits" in lighthouse_data and lighthouse_data["audits"]:
+                    lighthouse_html += """
+                    <div class="lighthouse-audits">
+                        <h3>Key Audit Results</h3>
+                        <div class="audit-list">
+                    """
+                    
+                    # Safely get failed audits
+                    failed_audits = {}
+                    try:
+                        failed_audits = {
+                            id: data for id, data in lighthouse_data["audits"].items() 
+                            if data is not None and data.get("score", 1) < 1
+                        }
+                    except (TypeError, AttributeError):
+                        pass
+                    
+                    if failed_audits:
+                        for audit_id, data in failed_audits.items():
+                            title = data.get("title", audit_id)
+                            description = data.get("description", "")
+                            display_value = data.get("displayValue", "")
+                            
+                            lighthouse_html += f"""
+                            <div class="audit-item poor">
+                                <div class="audit-title">{title}</div>
+                                <div class="audit-value">{display_value}</div>
+                                <div class="audit-description">{description}</div>
+                            </div>
+                            """
+                    else:
+                        lighthouse_html += """
+                        <div class="audit-item good">
+                            <div class="audit-title">All audits passed!</div>
+                            <div class="audit-description">No significant issues were found.</div>
+                        </div>
+                        """
+                    
+                    lighthouse_html += """
+                        </div>
+                    </div>
+                    """
+                
+                lighthouse_html += """
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        """
+                """
+            except Exception as e:
+                print(f"Error processing Lighthouse data: {e}")
+                lighthouse_html = """
+                <div id="tab-performance" class="tab-content">
+                    <div class="section">
+                        <h2>Performance Metrics</h2>
+                        <p>Error processing Lighthouse data. Please check the report format.</p>
+                    </div>
+                </div>
+                """
         
-        # Add error information if status is error
-        error_section = ""
-        if status == "error" and "error" in results:
-            error_section = f"""
-            <div class="section error">
-                <h2>Error Information</h2>
-                <p>{results.get("error", "Unknown error")}</p>
+        # Create tabs - include performance tab if lighthouse data exists
+        if lighthouse_data:
+            tabs_html = """
+            <div class="tabs">
+                <div class="tab active" data-tab="tab-flaws">Critical Issues</div>
+                <div class="tab" data-tab="tab-recommendations">Recommendations</div>
+                <div class="tab" data-tab="tab-performance">Performance</div>
+                <div class="tab" data-tab="tab-full">Full Analysis</div>
+            </div>
+            """
+        else:
+            tabs_html = """
+            <div class="tabs">
+                <div class="tab active" data-tab="tab-flaws">Critical Issues</div>
+                <div class="tab" data-tab="tab-recommendations">Recommendations</div>
+                <div class="tab" data-tab="tab-full">Full Analysis</div>
             </div>
             """
         
-        # Define JavaScript for tab functionality as a separate string to avoid f-string issues
-        tab_js = """
-            document.addEventListener('DOMContentLoaded', function() {
-                // Tab functionality
-                const tabs = document.querySelectorAll('.tab');
-                const tabContents = document.querySelectorAll('.tab-content');
-                
-                tabs.forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        // Remove active class from all tabs and contents
-                        tabs.forEach(t => t.classList.remove('active'));
-                        tabContents.forEach(c => c.classList.remove('active'));
-                        
-                        // Add active class to clicked tab and corresponding content
-                        tab.classList.add('active');
-                        const tabId = tab.getAttribute('data-tab');
-                        document.getElementById(tabId).classList.add('active');
-                    });
-                });
-            });
+        # Convert full markdown to HTML
+        analysis_html = markdown_to_html(analysis_text)
+        
+        # Additional CSS for Lighthouse metrics
+        additional_css = """
+        .lighthouse-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            background-color: #f8fafc;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .metric-name {
+            font-weight: 500;
+            color: #475569;
+            margin-bottom: 10px;
+        }
+        .metric-value {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .audit-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .audit-item {
+            background-color: #f8fafc;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+        .audit-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .audit-value {
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+        .audit-description {
+            color: #64748b;
+            font-size: 0.9em;
+        }
         """
         
         # Create an enhanced HTML report with metrics
@@ -653,6 +834,8 @@ def save_page_analysis_results(
                     display: block;
                 }}
                 
+                {additional_css}
+                
                 @media (max-width: 800px) {{
                     .org-info {{
                         grid-template-columns: 1fr;
@@ -665,9 +848,6 @@ def save_page_analysis_results(
                     }}
                 }}
             </style>
-            <script>
-                {tab_js}
-            </script>
         </head>
         <body>
             <div class="container">
@@ -675,7 +855,7 @@ def save_page_analysis_results(
                     <h1>{page_type} Analysis</h1>
                     
                     <div class="section">
-                        <h2>Organization Information</h2>
+                        <h2>Page Information</h2>
                         <div class="org-info">
                             <div class="org-info-item">
                                 <div class="org-info-label">Organization</div>
@@ -686,24 +866,15 @@ def save_page_analysis_results(
                                 <div class="org-info-value">{results.get('org_type', 'Unknown')}</div>
                             </div>
                             <div class="org-info-item">
-                                <div class="org-info-label">Purpose</div>
-                                <div class="org-info-value">{results.get('org_purpose', 'Unknown')}</div>
+                                <div class="org-info-label">Analysis Date</div>
+                                <div class="org-info-value">{results.get('analysis_date', 'Unknown')}</div>
                             </div>
-                        </div>
-                        <div style="margin-top: 20px;">
-                            <div><strong>Analysis Date:</strong> {results.get('analysis_date', 'Unknown')}</div>
                         </div>
                     </div>
                     
                     {score_html}
-                    
-                    {error_section}
-                    
-                    <div class="tabs">
-                        <div class="tab active" data-tab="tab-flaws">Critical Issues</div>
-                        <div class="tab" data-tab="tab-recommendations">Recommendations</div>
-                        <div class="tab" data-tab="tab-full">Full Analysis</div>
-                    </div>
+                                        
+                    {tabs_html}
                     
                     <div id="tab-flaws" class="tab-content active">
                         {critical_flaws_html if critical_flaws_html else '<div class="section"><p>No critical issues were identified in the analysis.</p></div>'}
@@ -712,6 +883,8 @@ def save_page_analysis_results(
                     <div id="tab-recommendations" class="tab-content">
                         {recommendations_html if recommendations_html else '<div class="section"><p>No specific recommendations were provided in the analysis.</p></div>'}
                     </div>
+                    
+                    {lighthouse_html}
                     
                     <div id="tab-full" class="tab-content">
                         <div class="section">
@@ -722,7 +895,15 @@ def save_page_analysis_results(
                         </div>
                     </div>
                     
-                    {screenshot_html}
+                    <div class="section">
+                        <h2>Page Screenshot</h2>
+                        <div class="scrollable-screenshot">
+                            <div class="screenshot-container">
+                                <img src="{screenshot_rel_path}" alt="{page_type}" class="screenshot">
+                                <div class="screenshot-caption">{page_type}</div>
+                            </div>
+                        </div>
+                    </div>
                     
                     <div class="navigation">
                         <a href="../index.html">← Back to All Pages</a>
@@ -730,6 +911,27 @@ def save_page_analysis_results(
                     </div>
                 </div>
             </div>
+            
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {{
+                    // Tab functionality
+                    const tabs = document.querySelectorAll('.tab');
+                    const tabContents = document.querySelectorAll('.tab-content');
+                    
+                    tabs.forEach(tab => {{
+                        tab.addEventListener('click', () => {{
+                            // Remove active class from all tabs and contents
+                            tabs.forEach(t => t.classList.remove('active'));
+                            tabContents.forEach(c => c.classList.remove('active'));
+                            
+                            // Add active class to clicked tab and corresponding content
+                            tab.classList.add('active');
+                            const tabId = tab.getAttribute('data-tab');
+                            document.getElementById(tabId).classList.add('active');
+                        }});
+                    }});
+                }});
+            </script>
         </body>
         </html>
         """

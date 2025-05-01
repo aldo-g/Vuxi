@@ -3,6 +3,7 @@ Core analyzer module for screenshot analysis.
 """
 import os
 from datetime import datetime
+import re
 from typing import List, Dict, Any
 
 from .api_clients import get_api_client
@@ -127,6 +128,28 @@ class ScreenshotAnalyzer:
         # Get the API client
         api_client = get_api_client()
         
+        # Check for Lighthouse data
+        lighthouse_dir = os.path.join(self.output_dir, "lighthouse")
+        lighthouse_reports = {}
+        
+        if os.path.exists(lighthouse_dir):
+            print("Found Lighthouse reports directory, checking for reports...")
+            from ..lighthouse.report_trimmer import trim_lighthouse_report
+            
+            # Load all JSON reports
+            for filename in os.listdir(lighthouse_dir):
+                if filename.endswith(".json"):
+                    try:
+                        report_path = os.path.join(lighthouse_dir, filename)
+                        trimmed_report = trim_lighthouse_report(report_path)
+                        # Use the URL as the key for matching with screenshots
+                        url = trimmed_report.get("url", "")
+                        if url:
+                            lighthouse_reports[url] = trimmed_report
+                            print(f"Loaded Lighthouse data for: {url}")
+                    except Exception as e:
+                        print(f"Error loading Lighthouse report {filename}: {e}")
+        
         output_paths = []
         
         # Analyze each screenshot individually
@@ -153,13 +176,47 @@ class ScreenshotAnalyzer:
                 "org_purpose": context.get("org_purpose", "Unknown Purpose")
             })
             
+            # Try to find matching Lighthouse data
+            lighthouse_data = None
+            
+            # Extract URL from filename
+            url_match = re.search(r'\d+_([^_]+)_', filename)
+            domain = url_match.group(1) if url_match else None
+            
+            # Try to match with Lighthouse data
+            if domain:
+                # Try different URL variations to match with Lighthouse data
+                possible_urls = [
+                    f"https://{domain}/",
+                    f"https://www.{domain}/"
+                ]
+                
+                # Additional path match attempt
+                path_match = re.search(r'\d+_[^_]+_(.+)\.png', filename)
+                if path_match:
+                    path = path_match.group(1).replace('_', '/')
+                    if path != "homepage":
+                        # Add URLs with paths
+                        possible_urls.extend([
+                            f"https://{domain}/{path}",
+                            f"https://www.{domain}/{path}"
+                        ])
+                
+                # Try to find a matching URL in the Lighthouse data
+                for url in possible_urls:
+                    if url in lighthouse_reports:
+                        lighthouse_data = lighthouse_reports[url]
+                        print(f"Found matching Lighthouse data for {filename}")
+                        break
+            
             # Save results
             page_name = page_type.lower().replace(" ", "_")
             output_path = save_page_analysis_results(
                 results, 
                 page_name, 
                 self.page_analysis_dir, 
-                format=save_format
+                format=save_format,
+                lighthouse_data=lighthouse_data
             )
             output_paths.append(output_path)
             
@@ -212,6 +269,7 @@ class ScreenshotAnalyzer:
         
         # Set debug directory
         debug_dir = os.path.join(self.analysis_dir, "debug")
+        os.makedirs(debug_dir, exist_ok=True)
         api_client.debug_dir = debug_dir
         
         # Analyze with API
@@ -227,13 +285,65 @@ class ScreenshotAnalyzer:
             "org_purpose": context.get("org_purpose", "Unknown Purpose")
         })
         
+        # Look for corresponding Lighthouse data
+        lighthouse_data = None
+        
+        # Check for Lighthouse data
+        lighthouse_dir = os.path.join(self.output_dir, "lighthouse")
+        if os.path.exists(lighthouse_dir):
+            # Import here to avoid circular imports
+            from ..lighthouse.report_trimmer import trim_lighthouse_report
+            
+            # Extract domain and path from filename
+            url_match = re.search(r'\d+_([^_]+)_', filename)
+            domain = url_match.group(1) if url_match else None
+            
+            path_match = re.search(r'\d+_[^_]+_(.+)\.png', filename)
+            path = path_match.group(1) if path_match else "homepage"
+            
+            if domain:
+                # Try different URL variations
+                possible_urls = [
+                    f"https://{domain}/",
+                    f"https://www.{domain}/",
+                    f"http://{domain}/",
+                    f"http://www.{domain}/"
+                ]
+                
+                # Add path variations if not homepage
+                if path != "homepage":
+                    path_for_url = path.replace('_', '/')
+                    possible_urls.extend([
+                        f"https://{domain}/{path_for_url}",
+                        f"https://www.{domain}/{path_for_url}",
+                        f"http://{domain}/{path_for_url}",
+                        f"http://www.{domain}/{path_for_url}"
+                    ])
+                
+                # Look for matching Lighthouse reports
+                for lighthouse_file in os.listdir(lighthouse_dir):
+                    if lighthouse_file.endswith(".json"):
+                        try:
+                            report_path = os.path.join(lighthouse_dir, lighthouse_file)
+                            trimmed_report = trim_lighthouse_report(report_path)
+                            
+                            # Check if the report URL matches any of our possible URLs
+                            report_url = trimmed_report.get("url", "")
+                            if report_url in possible_urls:
+                                lighthouse_data = trimmed_report
+                                print(f"Found matching Lighthouse data: {lighthouse_file}")
+                                break
+                        except Exception as e:
+                            print(f"Error processing Lighthouse report {lighthouse_file}: {e}")
+        
         page_name = page_type.lower().replace(" ", "_")
         
         output_path = save_page_analysis_results(
             results, 
             page_name, 
             self.page_analysis_dir, 
-            format=save_format
+            format=save_format,
+            lighthouse_data=lighthouse_data
         )
         
         print(f"Single file analysis saved to: {output_path}")
