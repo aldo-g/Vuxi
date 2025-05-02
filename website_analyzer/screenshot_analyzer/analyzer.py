@@ -2,18 +2,24 @@
 Core analyzer module for screenshot analysis.
 """
 import os
+import json
 from datetime import datetime
-import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from .api_clients import get_api_client
-from .prompts import get_desktop_analysis_prompt, get_individual_page_analysis_prompt
+from .prompts import (
+    get_desktop_analysis_prompt,
+    get_individual_page_analysis_prompt,
+    get_formatting_prompt,
+    get_html_generation_prompt
+)
 from .page_detector import determine_page_type
 from .utils.file_utils import collect_desktop_screenshots
 from .utils.html_generator import (
     save_analysis_results,
     save_page_analysis_results
 )
+from ..common.constants import USE_TWO_STAGE_ANALYSIS
 
 class ScreenshotAnalyzer:
     """
@@ -68,31 +74,125 @@ class ScreenshotAnalyzer:
         # Get prompt with context
         prompt = get_desktop_analysis_prompt(context)
         
-        # Get the API client
-        api_client = get_api_client()
+        if USE_TWO_STAGE_ANALYSIS:
+            # Use two-stage analysis
+            return self._two_stage_analysis(screenshots, prompt, context, save_format)
+        else:
+            # Get the API client
+            api_client = get_api_client()
+            
+            # Analyze screenshots with API
+            results = api_client.analyze(screenshots, prompt)
+            
+            # Add analysis date and metadata
+            results.update({
+                "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "screenshots_analyzed": len(screenshots),
+                "organization": context.get("org_name", "Unknown Organization"),
+                "org_type": context.get("org_type", "Unknown Type"),
+                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+            })
+            
+            # Save results
+            output_path = save_analysis_results(
+                results, 
+                self.analysis_dir, 
+                format=save_format
+            )
+            
+            print(f"Screenshot analysis saved to: {output_path}")
+            
+            return output_path
+    
+    def _two_stage_analysis(
+        self, 
+        screenshots: List[str], 
+        prompt: str, 
+        context: Dict[str, Any], 
+        save_format: str
+    ) -> str:
+        """
+        Perform two-stage analysis: first analyze, then format.
         
-        # Analyze screenshots with API
-        results = api_client.analyze(screenshots, prompt)
+        Args:
+            screenshots (List[str]): List of screenshot paths
+            prompt (str): Analysis prompt
+            context (Dict[str, Any]): Context information about the organization
+            save_format (str): Format to save results
+            
+        Returns:
+            str: Path to the analysis results file
+        """
+        # Get API clients
+        analysis_client = get_api_client(tier="high")
+        formatting_client = get_api_client(tier="standard")
         
-        # Add analysis date and metadata
-        results.update({
-            "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "screenshots_analyzed": len(screenshots),
-            "organization": context.get("org_name", "Unknown Organization"),
-            "org_type": context.get("org_type", "Unknown Type"),
-            "org_purpose": context.get("org_purpose", "Unknown Purpose")
-        })
+        # Stage 1: In-depth analysis
+        print("Stage 1: Performing in-depth analysis...")
+        raw_results = analysis_client.analyze(screenshots, prompt)
         
-        # Save results
-        output_path = save_analysis_results(
-            results, 
-            self.analysis_dir, 
-            format=save_format
-        )
+        if raw_results["status"] != "success":
+            print(f"Analysis failed: {raw_results.get('error', 'Unknown error')}")
+            return ""
         
-        print(f"Screenshot analysis saved to: {output_path}")
+        # Stage 2: Formatting for structured data
+        print("Stage 2: Formatting analysis results...")
+        formatting_prompt = get_formatting_prompt()
+        formatted_results = formatting_client.format(raw_results["results"], formatting_prompt)
         
-        return output_path
+        # If formatting was successful and returned JSON data
+        if formatted_results["status"] == "success" and "data" in formatted_results:
+            # Combine results
+            final_results = {
+                **raw_results,
+                "structured_data": formatted_results["data"],
+                "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "screenshots_analyzed": len(screenshots),
+                "organization": context.get("org_name", "Unknown Organization"),
+                "org_type": context.get("org_type", "Unknown Type"),
+                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+            }
+            
+            # Save raw data for debugging
+            debug_dir = os.path.join(self.analysis_dir, "debug")
+            os.makedirs(debug_dir, exist_ok=True)
+            
+            with open(os.path.join(debug_dir, "raw_analysis.json"), "w") as f:
+                json.dump(raw_results, f, indent=2)
+            
+            with open(os.path.join(debug_dir, "formatted_analysis.json"), "w") as f:
+                json.dump(formatted_results, f, indent=2)
+            
+            # Save results
+            output_path = save_analysis_results(
+                final_results, 
+                self.analysis_dir, 
+                format=save_format
+            )
+            
+            print(f"Two-stage analysis completed and saved to: {output_path}")
+            return output_path
+        else:
+            # Formatting failed, use raw results
+            print("Formatting failed, using raw analysis results.")
+            
+            raw_results.update({
+                "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "screenshots_analyzed": len(screenshots),
+                "organization": context.get("org_name", "Unknown Organization"),
+                "org_type": context.get("org_type", "Unknown Type"),
+                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+            })
+            
+            # Save results
+            output_path = save_analysis_results(
+                raw_results, 
+                self.analysis_dir, 
+                format=save_format
+            )
+            
+            print(f"Raw analysis saved to: {output_path}")
+            return output_path
     
     def analyze_individual_pages(
         self, 
@@ -125,31 +225,6 @@ class ScreenshotAnalyzer:
         
         print(f"Analyzing {len(screenshots)} individual pages...")
         
-        # Get the API client
-        api_client = get_api_client()
-        
-        # Check for Lighthouse data
-        lighthouse_dir = os.path.join(self.output_dir, "lighthouse")
-        lighthouse_reports = {}
-        
-        if os.path.exists(lighthouse_dir):
-            print("Found Lighthouse reports directory, checking for reports...")
-            from ..lighthouse.report_trimmer import trim_lighthouse_report
-            
-            # Load all JSON reports
-            for filename in os.listdir(lighthouse_dir):
-                if filename.endswith(".json"):
-                    try:
-                        report_path = os.path.join(lighthouse_dir, filename)
-                        trimmed_report = trim_lighthouse_report(report_path)
-                        # Use the URL as the key for matching with screenshots
-                        url = trimmed_report.get("url", "")
-                        if url:
-                            lighthouse_reports[url] = trimmed_report
-                            print(f"Loaded Lighthouse data for: {url}")
-                    except Exception as e:
-                        print(f"Error loading Lighthouse report {filename}: {e}")
-        
         output_paths = []
         
         # Analyze each screenshot individually
@@ -163,11 +238,145 @@ class ScreenshotAnalyzer:
             # Get prompt for individual page
             prompt = get_individual_page_analysis_prompt(page_type, context)
             
-            # Analyze with API
-            results = api_client.analyze([screenshot], prompt)
+            if USE_TWO_STAGE_ANALYSIS:
+                # Use two-stage analysis for individual page
+                output_path = self._two_stage_page_analysis(
+                    screenshot, 
+                    prompt, 
+                    page_type, 
+                    context, 
+                    save_format
+                )
+            else:
+                # Get the API client
+                api_client = get_api_client()
+                
+                # Analyze with API
+                results = api_client.analyze([screenshot], prompt)
+                
+                # Add metadata
+                results.update({
+                    "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "screenshot": screenshot,
+                    "page_type": page_type,
+                    "organization": context.get("org_name", "Unknown Organization"),
+                    "org_type": context.get("org_type", "Unknown Type"),
+                    "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                })
+                
+                # Save results
+                page_name = page_type.lower().replace(" ", "_")
+                output_path = save_page_analysis_results(
+                    results, 
+                    page_name, 
+                    self.page_analysis_dir, 
+                    format=save_format
+                )
             
-            # Add metadata
-            results.update({
+            output_paths.append(output_path)
+            print(f"Page analysis saved to: {output_path}")
+        
+        return output_paths
+    
+    def _two_stage_page_analysis(
+        self, 
+        screenshot: str, 
+        prompt: str, 
+        page_type: str, 
+        context: Dict[str, Any], 
+        save_format: str
+    ) -> str:
+        """
+        Perform two-stage analysis for an individual page.
+        
+        Args:
+            screenshot (str): Path to the screenshot
+            prompt (str): Analysis prompt
+            page_type (str): Type of page being analyzed
+            context (Dict[str, Any]): Context information
+            save_format (str): Format to save results
+            
+        Returns:
+            str: Path to the analysis results file
+        """
+        # Get API clients
+        analysis_client = get_api_client(tier="high")
+        formatting_client = get_api_client(tier="standard")
+        
+        # Stage 1: In-depth analysis
+        print("Stage 1: Performing in-depth page analysis...")
+        raw_results = analysis_client.analyze([screenshot], prompt)
+        
+        if raw_results["status"] != "success":
+            print(f"Page analysis failed: {raw_results.get('error', 'Unknown error')}")
+            
+            # Return basic error results
+            error_results = {
+                "status": "error",
+                "error": raw_results.get("error", "Analysis failed"),
+                "results": "Analysis failed. Please check the logs for details.",
+                "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "screenshot": screenshot,
+                "page_type": page_type,
+                "organization": context.get("org_name", "Unknown Organization"),
+                "org_type": context.get("org_type", "Unknown Type"),
+                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+            }
+            
+            page_name = page_type.lower().replace(" ", "_")
+            return save_page_analysis_results(
+                error_results, 
+                page_name, 
+                self.page_analysis_dir, 
+                format=save_format
+            )
+        
+        # Stage 2: Formatting for structured data
+        print("Stage 2: Formatting page analysis results...")
+        formatting_prompt = get_formatting_prompt()
+        formatted_results = formatting_client.format(raw_results["results"], formatting_prompt)
+        
+        # If formatting was successful and returned JSON data
+        if formatted_results["status"] == "success" and "data" in formatted_results:
+            # Combine results
+            final_results = {
+                **raw_results,
+                "structured_data": formatted_results["data"],
+                "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "screenshot": screenshot,
+                "page_type": page_type,
+                "organization": context.get("org_name", "Unknown Organization"),
+                "org_type": context.get("org_type", "Unknown Type"),
+                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+            }
+            
+            # Save raw data for debugging
+            debug_dir = os.path.join(self.page_analysis_dir, "debug")
+            os.makedirs(debug_dir, exist_ok=True)
+            
+            page_name = page_type.lower().replace(" ", "_")
+            
+            with open(os.path.join(debug_dir, f"{page_name}_raw_analysis.json"), "w") as f:
+                json.dump(raw_results, f, indent=2)
+            
+            with open(os.path.join(debug_dir, f"{page_name}_formatted_analysis.json"), "w") as f:
+                json.dump(formatted_results, f, indent=2)
+            
+            # Save results
+            output_path = save_page_analysis_results(
+                final_results, 
+                page_name, 
+                self.page_analysis_dir, 
+                format=save_format
+            )
+            
+            print(f"Two-stage page analysis completed and saved to: {output_path}")
+            return output_path
+        else:
+            # Formatting failed, use raw results
+            print("Formatting failed, using raw page analysis results.")
+            
+            raw_results.update({
                 "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "screenshot": screenshot,
                 "page_type": page_type,
@@ -176,53 +385,17 @@ class ScreenshotAnalyzer:
                 "org_purpose": context.get("org_purpose", "Unknown Purpose")
             })
             
-            # Try to find matching Lighthouse data
-            lighthouse_data = None
-            
-            # Extract URL from filename
-            url_match = re.search(r'\d+_([^_]+)_', filename)
-            domain = url_match.group(1) if url_match else None
-            
-            # Try to match with Lighthouse data
-            if domain:
-                # Try different URL variations to match with Lighthouse data
-                possible_urls = [
-                    f"https://{domain}/",
-                    f"https://www.{domain}/"
-                ]
-                
-                # Additional path match attempt
-                path_match = re.search(r'\d+_[^_]+_(.+)\.png', filename)
-                if path_match:
-                    path = path_match.group(1).replace('_', '/')
-                    if path != "homepage":
-                        # Add URLs with paths
-                        possible_urls.extend([
-                            f"https://{domain}/{path}",
-                            f"https://www.{domain}/{path}"
-                        ])
-                
-                # Try to find a matching URL in the Lighthouse data
-                for url in possible_urls:
-                    if url in lighthouse_reports:
-                        lighthouse_data = lighthouse_reports[url]
-                        print(f"Found matching Lighthouse data for {filename}")
-                        break
-            
             # Save results
             page_name = page_type.lower().replace(" ", "_")
             output_path = save_page_analysis_results(
-                results, 
+                raw_results, 
                 page_name, 
                 self.page_analysis_dir, 
-                format=save_format,
-                lighthouse_data=lighthouse_data
+                format=save_format
             )
-            output_paths.append(output_path)
             
-            print(f"Page analysis saved to: {output_path}")
-        
-        return output_paths
+            print(f"Raw page analysis saved to: {output_path}")
+            return output_path
 
     def analyze_single_file(
         self, 
@@ -264,88 +437,45 @@ class ScreenshotAnalyzer:
         # Get prompt for individual page
         prompt = get_individual_page_analysis_prompt(page_type, context)
         
-        # Get the API client
-        api_client = get_api_client()
-        
-        # Set debug directory
-        debug_dir = os.path.join(self.analysis_dir, "debug")
-        os.makedirs(debug_dir, exist_ok=True)
-        api_client.debug_dir = debug_dir
-        
-        # Analyze with API
-        results = api_client.analyze([file_path], prompt)
-        
-        # Add metadata
-        results.update({
-            "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "screenshot": file_path,
-            "page_type": page_type,
-            "organization": context.get("org_name", "Unknown Organization"),
-            "org_type": context.get("org_type", "Unknown Type"),
-            "org_purpose": context.get("org_purpose", "Unknown Purpose")
-        })
-        
-        # Look for corresponding Lighthouse data
-        lighthouse_data = None
-        
-        # Check for Lighthouse data
-        lighthouse_dir = os.path.join(self.output_dir, "lighthouse")
-        if os.path.exists(lighthouse_dir):
-            # Import here to avoid circular imports
-            from ..lighthouse.report_trimmer import trim_lighthouse_report
+        if USE_TWO_STAGE_ANALYSIS:
+            # Use two-stage analysis for single file
+            return self._two_stage_page_analysis(
+                file_path, 
+                prompt, 
+                page_type, 
+                context, 
+                save_format
+            )
+        else:
+            # Get the API client
+            api_client = get_api_client()
             
-            # Extract domain and path from filename
-            url_match = re.search(r'\d+_([^_]+)_', filename)
-            domain = url_match.group(1) if url_match else None
+            # Set debug directory
+            debug_dir = os.path.join(self.analysis_dir, "debug")
+            api_client.debug_dir = debug_dir
             
-            path_match = re.search(r'\d+_[^_]+_(.+)\.png', filename)
-            path = path_match.group(1) if path_match else "homepage"
+            # Analyze with API
+            results = api_client.analyze([file_path], prompt)
             
-            if domain:
-                # Try different URL variations
-                possible_urls = [
-                    f"https://{domain}/",
-                    f"https://www.{domain}/",
-                    f"http://{domain}/",
-                    f"http://www.{domain}/"
-                ]
-                
-                # Add path variations if not homepage
-                if path != "homepage":
-                    path_for_url = path.replace('_', '/')
-                    possible_urls.extend([
-                        f"https://{domain}/{path_for_url}",
-                        f"https://www.{domain}/{path_for_url}",
-                        f"http://{domain}/{path_for_url}",
-                        f"http://www.{domain}/{path_for_url}"
-                    ])
-                
-                # Look for matching Lighthouse reports
-                for lighthouse_file in os.listdir(lighthouse_dir):
-                    if lighthouse_file.endswith(".json"):
-                        try:
-                            report_path = os.path.join(lighthouse_dir, lighthouse_file)
-                            trimmed_report = trim_lighthouse_report(report_path)
-                            
-                            # Check if the report URL matches any of our possible URLs
-                            report_url = trimmed_report.get("url", "")
-                            if report_url in possible_urls:
-                                lighthouse_data = trimmed_report
-                                print(f"Found matching Lighthouse data: {lighthouse_file}")
-                                break
-                        except Exception as e:
-                            print(f"Error processing Lighthouse report {lighthouse_file}: {e}")
-        
-        page_name = page_type.lower().replace(" ", "_")
-        
-        output_path = save_page_analysis_results(
-            results, 
-            page_name, 
-            self.page_analysis_dir, 
-            format=save_format,
-            lighthouse_data=lighthouse_data
-        )
-        
-        print(f"Single file analysis saved to: {output_path}")
-        
-        return output_path
+            # Add metadata
+            results.update({
+                "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "screenshot": file_path,
+                "page_type": page_type,
+                "organization": context.get("org_name", "Unknown Organization"),
+                "org_type": context.get("org_type", "Unknown Type"),
+                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+            })
+            
+            page_name = page_type.lower().replace(" ", "_")
+            
+            output_path = save_page_analysis_results(
+                results, 
+                page_name, 
+                self.page_analysis_dir, 
+                format=save_format
+            )
+            
+            print(f"Single file analysis saved to: {output_path}")
+            
+            return output_path

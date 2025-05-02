@@ -100,6 +100,10 @@ class CLI:
         
         parser.add_argument("--desktop-only", action="store_true", help="Only analyze desktop screenshots (default)")
         parser.add_argument("--all-devices", action="store_true", help="Analyze screenshots for all devices")
+        
+        # Add argument for two-stage analysis
+        parser.add_argument("--two-stage", action="store_true", help="Use two-stage analysis (separate analysis and formatting)")
+        parser.add_argument("--single-stage", action="store_true", help="Use single-stage analysis (default)")
             
     def _add_analyze_pages_arguments(self, parser: argparse.ArgumentParser) -> None:
         """
@@ -116,6 +120,10 @@ class CLI:
         parser.add_argument("--org-type", default="non-profit", help="Organization type (non-profit, business, educational, etc.)")
         parser.add_argument("--org-purpose", default="To encourage donations and sign-ups for trainings", 
                         help="Main purpose of the website (e.g., drive donations, generate leads, educate visitors)")
+        
+        # Add argument for two-stage analysis
+        parser.add_argument("--two-stage", action="store_true", help="Use two-stage analysis (separate analysis and formatting)")
+        parser.add_argument("--single-stage", action="store_true", help="Use single-stage analysis (default)")
         
     def _add_analyze_file_arguments(self, parser: argparse.ArgumentParser) -> None:
         """
@@ -246,6 +254,18 @@ class CLI:
                 "org_purpose": args.org_purpose
             }
             
+            # Set two-stage analysis based on command line arguments
+            if args.two_stage:
+                from ..common.constants import USE_TWO_STAGE_ANALYSIS
+                import builtins
+                builtins.USE_TWO_STAGE_ANALYSIS = True
+                print("Using two-stage analysis (separate analysis and formatting).")
+            elif args.single_stage:
+                from ..common.constants import USE_TWO_STAGE_ANALYSIS
+                import builtins
+                builtins.USE_TWO_STAGE_ANALYSIS = False
+                print("Using single-stage analysis.")
+            
             if not args.all_devices:  # Desktop is the default
                 # Analyze desktop screenshots
                 output_path = analyzer.analyze_desktop_screenshots(
@@ -267,56 +287,6 @@ class CLI:
             
         except Exception as e:
             print(f"Error during screenshot analysis: {e}", file=sys.stderr)
-            return 1
-    
-    def analyze_pages_command(self, args: argparse.Namespace) -> int:
-        """
-        Run the screenshot analyzer for individual pages.
-        
-        Args:
-            args (argparse.Namespace): Command line arguments
-            
-        Returns:
-            int: Exit code (0 for success, non-zero for failure)
-        """
-        try:
-            # Check if the input directory exists
-            if not os.path.exists(args.input_dir):
-                print(f"Input directory does not exist: {args.input_dir}")
-                return 1
-            
-            # Initialize screenshot analyzer
-            analyzer = ScreenshotAnalyzer(args.input_dir)
-            
-            # Create the context dictionary with all org-related parameters
-            context = {
-                "org_name": args.org_name,
-                "org_type": args.org_type,
-                "org_purpose": args.org_purpose
-            }
-            
-            # Analyze individual pages
-            output_paths = analyzer.analyze_individual_pages(
-                context=context,
-                save_format=args.output_format
-            )
-            
-            if output_paths:
-                print(f"\nIndividual page analyses completed successfully!")
-                print(f"Analysis reports saved to: {os.path.abspath(os.path.dirname(output_paths[0]))}")
-                
-                # Create an index file for all page analyses
-                index_path = self.create_pages_index(args.input_dir, output_paths)
-                if index_path:
-                    print(f"Index page: {os.path.abspath(index_path)}")
-                
-                return 0
-            else:
-                print("Individual page analysis failed")
-                return 1
-            
-        except Exception as e:
-            print(f"Error during individual page analysis: {e}", file=sys.stderr)
             return 1
     
     def analyze_file_command(self, args: argparse.Namespace) -> int:
@@ -561,6 +531,69 @@ class CLI:
             
         except Exception as e:
             print(f"Error during Lighthouse report trimming: {e}", file=sys.stderr)
+            return 1
+        
+    def analyze_pages_command(self, args: argparse.Namespace) -> int:
+        """
+        Run the screenshot analyzer for individual pages separately.
+        
+        Args:
+            args (argparse.Namespace): Command line arguments
+            
+        Returns:
+            int: Exit code (0 for success, non-zero for failure)
+        """
+        try:
+            # Check if the input directory exists
+            if not os.path.exists(args.input_dir):
+                print(f"Input directory does not exist: {args.input_dir}")
+                return 1
+            
+            # Initialize screenshot analyzer
+            analyzer = ScreenshotAnalyzer(args.input_dir)
+            
+            # Create the context dictionary with all org-related parameters
+            context = {
+                "org_name": args.org_name,
+                "org_type": args.org_type,
+                "org_purpose": args.org_purpose
+            }
+            
+            # Set two-stage analysis based on command line arguments
+            if hasattr(args, 'two_stage') and args.two_stage:
+                # Import and modify the constants at runtime
+                from ..common.constants import USE_TWO_STAGE_ANALYSIS
+                import sys
+                sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = True
+                print("Using two-stage analysis (separate analysis and formatting).")
+            elif hasattr(args, 'single_stage') and args.single_stage:
+                from ..common.constants import USE_TWO_STAGE_ANALYSIS
+                import sys
+                sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = False
+                print("Using single-stage analysis.")
+            
+            # Analyze individual pages
+            output_paths = analyzer.analyze_individual_pages(
+                context=context,
+                save_format=args.output_format
+            )
+            
+            if output_paths:
+                print(f"\nIndividual page analyses completed successfully!")
+                print(f"Analysis reports saved to: {os.path.abspath(os.path.dirname(output_paths[0]))}")
+                
+                # Create an index file for all page analyses
+                index_path = self.create_pages_index(args.input_dir, output_paths)
+                if index_path:
+                    print(f"Index page: {os.path.abspath(index_path)}")
+                
+                return 0
+            else:
+                print("Individual page analysis failed")
+                return 1
+            
+        except Exception as e:
+            print(f"Error during individual page analysis: {e}", file=sys.stderr)
             return 1
 
 

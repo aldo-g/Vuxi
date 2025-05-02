@@ -20,9 +20,6 @@ def save_analysis_results(results: Dict[str, Any], output_dir: str, format: str 
     Returns:
         str: Path to the saved file
     """
-    import json
-    import re
-    
     if format == "json":
         # Save to JSON file
         output_path = os.path.join(output_dir, "desktop_screenshot_analysis.json")
@@ -39,136 +36,500 @@ def save_analysis_results(results: Dict[str, Any], output_dir: str, format: str 
         analysis_text = results.get("results", "No results available")
         status = results.get("status", "unknown")
         
-        # Extract scores from analysis text
-        scores = {}
-        score_patterns = [
-            (r"BRAND IDENTITY \(Score: (\d+)/10\)", "brand_identity"),
-            (r"INFORMATION ARCHITECTURE \(Score: (\d+)/10\)", "information_architecture"),
-            (r"ACTION-ORIENTED DESIGN \(Score: (\d+)/10\)", "action_oriented"),
-            (r"VISUAL STORYTELLING \(Score: (\d+)/10\)", "visual_storytelling"),
-            (r"COMPONENT CONSISTENCY \(Score: (\d+)/10\)", "component_consistency"),
-            (r"RESPONSIVE DESIGN APPROACH \(Score: (\d+)/10\)", "responsive_design"),
-            (r"AUDIENCE ALIGNMENT \(Score: (\d+)/10\)", "audience_alignment"),
-            (r"overall effectiveness score[:\s]+(\d+)/10", "overall_effectiveness")
-        ]
+        # Check if we have structured data from two-stage analysis
+        structured_data = results.get("structured_data", None)
         
-        for pattern, key in score_patterns:
-            match = re.search(pattern, analysis_text, re.IGNORECASE)
-            if match:
-                try:
-                    scores[key] = int(match.group(1))
-                except (ValueError, IndexError):
-                    pass
+        # Convert markdown to HTML
+        analysis_html = markdown_to_html(analysis_text)
         
-        # Generate score visualization HTML
-        score_html = ""
-        if scores:
-            score_html = """
-            <div class="section">
-                <h2>Evaluation Scores</h2>
-                <div class="score-container">
+        # Add error information if status is error
+        error_section = ""
+        if status == "error" and "error" in results:
+            error_section = f"""
+            <div class="section error">
+                <h2>Error Information</h2>
+                <p>{results.get("error", "Unknown error")}</p>
+            </div>
             """
-            
-            score_labels = {
-                "brand_identity": "Brand Identity",
-                "information_architecture": "Information Architecture",
-                "action_oriented": "Action-Oriented Design",
-                "visual_storytelling": "Visual Storytelling",
-                "component_consistency": "Component Consistency",
-                "responsive_design": "Responsive Design Approach",
-                "audience_alignment": "Audience Alignment",
-                "overall_effectiveness": "Overall Effectiveness"
-            }
-            
-            for key, label in score_labels.items():
-                if key in scores:
-                    score = scores[key]
+        
+        # Enhanced HTML generation if we have structured data
+        if structured_data:
+            # Extract scores
+            scores_html = ""
+            if "scores" in structured_data and structured_data["scores"]:
+                scores_html = """
+                <div class="section scores-section">
+                    <h2>Analysis Scores</h2>
+                    <div class="score-container">
+                """
+                
+                for score in structured_data["scores"]:
+                    category = score.get("category", "Unknown")
+                    score_value = score.get("score", 0)
+                    description = score.get("description", "")
+                    
                     # Determine color based on score
-                    if score >= 8:
+                    if score_value >= 8:
                         color_class = "good"
-                    elif score >= 6:
+                    elif score_value >= 6:
                         color_class = "average"
                     else:
                         color_class = "poor"
-                        
-                    score_html += f"""
+                    
+                    scores_html += f"""
                     <div class="score-item">
-                        <div class="score-label">{label}</div>
+                        <div class="score-label">{category}</div>
                         <div class="score-meter">
-                            <div class="score-bar {color_class}" style="width: {score * 10}%"></div>
+                            <div class="score-bar {color_class}" style="width: {score_value * 10}%"></div>
                         </div>
-                        <div class="score-value {color_class}">{score}/10</div>
+                        <div class="score-value {color_class}">{score_value}/10</div>
+                        <div class="score-description">{description}</div>
                     </div>
                     """
+                
+                scores_html += """
+                    </div>
+                </div>
+                """
             
-            score_html += """
+            # Extract critical issues
+            issues_html = ""
+            if "critical_issues" in structured_data and structured_data["critical_issues"]:
+                issues_html = """
+                <div class="section issues-section">
+                    <h2>Critical Issues</h2>
+                    <div class="issues-content">
+                        <ul class="issues-list">
+                """
+                
+                for issue in structured_data["critical_issues"]:
+                    title = issue.get("title", "Unknown Issue")
+                    severity = issue.get("severity", "Medium")
+                    description = issue.get("description", "")
+                    area = issue.get("area", "")
+                    
+                    severity_class = f"{severity.lower()}-severity"
+                    
+                    issues_html += f"""
+                    <li class="issue-item {severity_class}">
+                        <div class="issue-header">
+                            <span class="issue-title">{title}</span>
+                            <span class="issue-severity">{severity} Severity</span>
+                        </div>
+                        <div class="issue-description">{description}</div>
+                        {f'<div class="issue-area">Area: {area}</div>' if area else ''}
+                    </li>
+                    """
+                
+                issues_html += """
+                        </ul>
+                    </div>
+                </div>
+                """
+            
+            # Extract recommendations
+            recommendations_html = ""
+            if "recommendations" in structured_data and structured_data["recommendations"]:
+                recommendations_html = """
+                <div class="section recommendations-section">
+                    <h2>Recommendations</h2>
+                    <div class="recommendations-content">
+                        <ul class="recommendations-list">
+                """
+                
+                for rec in structured_data["recommendations"]:
+                    title = rec.get("title", "Unknown Recommendation")
+                    impact = rec.get("impact", "Medium")
+                    description = rec.get("description", "")
+                    area = rec.get("area", "")
+                    
+                    impact_class = f"{impact.lower()}-impact"
+                    
+                    recommendations_html += f"""
+                    <li class="recommendation-item {impact_class}">
+                        <div class="recommendation-header">
+                            <span class="recommendation-title">{title}</span>
+                            <span class="recommendation-impact">{impact} Impact</span>
+                        </div>
+                        <div class="recommendation-description">{description}</div>
+                        {f'<div class="recommendation-area">Area: {area}</div>' if area else ''}
+                    </li>
+                    """
+                
+                recommendations_html += """
+                        </ul>
+                    </div>
+                </div>
+                """
+            
+            # Extract summary
+            summary_html = ""
+            if "summary" in structured_data:
+                summary = structured_data["summary"]
+                summary_text = summary.get("text", "")
+                overall_score = summary.get("overall_score", None)
+                
+                summary_html = """
+                <div class="section summary-section">
+                    <h2>Summary</h2>
+                """
+                
+                if overall_score is not None:
+                    # Determine color based on score
+                    if overall_score >= 8:
+                        color_class = "good"
+                    elif overall_score >= 6:
+                        color_class = "average"
+                    else:
+                        color_class = "poor"
+                    
+                    summary_html += f"""
+                    <div class="overall-score-container">
+                        <div class="overall-score-label">Overall Effectiveness Score</div>
+                        <div class="overall-score-value {color_class}">{overall_score}/10</div>
+                    </div>
+                    """
+                
+                if summary_text:
+                    summary_html += f"""
+                    <div class="summary-text">{summary_text}</div>
+                    """
+                
+                summary_html += """
+                </div>
+                """
+            
+            # Combine all sections
+            structured_html = f"""
+            <div class="structured-analysis">
+                {summary_html}
+                {scores_html}
+                {issues_html}
+                {recommendations_html}
+            </div>
+            """
+            
+            # Add tabs for structured vs. full analysis
+            tabs_html = f"""
+            <div class="tabs">
+                <div class="tab active" data-tab="tab-structured">Structured Analysis</div>
+                <div class="tab" data-tab="tab-full">Full Analysis</div>
+            </div>
+            
+            <div id="tab-structured" class="tab-content active">
+                {structured_html}
+            </div>
+            
+            <div id="tab-full" class="tab-content">
+                <div class="section">
+                    <h2>Complete Analysis</h2>
+                    <div class="analysis-result">
+                        {analysis_html}
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {{
+                    // Tab functionality
+                    const tabs = document.querySelectorAll('.tab');
+                    const tabContents = document.querySelectorAll('.tab-content');
+                    
+                    tabs.forEach(tab => {{
+                        tab.addEventListener('click', () => {{
+                            // Remove active class from all tabs and contents
+                            tabs.forEach(t => t.classList.remove('active'));
+                            tabContents.forEach(c => c.classList.remove('active'));
+                            
+                            // Add active class to clicked tab and corresponding content
+                            tab.classList.add('active');
+                            const tabId = tab.getAttribute('data-tab');
+                            document.getElementById(tabId).classList.add('active');
+                        }});
+                    }});
+                }});
+            </script>
+            """
+            
+            # Use enhanced HTML with tabs for structured and full analysis
+            analysis_section = tabs_html
+        else:
+            # Use standard HTML for regular analysis
+            analysis_section = f"""
+            <div class="section">
+                <h2>Analysis Results</h2>
+                <div class="analysis-result">
+                    {analysis_html}
                 </div>
             </div>
             """
         
-        # Extract Strategic Recommendations
-        recommendations_html = ""
-        recommendations_patterns = [
-            r"STRATEGIC RECOMMENDATIONS:(.*?)(?:EFFECTIVENESS SUMMARY:|$)",
-            r"Strategic Recommendations:(.*?)(?:Effectiveness Summary:|$)"
-        ]
+        # Add CSS for structured analysis and tabs
+        structured_css = """
+            .tabs {
+                display: flex;
+                border-bottom: 1px solid #e2e8f0;
+                margin-bottom: 20px;
+            }
+            .tab {
+                padding: 10px 20px;
+                cursor: pointer;
+                border-bottom: 3px solid transparent;
+                font-weight: 500;
+                transition: all 0.3s ease;
+            }
+            .tab:hover {
+                background-color: #f8fafc;
+            }
+            .tab.active {
+                border-bottom-color: #3b82f6;
+                color: #3b82f6;
+            }
+            .tab-content {
+                display: none;
+            }
+            .tab-content.active {
+                display: block;
+            }
+            .score-container {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 15px;
+                margin-top: 15px;
+            }
+            .score-item {
+                display: grid;
+                grid-template-columns: 200px 1fr 50px;
+                gap: 15px;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .score-label {
+                font-weight: 500;
+                color: #475569;
+            }
+            .score-meter {
+                height: 12px;
+                background-color: #e2e8f0;
+                border-radius: 6px;
+                overflow: hidden;
+            }
+            .score-bar {
+                height: 100%;
+                border-radius: 6px;
+            }
+            .score-value {
+                font-weight: bold;
+                text-align: right;
+            }
+            .score-description {
+                grid-column: span 3;
+                color: #64748b;
+                font-size: 0.9em;
+                margin-top: -5px;
+            }
+            .issues-list, .recommendations-list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+            .issue-item, .recommendation-item {
+                margin-bottom: 20px;
+                padding: 15px;
+                border-radius: 6px;
+            }
+            .issue-item {
+                background-color: #fff5f7;
+                border-left: 4px solid #e53e78;
+            }
+            .recommendation-item {
+                background-color: #f0fdf4;
+                border-left: 4px solid #10b981;
+            }
+            .issue-header, .recommendation-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .issue-title, .recommendation-title {
+                font-weight: 600;
+                font-size: 1.1em;
+            }
+            .issue-severity, .recommendation-impact {
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 0.8em;
+                font-weight: 500;
+            }
+            .high-severity {
+                background-color: #fee2e2;
+                color: #b91c1c;
+            }
+            .medium-severity {
+                background-color: #fef3c7;
+                color: #d97706;
+            }
+            .low-severity {
+                background-color: #e0f2fe;
+                color: #0369a1;
+            }
+            .high-impact {
+                background-color: #d1fae5;
+                color: #047857;
+            }
+            .medium-impact {
+                background-color: #e0f2fe;
+                color: #0369a1;
+            }
+            .low-impact {
+                background-color: #f3f4f6;
+                color: #4b5563;
+            }
+            .issue-description, .recommendation-description {
+                margin-bottom: 10px;
+            }
+            .issue-area, .recommendation-area {
+                font-size: 0.9em;
+                color: #64748b;
+            }
+            .overall-score-container {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+            .overall-score-label {
+                font-weight: 500;
+            }
+            .overall-score-value {
+                font-size: 1.8em;
+                font-weight: 700;
+                padding: 10px 20px;
+                border-radius: 6px;
+                background-color: #f8fafc;
+            }
+            .summary-text {
+                font-size: 1.1em;
+                line-height: 1.7;
+                color: #334155;
+                padding: 15px;
+                background-color: #f8fafc;
+                border-radius: 6px;
+                margin-bottom: 20px;
+            }
+            @media (max-width: 768px) {
+                .score-item {
+                    grid-template-columns: 1fr;
+                }
+                .score-value {
+                    text-align: left;
+                }
+                .issue-header, .recommendation-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 8px;
+                }
+                .overall-score-container {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+            }
+        """
         
-        for pattern in recommendations_patterns:
-            match = re.search(pattern, analysis_text, re.DOTALL | re.IGNORECASE)
-            if match and match.group(1).strip():
-                recommendations_text = match.group(1).strip()
-                recommendations_html = f"""
-                <div class="section recommendations-section">
-                    <h2>Strategic Recommendations</h2>
-                    <div class="recommendations-content">
-                        {markdown_to_html(recommendations_text)}
-                    </div>
+        # Create a simple HTML report
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Desktop Screenshot Analysis Report</title>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 20px;
+                    color: #333;
+                }}
+                .container {{
+                    max-width: 1200px;
+                    margin: 0 auto;
+                }}
+                h1, h2, h3, h4, h5, h6 {{
+                    color: #2c3e50;
+                    margin-top: 1.5em;
+                    margin-bottom: 0.5em;
+                }}
+                h1 {{ font-size: 2em; }}
+                h2 {{ font-size: 1.75em; }}
+                h3 {{ font-size: 1.5em; }}
+                h4 {{ font-size: 1.25em; }}
+                h5 {{ font-size: 1.1em; }}
+                h6 {{ font-size: 1em; }}
+                p {{
+                    margin-bottom: 1em;
+                }}
+                .section {{
+                    background-color: #f8f9fa;
+                    border-radius: 5px;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                }}
+                .error {{
+                    background-color: #fee;
+                    border-left: 4px solid #c00;
+                }}
+                pre {{
+                    background-color: #f5f5f5;
+                    padding: 10px;
+                    border-radius: 5px;
+                    overflow-x: auto;
+                    white-space: pre-wrap;
+                }}
+                .analysis-result {{
+                    margin-top: 20px;
+                }}
+                li {{
+                    margin-bottom: 0.5em;
+                }}
+                ul, ol {{
+                    padding-left: 2em;
+                }}
+                .good {{ background-color: #10b981; color: #10b981; }}
+                .average {{ background-color: #f59e0b; color: #f59e0b; }}
+                .poor {{ background-color: #ef4444; color: #ef4444; }}
+                
+                {structured_css}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Desktop Screenshot Analysis Report</h1>
+                
+                <div class="section">
+                    <h2>Analysis Summary</h2>
+                    <p><strong>Organization:</strong> {results.get('organization', 'Unknown')}</p>
+                    <p><strong>Screenshots Analyzed:</strong> {results.get('screenshots_analyzed', 0)} of {results.get('screenshot_count', 0)} total</p>
+                    <p><strong>Analysis Date:</strong> {results.get('analysis_date', 'Unknown')}</p>
+                    <p><strong>Status:</strong> {status}</p>
                 </div>
-                """
-                break
-        
-        # Extract Theme Assessment (equivalent to critical issues)
-        theme_assessment_html = ""
-        theme_patterns = [
-            r"OVERALL THEME ASSESSMENT:(.*?)(?:STRATEGIC RECOMMENDATIONS:|$)",
-            r"Overall Theme Assessment:(.*?)(?:Strategic Recommendations:|$)"
-        ]
-        
-        for pattern in theme_patterns:
-            match = re.search(pattern, analysis_text, re.DOTALL | re.IGNORECASE)
-            if match and match.group(1).strip():
-                theme_text = match.group(1).strip()
-                theme_assessment_html = f"""
-                <div class="section issues-section">
-                    <h2>Theme Assessment</h2>
-                    <div class="issues-content">
-                        {markdown_to_html(theme_text)}
-                    </div>
+                
+                {error_section}
+                
+                {analysis_section}
+                
+                <div class="section">
+                    <h2>Individual Page Analysis</h2>
+                    <p>For detailed analysis of individual pages, use the following command:</p>
+                    <pre>python -m website_analyzer.cli analyze-pages</pre>
                 </div>
-                """
-                break
-        
-        # Convert full markdown to HTML
-        analysis_html = markdown_to_html(analysis_text)
-        
-        # Create template context
-        context = {
-            "organization": results.get('organization', 'Unknown Organization'),
-            "screenshots_analyzed": results.get('screenshots_analyzed', 0),
-            "screenshot_count": results.get('screenshot_count', 0),
-            "analysis_date": results.get('analysis_date', 'Unknown'),
-            "status": status,
-            "error": results.get("error") if status == "error" else None,
-            "analysis_html": analysis_html,
-            "score_html": score_html,
-            "recommendations_html": recommendations_html,
-            "theme_assessment_html": theme_assessment_html,
-            "common_styles": ""  # We'll define styles in the template
-        }
-        
-        # Use the template system
-        from website_analyzer.reporting.template_system import render_template
-        html_content = render_template('desktop_analysis.html', context)
+            </div>
+        </body>
+        </html>
+        """
         
         with open(output_path, "w") as f:
             f.write(html_content)
