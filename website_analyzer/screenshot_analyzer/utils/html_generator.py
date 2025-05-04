@@ -1477,11 +1477,11 @@ def save_page_analysis_results(
                     {score_html}
                     
                     {tabs_html}
-                    
-                    {screenshot_html}
-                    
+
                     {lighthouse_reports_html}
                     
+                    {screenshot_html}
+                                        
                     <div class="navigation">
                         <a href="index.html">← Back to All Pages</a>
                         <a href="../../desktop_screenshot_analysis.html">View Overall Analysis →</a>
@@ -1707,10 +1707,12 @@ def save_page_analysis_results(
                             {analysis_html}
                         </div>
                     </div>
+
+                    {lighthouse_reports_html}
                     
                     {screenshot_html}
                     
-                    {lighthouse_reports_html}
+                    
                     
                     <div class="navigation">
                         <a href="index.html">← Back to All Pages</a>
