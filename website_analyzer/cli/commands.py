@@ -124,6 +124,7 @@ class CLI:
         # Add argument for two-stage analysis
         parser.add_argument("--two-stage", action="store_true", help="Use two-stage analysis (separate analysis and formatting)")
         parser.add_argument("--single-stage", action="store_true", help="Use single-stage analysis (default)")
+
         
     def _add_analyze_file_arguments(self, parser: argparse.ArgumentParser) -> None:
         """
@@ -561,15 +562,24 @@ class CLI:
             
             # Set two-stage analysis based on command line arguments
             if hasattr(args, 'two_stage') and args.two_stage:
-                # Import and modify the constants at runtime
                 from ..common.constants import USE_TWO_STAGE_ANALYSIS
                 import sys
-                sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = True
+                try:
+                    sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = True
+                except (KeyError, AttributeError):
+                    # Fallback if module structure is different
+                    import builtins
+                    builtins.USE_TWO_STAGE_ANALYSIS = True
                 print("Using two-stage analysis (separate analysis and formatting).")
             elif hasattr(args, 'single_stage') and args.single_stage:
                 from ..common.constants import USE_TWO_STAGE_ANALYSIS
                 import sys
-                sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = False
+                try:
+                    sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = False
+                except (KeyError, AttributeError):
+                    # Fallback if module structure is different
+                    import builtins
+                    builtins.USE_TWO_STAGE_ANALYSIS = False
                 print("Using single-stage analysis.")
             
             # Analyze individual pages
@@ -594,8 +604,9 @@ class CLI:
             
         except Exception as e:
             print(f"Error during individual page analysis: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
             return 1
-
 
 def main():
     """Main entry point for the CLI."""

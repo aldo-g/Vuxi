@@ -11,7 +11,8 @@ from .prompts import (
     get_desktop_analysis_prompt,
     get_individual_page_analysis_prompt,
     get_formatting_prompt,
-    get_html_generation_prompt
+    get_html_generation_prompt,
+    validate_structured_data
 )
 from .page_detector import determine_page_type
 from .utils.file_utils import collect_desktop_screenshots
@@ -20,6 +21,7 @@ from .utils.html_generator import (
     save_page_analysis_results
 )
 from ..common.constants import USE_TWO_STAGE_ANALYSIS
+from ..lighthouse.auditor import LighthouseAuditor
 
 class ScreenshotAnalyzer:
     """
@@ -39,6 +41,9 @@ class ScreenshotAnalyzer:
         self.page_analysis_dir = os.path.join(self.analysis_dir, "pages")
         os.makedirs(self.analysis_dir, exist_ok=True)
         os.makedirs(self.page_analysis_dir, exist_ok=True)
+        
+        # Initialize lighthouse auditor
+        self.lighthouse_auditor = LighthouseAuditor(output_dir)
     
     def analyze_desktop_screenshots(
         self, 
@@ -74,9 +79,21 @@ class ScreenshotAnalyzer:
         # Get prompt with context
         prompt = get_desktop_analysis_prompt(context)
         
+        # Get lighthouse data
+        lighthouse_reports = []
+        try:
+            lighthouse_reports = self.lighthouse_auditor.get_all_reports()
+            print(f"Found {len(lighthouse_reports)} Lighthouse reports")
+            if lighthouse_reports:
+                print(f"First report URL: {lighthouse_reports[0].get('url', 'Unknown')}")
+        except Exception as e:
+            print(f"Error getting Lighthouse reports: {e}")
+            import traceback
+            traceback.print_exc()
+        
         if USE_TWO_STAGE_ANALYSIS:
             # Use two-stage analysis
-            return self._two_stage_analysis(screenshots, prompt, context, save_format)
+            return self._two_stage_analysis(screenshots, prompt, context, save_format, lighthouse_reports)
         else:
             # Get the API client
             api_client = get_api_client()
@@ -90,7 +107,8 @@ class ScreenshotAnalyzer:
                 "screenshots_analyzed": len(screenshots),
                 "organization": context.get("org_name", "Unknown Organization"),
                 "org_type": context.get("org_type", "Unknown Type"),
-                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                "org_purpose": context.get("org_purpose", "Unknown Purpose"),
+                "lighthouse_reports": lighthouse_reports
             })
             
             # Save results
@@ -109,7 +127,8 @@ class ScreenshotAnalyzer:
         screenshots: List[str], 
         prompt: str, 
         context: Dict[str, Any], 
-        save_format: str
+        save_format: str,
+        lighthouse_reports: List[Dict] = None
     ) -> str:
         """
         Perform two-stage analysis: first analyze, then format.
@@ -119,6 +138,7 @@ class ScreenshotAnalyzer:
             prompt (str): Analysis prompt
             context (Dict[str, Any]): Context information about the organization
             save_format (str): Format to save results
+            lighthouse_reports (List[Dict], optional): Lighthouse reports
             
         Returns:
             str: Path to the analysis results file
@@ -142,15 +162,19 @@ class ScreenshotAnalyzer:
         
         # If formatting was successful and returned JSON data
         if formatted_results["status"] == "success" and "data" in formatted_results:
+            # Validate the structured data
+            validated_data = validate_structured_data(formatted_results["data"])
+            
             # Combine results
             final_results = {
                 **raw_results,
-                "structured_data": formatted_results["data"],
+                "structured_data": validated_data,
                 "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "screenshots_analyzed": len(screenshots),
                 "organization": context.get("org_name", "Unknown Organization"),
                 "org_type": context.get("org_type", "Unknown Type"),
-                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                "org_purpose": context.get("org_purpose", "Unknown Purpose"),
+                "lighthouse_reports": lighthouse_reports if lighthouse_reports else []
             }
             
             # Save raw data for debugging
@@ -162,6 +186,10 @@ class ScreenshotAnalyzer:
             
             with open(os.path.join(debug_dir, "formatted_analysis.json"), "w") as f:
                 json.dump(formatted_results, f, indent=2)
+            
+            # Debug lighthouse data
+            with open(os.path.join(debug_dir, "lighthouse_data.json"), "w") as f:
+                json.dump({"lighthouse_reports": lighthouse_reports if lighthouse_reports else []}, f, indent=2)
             
             # Save results
             output_path = save_analysis_results(
@@ -181,7 +209,8 @@ class ScreenshotAnalyzer:
                 "screenshots_analyzed": len(screenshots),
                 "organization": context.get("org_name", "Unknown Organization"),
                 "org_type": context.get("org_type", "Unknown Type"),
-                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                "org_purpose": context.get("org_purpose", "Unknown Purpose"),
+                "lighthouse_reports": lighthouse_reports if lighthouse_reports else []
             })
             
             # Save results
@@ -225,6 +254,14 @@ class ScreenshotAnalyzer:
         
         print(f"Analyzing {len(screenshots)} individual pages...")
         
+        # Get lighthouse data
+        lighthouse_reports = []
+        try:
+            lighthouse_reports = self.lighthouse_auditor.get_all_reports()
+            print(f"Found {len(lighthouse_reports)} Lighthouse reports")
+        except Exception as e:
+            print(f"Error getting Lighthouse reports: {e}")
+        
         output_paths = []
         
         # Analyze each screenshot individually
@@ -238,6 +275,14 @@ class ScreenshotAnalyzer:
             # Get prompt for individual page
             prompt = get_individual_page_analysis_prompt(page_type, context)
             
+            # Find matching lighthouse report for this page (if any)
+            page_lighthouse_report = None
+            for report in lighthouse_reports:
+                if filename.split('.')[0] in report.get('html_report', ''):
+                    page_lighthouse_report = [report]
+                    print(f"Found matching Lighthouse report for {filename}")
+                    break
+            
             if USE_TWO_STAGE_ANALYSIS:
                 # Use two-stage analysis for individual page
                 output_path = self._two_stage_page_analysis(
@@ -245,7 +290,8 @@ class ScreenshotAnalyzer:
                     prompt, 
                     page_type, 
                     context, 
-                    save_format
+                    save_format,
+                    page_lighthouse_report
                 )
             else:
                 # Get the API client
@@ -261,7 +307,8 @@ class ScreenshotAnalyzer:
                     "page_type": page_type,
                     "organization": context.get("org_name", "Unknown Organization"),
                     "org_type": context.get("org_type", "Unknown Type"),
-                    "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                    "org_purpose": context.get("org_purpose", "Unknown Purpose"),
+                    "lighthouse_reports": page_lighthouse_report if page_lighthouse_report else []
                 })
                 
                 # Save results
@@ -284,7 +331,8 @@ class ScreenshotAnalyzer:
         prompt: str, 
         page_type: str, 
         context: Dict[str, Any], 
-        save_format: str
+        save_format: str,
+        lighthouse_reports: List[Dict] = None
     ) -> str:
         """
         Perform two-stage analysis for an individual page.
@@ -295,6 +343,7 @@ class ScreenshotAnalyzer:
             page_type (str): Type of page being analyzed
             context (Dict[str, Any]): Context information
             save_format (str): Format to save results
+            lighthouse_reports (List[Dict], optional): Lighthouse reports
             
         Returns:
             str: Path to the analysis results file
@@ -320,7 +369,8 @@ class ScreenshotAnalyzer:
                 "page_type": page_type,
                 "organization": context.get("org_name", "Unknown Organization"),
                 "org_type": context.get("org_type", "Unknown Type"),
-                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                "org_purpose": context.get("org_purpose", "Unknown Purpose"),
+                "lighthouse_reports": lighthouse_reports if lighthouse_reports else []
             }
             
             page_name = page_type.lower().replace(" ", "_")
@@ -338,16 +388,20 @@ class ScreenshotAnalyzer:
         
         # If formatting was successful and returned JSON data
         if formatted_results["status"] == "success" and "data" in formatted_results:
+            # Validate the structured data
+            validated_data = validate_structured_data(formatted_results["data"])
+            
             # Combine results
             final_results = {
                 **raw_results,
-                "structured_data": formatted_results["data"],
+                "structured_data": validated_data,
                 "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "screenshot": screenshot,
                 "page_type": page_type,
                 "organization": context.get("org_name", "Unknown Organization"),
                 "org_type": context.get("org_type", "Unknown Type"),
-                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                "org_purpose": context.get("org_purpose", "Unknown Purpose"),
+                "lighthouse_reports": lighthouse_reports if lighthouse_reports else []
             }
             
             # Save raw data for debugging
@@ -361,6 +415,10 @@ class ScreenshotAnalyzer:
             
             with open(os.path.join(debug_dir, f"{page_name}_formatted_analysis.json"), "w") as f:
                 json.dump(formatted_results, f, indent=2)
+            
+            if lighthouse_reports:
+                with open(os.path.join(debug_dir, f"{page_name}_lighthouse.json"), "w") as f:
+                    json.dump({"lighthouse_reports": lighthouse_reports}, f, indent=2)
             
             # Save results
             output_path = save_page_analysis_results(
@@ -382,7 +440,8 @@ class ScreenshotAnalyzer:
                 "page_type": page_type,
                 "organization": context.get("org_name", "Unknown Organization"),
                 "org_type": context.get("org_type", "Unknown Type"),
-                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                "org_purpose": context.get("org_purpose", "Unknown Purpose"),
+                "lighthouse_reports": lighthouse_reports if lighthouse_reports else []
             })
             
             # Save results
@@ -437,6 +496,21 @@ class ScreenshotAnalyzer:
         # Get prompt for individual page
         prompt = get_individual_page_analysis_prompt(page_type, context)
         
+        # Get lighthouse data
+        lighthouse_reports = []
+        try:
+            lighthouse_reports = self.lighthouse_auditor.get_all_reports()
+            # Find matching lighthouse report for this page (if any)
+            page_lighthouse_report = None
+            for report in lighthouse_reports:
+                if filename.split('.')[0] in report.get('html_report', ''):
+                    page_lighthouse_report = [report]
+                    print(f"Found matching Lighthouse report for {filename}")
+                    break
+        except Exception as e:
+            print(f"Error getting Lighthouse reports: {e}")
+            page_lighthouse_report = []
+        
         if USE_TWO_STAGE_ANALYSIS:
             # Use two-stage analysis for single file
             return self._two_stage_page_analysis(
@@ -444,7 +518,8 @@ class ScreenshotAnalyzer:
                 prompt, 
                 page_type, 
                 context, 
-                save_format
+                save_format,
+                page_lighthouse_report
             )
         else:
             # Get the API client
@@ -464,7 +539,8 @@ class ScreenshotAnalyzer:
                 "page_type": page_type,
                 "organization": context.get("org_name", "Unknown Organization"),
                 "org_type": context.get("org_type", "Unknown Type"),
-                "org_purpose": context.get("org_purpose", "Unknown Purpose")
+                "org_purpose": context.get("org_purpose", "Unknown Purpose"),
+                "lighthouse_reports": page_lighthouse_report if page_lighthouse_report else []
             })
             
             page_name = page_type.lower().replace(" ", "_")
