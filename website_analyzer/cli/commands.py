@@ -7,13 +7,14 @@ argument parsing and command execution.
 import json
 from website_analyzer.lighthouse.report_trimmer import (
     trim_lighthouse_report,
+    format_trimmed_report_for_analysis,
     trim_all_lighthouse_reports
 )
 
 import os
 import sys
 import argparse
-from typing import List
+from typing import Dict, Any, Optional, List
 
 from website_analyzer.crawler import WebCrawler
 from website_analyzer.crawler.screenshot_capturer import ScreenshotCapturer
@@ -65,6 +66,11 @@ class CLI:
         trim_lighthouse_parser = subparsers.add_parser('trim-lighthouse', help='Trim Lighthouse reports for API analysis')
         self._add_trim_lighthouse_arguments(trim_lighthouse_parser)
         trim_lighthouse_parser.set_defaults(func=self.trim_lighthouse_command)
+        
+        # Generate PDF report command
+        generate_pdf_parser = subparsers.add_parser('generate-pdf', help='Generate a comprehensive PDF report')
+        self._add_generate_pdf_arguments(generate_pdf_parser)
+        generate_pdf_parser.set_defaults(func=self.generate_pdf_command)
         
         return parser
     
@@ -288,6 +294,80 @@ class CLI:
             
         except Exception as e:
             print(f"Error during screenshot analysis: {e}", file=sys.stderr)
+            return 1
+    
+    def analyze_pages_command(self, args: argparse.Namespace) -> int:
+        """
+        Run the screenshot analyzer for individual pages.
+        
+        Args:
+            args (argparse.Namespace): Command line arguments
+            
+        Returns:
+            int: Exit code (0 for success, non-zero for failure)
+        """
+        try:
+            # Check if the input directory exists
+            if not os.path.exists(args.input_dir):
+                print(f"Input directory does not exist: {args.input_dir}")
+                return 1
+            
+            # Initialize screenshot analyzer
+            analyzer = ScreenshotAnalyzer(args.input_dir)
+            
+            # Create the context dictionary with all org-related parameters
+            context = {
+                "org_name": args.org_name,
+                "org_type": args.org_type,
+                "org_purpose": args.org_purpose
+            }
+            
+            # Set two-stage analysis based on command line arguments
+            if hasattr(args, 'two_stage') and args.two_stage:
+                from ..common.constants import USE_TWO_STAGE_ANALYSIS
+                import sys
+                try:
+                    sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = True
+                except (KeyError, AttributeError):
+                    # Fallback if module structure is different
+                    import builtins
+                    builtins.USE_TWO_STAGE_ANALYSIS = True
+                print("Using two-stage analysis (separate analysis and formatting).")
+            elif hasattr(args, 'single_stage') and args.single_stage:
+                from ..common.constants import USE_TWO_STAGE_ANALYSIS
+                import sys
+                try:
+                    sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = False
+                except (KeyError, AttributeError):
+                    # Fallback if module structure is different
+                    import builtins
+                    builtins.USE_TWO_STAGE_ANALYSIS = False
+                print("Using single-stage analysis.")
+            
+            # Analyze individual pages
+            output_paths = analyzer.analyze_individual_pages(
+                context=context,
+                save_format=args.output_format
+            )
+            
+            if output_paths:
+                print(f"\nIndividual page analyses completed successfully!")
+                print(f"Analysis reports saved to: {os.path.abspath(os.path.dirname(output_paths[0]))}")
+                
+                # Create an index file for all page analyses
+                index_path = self.create_pages_index(args.input_dir, output_paths)
+                if index_path:
+                    print(f"Index page: {os.path.abspath(index_path)}")
+                
+                return 0
+            else:
+                print("Individual page analysis failed")
+                return 1
+            
+        except Exception as e:
+            print(f"Error during individual page analysis: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
             return 1
     
     def analyze_file_command(self, args: argparse.Namespace) -> int:
@@ -533,10 +613,23 @@ class CLI:
         except Exception as e:
             print(f"Error during Lighthouse report trimming: {e}", file=sys.stderr)
             return 1
-        
-    def analyze_pages_command(self, args: argparse.Namespace) -> int:
+    
+    # Add this method to define the arguments
+    def _add_generate_pdf_arguments(self, parser: argparse.ArgumentParser) -> None:
         """
-        Run the screenshot analyzer for individual pages separately.
+        Add arguments for the generate-pdf command.
+        
+        Args:
+            parser (argparse.ArgumentParser): The parser to add arguments to
+        """
+        parser.add_argument("--input-dir", "-i", default="website_analysis", 
+                            help="Directory containing analysis data")
+        parser.add_argument("--output", "-o", default=None, 
+                            help="Output path for the PDF report (defaults to <input_dir>/website_analysis_report.pdf)")
+
+    def generate_pdf_command(self, args: argparse.Namespace) -> int:
+        """
+        Generate an executive summary report using an LLM.
         
         Args:
             args (argparse.Namespace): Command line arguments
@@ -549,64 +642,30 @@ class CLI:
             if not os.path.exists(args.input_dir):
                 print(f"Input directory does not exist: {args.input_dir}")
                 return 1
-            
-            # Initialize screenshot analyzer
-            analyzer = ScreenshotAnalyzer(args.input_dir)
-            
-            # Create the context dictionary with all org-related parameters
-            context = {
-                "org_name": args.org_name,
-                "org_type": args.org_type,
-                "org_purpose": args.org_purpose
-            }
-            
-            # Set two-stage analysis based on command line arguments
-            if hasattr(args, 'two_stage') and args.two_stage:
-                from ..common.constants import USE_TWO_STAGE_ANALYSIS
-                import sys
-                try:
-                    sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = True
-                except (KeyError, AttributeError):
-                    # Fallback if module structure is different
-                    import builtins
-                    builtins.USE_TWO_STAGE_ANALYSIS = True
-                print("Using two-stage analysis (separate analysis and formatting).")
-            elif hasattr(args, 'single_stage') and args.single_stage:
-                from ..common.constants import USE_TWO_STAGE_ANALYSIS
-                import sys
-                try:
-                    sys.modules['website_analyzer.common.constants'].USE_TWO_STAGE_ANALYSIS = False
-                except (KeyError, AttributeError):
-                    # Fallback if module structure is different
-                    import builtins
-                    builtins.USE_TWO_STAGE_ANALYSIS = False
-                print("Using single-stage analysis.")
-            
-            # Analyze individual pages
-            output_paths = analyzer.analyze_individual_pages(
-                context=context,
-                save_format=args.output_format
-            )
-            
-            if output_paths:
-                print(f"\nIndividual page analyses completed successfully!")
-                print(f"Analysis reports saved to: {os.path.abspath(os.path.dirname(output_paths[0]))}")
                 
-                # Create an index file for all page analyses
-                index_path = self.create_pages_index(args.input_dir, output_paths)
-                if index_path:
-                    print(f"Index page: {os.path.abspath(index_path)}")
-                
-                return 0
-            else:
-                print("Individual page analysis failed")
-                return 1
+            # Import executive summary generator
+            from ..reporting.executive_summary import ExecutiveSummaryGenerator
+            
+            # Initialize report generator
+            report_generator = ExecutiveSummaryGenerator(args.input_dir)
+            
+            # Generate executive summary
+            output_path = report_generator.generate(args.output)
+            
+            print(f"\nExecutive summary generated: {os.path.abspath(output_path)}")
+            print("\nTo create a PDF:")
+            print("1. Open this HTML file in your browser")
+            print("2. Use the Print function (Cmd+P or Ctrl+P)")
+            print("3. Select 'Save as PDF' as the destination in the print dialog")
+            print("4. Click 'Save' or 'Print' to create the PDF file")
+            return 0
             
         except Exception as e:
-            print(f"Error during individual page analysis: {e}", file=sys.stderr)
+            print(f"Error generating executive summary: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
             return 1
+
 
 def main():
     """Main entry point for the CLI."""
