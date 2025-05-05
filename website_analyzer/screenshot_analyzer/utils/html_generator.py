@@ -6,7 +6,7 @@ import os
 import re
 from typing import Dict, Any, List
 
-from markdown_utils import markdown_to_html
+from .markdown_utils import markdown_to_html
 
 def save_analysis_results(results: Dict[str, Any], output_dir: str, format: str = "html") -> str:
     """
