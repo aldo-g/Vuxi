@@ -213,3 +213,112 @@ class WebCrawler:
         print(f"Pages crawled: {page_count}")
         
         return crawl_stats
+    
+    def _prepare_page_for_screenshots(self, page):
+        """
+        Prepare the page for optimal screenshots by handling common overlay elements.
+        
+        Args:
+            page: Playwright page object
+        """
+        try:
+            # Remove cookie banners, notification overlays, and popups
+            page.evaluate("""
+                () => {
+                    // Common overlay selectors
+                    const overlaySelectors = [
+                        // Cookie consent banners
+                        '[class*="cookie"]', '[id*="cookie"]', '[class*="consent"]', 
+                        '[id*="consent"]', '[class*="gdpr"]', '[id*="gdpr"]',
+                        
+                        // Chat widgets and help bubbles
+                        '[class*="chat-widget"]', '[id*="chat-widget"]', 
+                        '[class*="intercom"]', '[id*="intercom"]',
+                        '[class*="zendesk"]', '[id*="zendesk"]',
+                        '[class*="crisp"]', '[id*="crisp"]',
+                        '[class*="drift"]', '[id*="drift"]',
+                        '[class*="livechat"]', '[id*="livechat"]',
+                        
+                        // Notification banners
+                        '[class*="banner"]', '[id*="banner"]',
+                        '[class*="notification"]', '[id*="notification"]',
+                        '[class*="alert"]', '[id*="alert"]',
+                        
+                        // Popups and modals
+                        '[class*="popup"]', '[id*="popup"]',
+                        '[class*="modal"]', '[id*="modal"]',
+                        '[class*="overlay"]', '[id*="overlay"]',
+                        '[class*="dialog"]', '[id*="dialog"]',
+                        
+                        // Newsletter subscriptions
+                        '[class*="newsletter"]', '[id*="newsletter"]',
+                        '[class*="subscribe"]', '[id*="subscribe"]'
+                    ];
+                    
+                    // Try each selector
+                    overlaySelectors.forEach(selector => {
+                        try {
+                            const elements = document.querySelectorAll(selector);
+                            elements.forEach(el => {
+                                // Only remove if it seems to be an overlay/popup
+                                const style = window.getComputedStyle(el);
+                                const isOverlay = (
+                                    (style.position === 'fixed' || style.position === 'absolute') && 
+                                    (parseFloat(style.zIndex) > 10 || style.zIndex === 'auto')
+                                );
+                                
+                                if (isOverlay) {
+                                    try {
+                                        // Try to find and click a close button first
+                                        const closeButtons = el.querySelectorAll(
+                                            '[class*="close"], [id*="close"], .fa-times, button[aria-label="Close"], button:contains("×"), .dismiss'
+                                        );
+                                        
+                                        if (closeButtons.length > 0) {
+                                            closeButtons[0].click();
+                                        } else {
+                                            // If no close button, just hide the element
+                                            el.style.display = 'none';
+                                            el.style.visibility = 'hidden';
+                                            el.style.opacity = '0';
+                                            el.style.pointerEvents = 'none';
+                                        }
+                                    } catch(closeError) {
+                                        // Fallback to just hiding
+                                        el.style.display = 'none';
+                                    }
+                                }
+                            });
+                        } catch(selectorError) {
+                            // Ignore errors for individual selectors
+                        }
+                    });
+                    
+                    // Specifically address fixed position elements that might obscure content
+                    const fixedElements = Array.from(document.querySelectorAll('*')).filter(el => {
+                        const style = window.getComputedStyle(el);
+                        return style.position === 'fixed' && 
+                            style.display !== 'none' && 
+                            style.visibility !== 'hidden' &&
+                            parseFloat(style.zIndex) > 100;
+                    });
+                    
+                    fixedElements.forEach(el => {
+                        // Check if this is a header, navigation, or critical component
+                        const isHeader = el.tagName === 'HEADER' || 
+                                        el.id.toLowerCase().includes('header') || 
+                                        Array.from(el.classList).some(c => c.toLowerCase().includes('header'));
+                        
+                        const isNavigation = el.tagName === 'NAV' || 
+                                        el.id.toLowerCase().includes('nav') || 
+                                        Array.from(el.classList).some(c => c.toLowerCase().includes('nav'));
+                        
+                        // Only hide if not header or navigation
+                        if (!isHeader && !isNavigation) {
+                            el.style.display = 'none';
+                        }
+                    });
+                }
+            """)
+        except Exception as e:
+            print(f"Error preparing page for screenshots: {e}")
