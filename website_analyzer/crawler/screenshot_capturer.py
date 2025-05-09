@@ -1010,14 +1010,6 @@ class ScreenshotCapturer:
                 time.sleep(0.1)
             page.mouse.move(width / 2, height / 2)
             time.sleep(0.2)
-            page.evaluate("""
-                () => {
-                    const currentY = window.scrollY;
-                    window.scrollBy(0, 10);
-                    setTimeout(() => { window.scrollBy(0, -10); }, 100);
-                }
-            """)
-            time.sleep(0.5)
         except Exception as e:
             print(f"Error during final interaction jiggle: {e}")
 
