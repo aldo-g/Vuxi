@@ -33,8 +33,8 @@ class ScreenshotCapturer:
 
         # Create viewports for different device types
         self.viewports = [
-            {"name": "mobile", "width": 375, "height": 667},
-            {"name": "tablet", "width": 768, "height": 1024},
+            # {"name": "mobile", "width": 375, "height": 667},
+            # {"name": "tablet", "width": 768, "height": 1024},
             {"name": "desktop", "width": 1440, "height": 900}
         ]
 
@@ -167,17 +167,24 @@ class ScreenshotCapturer:
 
             # STEP 21: Final header and video check - ensure everything is visible
             page.evaluate("window.scrollTo(0, 0)")
-            time.sleep(0.5)
+            time.sleep(1.0)  # Increased wait time
+
+            # Headers first, then videos (opposite of previous order)
+            if fixed_elements:
+                self._ensure_header_visibility(page, fixed_elements)
+                print("✓ Final header visibility enforcement")
+                # Give headers time to appear
+                time.sleep(1.5)  # Add extra time specifically for headers
 
             if video_elements:
-                self._force_youtube_video_visibility(page, video_elements) # Final comprehensive YouTube check
+                self._force_youtube_video_visibility(page, video_elements)
                 print("✓ Final YouTube video enforcement attempt")
-                # Allow time for the videos to display after final enforcement
-                time.sleep(3) # Crucial wait after final YouTube interaction
+                # Allow time for videos to display
+                time.sleep(2)
 
             # STEP 22: Take the screenshot with all content loaded
             page.screenshot(path=filepath, full_page=True)
-            print(f"✓ Captured complete {viewport['name']} screenshot: {filepath}")
+            print(f"--------------✓ Captured complete {viewport['name']} screenshot: {filepath}----------")
 
             return {
                 'viewport': viewport["name"],
@@ -654,36 +661,148 @@ class ScreenshotCapturer:
             print(f"Error ensuring fixed elements are loaded: {e}")
 
     def _ensure_header_visibility(self, page, fixed_elements: List[Dict[str, Any]]):
-        if not fixed_elements: return
+        """
+        Enhanced method to ensure header visibility with more aggressive approach.
+        """
         try:
-            print("Ensuring header visibility for screenshot...")
+            print("Applying strong enforcement for header visibility...")
             page.evaluate("window.scrollTo(0, 0)")
             time.sleep(0.5)
+            
+            # First apply generic header detection if no fixed elements were found
+            if not fixed_elements:
+                print("No fixed elements detected previously, trying generic header selectors...")
+                page.evaluate("""
+                    () => {
+                        // Common header selectors
+                        const headerSelectors = [
+                            'header', '#header', '.header', '.site-header', 
+                            'nav.navbar', '.navigation', '#navigation',
+                            '.main-header', '.global-header', '.top-header',
+                            '[class*="header-"]', '[id*="header-"]'
+                        ];
+                        
+                        headerSelectors.forEach(selector => {
+                            const element = document.querySelector(selector);
+                            if (element) {
+                                console.log("Found header with selector:", selector);
+                                // Force strong visibility
+                                element.style.cssText += `
+                                    display: block !important;
+                                    visibility: visible !important;
+                                    opacity: 1 !important;
+                                    position: fixed !important;
+                                    top: 0 !important;
+                                    left: 0 !important;
+                                    width: 100% !important;
+                                    z-index: 9999999 !important;
+                                    transform: none !important;
+                                    clip: auto !important;
+                                    clip-path: none !important;
+                                    max-height: none !important;
+                                    overflow: visible !important;
+                                `;
+                            }
+                        });
+                    }
+                """)
+            
+            # Now process any previously identified fixed elements
             for element_data in fixed_elements:
-                if element_data["isHeader"] or element_data["isNavigation"]:
+                if element_data.get("isHeader", False) or element_data.get("isNavigation", False):
                     selector = element_data["selector"]
+                    print(f"Applying header visibility enforcement to: {selector}")
                     page.evaluate("""
                         (sel) => {
                             const elem = document.querySelector(sel);
                             if (elem) {
-                                elem.style.opacity = '1';
-                                elem.style.visibility = 'visible';
-                                elem.style.display = elem.style.display === 'none' ? 'block' : elem.style.display;
-                                if (elem.style.position === 'fixed' || elem.style.position === 'sticky') {
-                                    elem.style.top = '0px';
-                                }
-                                if (!elem.style.zIndex || parseInt(elem.style.zIndex) < 1000) {
-                                    elem.style.zIndex = '1000';
-                                }
+                                // Apply extremely strong visibility overrides
+                                elem.style.cssText += `
+                                    display: block !important;
+                                    visibility: visible !important;
+                                    opacity: 1 !important;
+                                    position: fixed !important;
+                                    top: 0 !important;
+                                    left: 0 !important;
+                                    width: 100% !important;
+                                    z-index: 9999999 !important;
+                                    transform: none !important;
+                                    clip: auto !important;
+                                    clip-path: none !important;
+                                    max-height: none !important;
+                                    overflow: visible !important;
+                                `;
+                                
+                                // Also force visibility of all child elements
+                                Array.from(elem.querySelectorAll('*')).forEach(child => {
+                                    child.style.visibility = 'visible !important';
+                                    child.style.opacity = '1 !important';
+                                    child.style.display = child.style.display === 'none' ? 'block !important' : child.style.display;
+                                });
+                                
+                                // Special handling for logos in headers
+                                const logos = elem.querySelectorAll('img[src*="logo"], [class*="logo"] img, [id*="logo"] img');
+                                logos.forEach(logo => {
+                                    logo.style.cssText += `
+                                        display: inline-block !important;
+                                        visibility: visible !important;
+                                        opacity: 1 !important;
+                                        max-width: none !important;
+                                        max-height: none !important;
+                                    `;
+                                });
                             }
                         }
                     """, selector)
-                    try:
-                        el_handle = page.query_selector(selector)
-                        if el_handle: el_handle.scroll_into_view_if_needed()
-                    except: pass
-            page.evaluate("window.scrollTo(0, 0)")
-            time.sleep(0.5)
+            
+            # Final extra attempt for Edinburgh Peace Institute specifically
+            # (since we know this is the site giving trouble)
+            page.evaluate("""
+                () => {
+                    // Try specific selectors for the Edinburgh Peace Institute site
+                    const siteSpecificSelectors = [
+                        '.site-header', 
+                        '.main-header', 
+                        '#masthead',
+                        'header.header',
+                        '.navigation-top',
+                        '.navbar-fixed-top'
+                    ];
+                    
+                    // Apply special handling for each potential header
+                    siteSpecificSelectors.forEach(selector => {
+                        const header = document.querySelector(selector);
+                        if (header) {
+                            console.log("Found Edinburgh Peace Institute specific header:", selector);
+                            header.style.cssText += `
+                                display: block !important;
+                                visibility: visible !important;
+                                opacity: 1 !important;
+                                position: fixed !important;
+                                top: 0 !important;
+                                left: 0 !important;
+                                width: 100% !important;
+                                z-index: 9999999 !important;
+                            `;
+                            
+                            // Deal with all nested elements
+                            const allHeaderElements = header.querySelectorAll('*');
+                            allHeaderElements.forEach(el => {
+                                el.style.visibility = 'visible !important';
+                                el.style.opacity = '1 !important';
+                                if (el.style.display === 'none') {
+                                    el.style.display = 'block !important';
+                                }
+                            });
+                        }
+                    });
+                }
+            """)
+            
+            # Make absolutely sure we're at the top of the page
+            page.evaluate("window.scrollTo({top: 0, behavior: 'auto'})")
+            time.sleep(1.0)  # Longer wait to ensure everything renders
+            
         except Exception as e:
             print(f"Error ensuring header visibility: {e}")
 
@@ -941,199 +1060,189 @@ class ScreenshotCapturer:
         try:
             youtube_videos = [v for v in video_elements if v.get("type") == "youtube" or (v.get("src") and ("youtube.com/" in v["src"] or "youtu.be/" in v["src"] or "youtube-nocookie.com/" in v["src"]))]
             if youtube_videos:
-                print(f"Attempting to force visibility and play for {len(youtube_videos)} YouTube videos...")
+                print(f"Attempting to force visibility for {len(youtube_videos)} YouTube videos...")
+                
+                # First approach - force CSS visibility on the parent container
                 for video_data in youtube_videos:
                     video_selector = video_data["selector"]
                     print(f"Processing YouTube video: {video_selector}")
-                    iframe_element_handle = page.query_selector(video_selector)
-                    if not iframe_element_handle:
-                        print(f"  YouTube iframe {video_selector} not found.")
-                        continue
+                    
+                    # Apply stronger CSS overrides to ensure visibility
                     page.evaluate("""
                         (selector) => {
-                            // Find the iframe
                             const iframe = document.querySelector(selector);
-                            if (iframe) {
-                                console.log("Forcing YouTube video visibility:", selector);
-                                
-                                // Make the YouTube iframe absolutely visible 
-                                iframe.style.opacity = '1 !important';
-                                iframe.style.visibility = 'visible !important';
-                                iframe.style.display = 'block !important';
-                                
-                                // If iframe is inside a relative/absolute positioned container, ensure z-index
-                                iframe.style.zIndex = '999999';
-                                
-                                // If it has a width/height of 0, force dimensions
-                                if (iframe.offsetWidth === 0 || iframe.offsetHeight === 0) {
-                                    iframe.style.width = '100%';
-                                    iframe.style.height = '100%';
-                                    iframe.style.minWidth = '300px';
-                                    iframe.style.minHeight = '200px';
-                                }
-                                
-                                // Modify src if needed to force autoplay
-                                if (iframe.src) {
-                                    try {
-                                        let url = new URL(iframe.src);
-                                        
-                                        // Clear any previous params then set our needed ones
-                                        // to avoid any conflicting parameters
-                                        url.searchParams.delete('autoplay');
-                                        url.searchParams.delete('mute');
-                                        url.searchParams.delete('controls');
-                                        url.searchParams.delete('loop');
-                                        
-                                        // Now set our parameters
-                                        url.searchParams.set('autoplay', '1');
-                                        url.searchParams.set('mute', '1');
-                                        url.searchParams.set('controls', '0');  // Hide controls for floorplans
-                                        url.searchParams.set('rel', '0');
-                                        url.searchParams.set('showinfo', '0');
-                                        url.searchParams.set('loop', '1');
-                                        
-                                        // Get video ID for playlist parameter
-                                        let videoId = '';
-                                        if (url.searchParams.has('v')) {
-                                            videoId = url.searchParams.get('v');
-                                        } else if (url.pathname.includes('/embed/')) {
-                                            videoId = url.pathname.split('/embed/')[1].split('?')[0];
-                                        }
-                                        
-                                        if (videoId) {
-                                            url.searchParams.set('playlist', videoId);
-                                        }
-                                        
-                                        // Update source with all our parameters
-                                        iframe.src = url.toString();
-                                    } catch(e) {
-                                        console.error("Error updating YouTube URL:", e);
-                                    }
-                                }
-                                
-                                // Set iframe attributes
-                                iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-                                iframe.allowFullscreen = true;
-                                
-                                // Make all parent elements visible
-                                let parent = iframe.parentElement;
-                                let depth = 0;
-                                
-                                while (parent && parent.tagName !== 'BODY' && depth < 10) {
-                                    // Force parent visibility
-                                    parent.style.opacity = '1 !important';
-                                    parent.style.visibility = 'visible !important';
-                                    parent.style.display = parent.style.display === 'none' ? 'block' : parent.style.display;
-                                    
-                                    // Handle potential stacking contexts
-                                    const parentStyle = window.getComputedStyle(parent);
-                                    if (parentStyle.position === 'relative' || 
-                                        parentStyle.position === 'absolute' || 
-                                        parentStyle.position === 'fixed') {
-                                        parent.style.zIndex = '999998';  // Just below the iframe
-                                    }
-                                    
-                                    parent = parent.parentElement;
-                                    depth++;
-                                }
-                                
-                                // Get the document element of the iframe if possible
-                                setTimeout(() => {
-                                    try {
-                                        // Try to reach into the iframe to force play
-                                        if (iframe.contentWindow) {
-                                            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-                                        }
-                                    } catch(e) {}
-                                }, 1000);
+                            if (!iframe) return;
+                            
+                            console.log("Applying YouTube visibility fixes:", selector);
+                            
+                            // IMPORTANT: Multiple approaches to ensure something appears
+                            
+                            // 1. Strong CSS visibility fixes with !important
+                            iframe.style.cssText += `
+                                opacity: 1 !important;
+                                visibility: visible !important; 
+                                display: block !important;
+                                position: relative !important;
+                                z-index: 999999 !important;
+                                min-width: 300px !important;
+                                min-height: 200px !important;
+                                background-color: #000 !important;
+                            `;
+                            
+                            // 2. Also force visibility on all parent containers
+                            let parent = iframe.parentElement;
+                            let depth = 0;
+                            while (parent && parent.tagName !== 'BODY' && depth < 10) {
+                                parent.style.cssText += `
+                                    opacity: 1 !important;
+                                    visibility: visible !important;
+                                    display: block !important;
+                                    z-index: 9999 !important;
+                                `;
+                                parent = parent.parentElement;
+                                depth++;
                             }
+                            
+                            // 3. Ensure src properly set with thumbnail display parameters
+                            try {
+                                // Get current src, working around potential edge cases
+                                let currentSrc = iframe.src || iframe.getAttribute('src') || '';
+                                if (!currentSrc || (!currentSrc.startsWith('http:') && !currentSrc.startsWith('https:'))) {
+                                    return; // Can't process empty or invalid URLs
+                                }
+                                
+                                // Extract video ID - this is crucial for showing at least thumbnail
+                                let url = new URL(currentSrc);
+                                let videoId = '';
+                                
+                                // Handle different YouTube URL formats
+                                if (url.searchParams.has('v')) {
+                                    videoId = url.searchParams.get('v');
+                                } else if (url.pathname.includes('/embed/')) {
+                                    videoId = url.pathname.split('/embed/')[1].split(/[?#/]/)[0];
+                                } else if (url.hostname.includes('youtu.be')) {
+                                    videoId = url.pathname.substring(1).split(/[?#/]/)[0];
+                                }
+                                
+                                if (videoId) {
+                                    // Create optimal thumbnail-showing URL to ensure something visible appears
+                                    // This is more reliable than trying to play the video
+                                    let thumbnailShowingUrl = `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&showinfo=1&rel=0&iv_load_policy=3&modestbranding=1`;
+                                    
+                                    // Only update if needed
+                                    if (iframe.src !== thumbnailShowingUrl) {
+                                        console.log("Setting thumbnail-optimized YouTube URL:", thumbnailShowingUrl);
+                                        iframe.src = thumbnailShowingUrl;
+                                    }
+                                    
+                                    // Also set a fallback background image using video ID just in case
+                                    // This provides double insurance something will show up
+                                    iframe.style.backgroundImage = `url(https://img.youtube.com/vi/${videoId}/0.jpg)`;
+                                    iframe.style.backgroundSize = 'cover';
+                                    iframe.style.backgroundPosition = 'center';
+                                }
+                                
+                            } catch(e) {
+                                console.error("Error updating YouTube iframe:", e);
+                            }
+                            
+                            // 4. Add attributes for maximum compatibility
+                            iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+                            iframe.allowFullscreen = true;
                         }
-                    """, video["selector"])
+                    """, video_selector)
+                    
+                    # Wait a moment for changes to take effect
                     page.wait_for_timeout(500)
-                    iframe_content_frame = iframe_element_handle.content_frame()
-                    if iframe_content_frame:
-                        print(f"  Got content_frame for {video_selector}")
-                        cookie_selectors_internal = [
-                            'button[aria-label*="Accept"]', 'button[aria-label*="Agree"]', 'button:has-text("Accept all")', 
-                            'button:has-text("Agree to all")', 'div[role="dialog"] button:has-text("Accept")', 
-                            'form[action*="consent"] button[type="submit"]', 'button.ytp-button[title*="Accept"]', 
-                            'div#dialog button.yt-spec-button-shape-next--filled', 'button[data-idom-class*="dismiss"]'
-                        ]
-                        for cs_selector_internal in cookie_selectors_internal:
-                            try:
-                                cookie_button_internal = iframe_content_frame.query_selector(cs_selector_internal)
-                                if cookie_button_internal and cookie_button_internal.is_visible():
-                                    print(f"    Attempting to click cookie button within iframe: {cs_selector_internal}")
-                                    cookie_button_internal.click(timeout=3000)
-                                    print(f"    Clicked cookie button {cs_selector_internal} within iframe.")
-                                    page.wait_for_timeout(1500)
-                                    break 
-                            except Exception: pass # Silently continue if cookie button fails
-                        
-                        current_iframe_src_attr = iframe_element_handle.get_attribute('src')
-                        if not current_iframe_src_attr:
-                             print(f"  YouTube iframe {video_selector} has no initial src. Cannot modify.")
-                        else:
-                            print(f"  Current iframe src (attribute): {current_iframe_src_attr}")
+                    
+                    # Try to access the iframe content if possible
+                    try:
+                        iframe_element_handle = page.query_selector(video_selector)
+                        if iframe_element_handle:
+                            # Force scroll to make sure the video is in view
+                            iframe_element_handle.scroll_into_view_if_needed()
+                            
+                            # Try sending YouTube iframe API messages
                             page.evaluate("""
-                                (args) => {
-                                    const selector = args.selector; let originalSrc = args.originalSrc;
+                                (selector) => {
                                     const iframe = document.querySelector(selector);
                                     if (iframe) {
+                                        // Try multiple methods of getting video to show
                                         try {
-                                            if (!originalSrc || (!originalSrc.startsWith('http:') && !originalSrc.startsWith('https:'))) {
-                                                if (iframe.src && (iframe.src.startsWith('http:') || iframe.src.startsWith('https:'))) originalSrc = iframe.src;
-                                                else return;
+                                            // Try PostMessage for YouTube iframe API
+                                            iframe.contentWindow.postMessage('{"event":"command","func":"stopVideo","args":""}', '*');
+                                            
+                                            // Add a play button overlay if none exists
+                                            const hasOverlay = iframe.nextElementSibling && 
+                                                            (iframe.nextElementSibling.classList.contains('play-button-overlay') ||
+                                                            iframe.nextElementSibling.classList.contains('youtube-overlay'));
+                                            
+                                            if (!hasOverlay) {
+                                                // Create a visual play button overlay
+                                                const overlay = document.createElement('div');
+                                                overlay.classList.add('youtube-overlay');
+                                                overlay.style.cssText = `
+                                                    position: absolute;
+                                                    top: 0;
+                                                    left: 0;
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    display: flex;
+                                                    align-items: center;
+                                                    justify-content: center;
+                                                    pointer-events: none;
+                                                    z-index: 999999;
+                                                `;
+                                                
+                                                const playButton = document.createElement('div');
+                                                playButton.style.cssText = `
+                                                    width: 68px;
+                                                    height: 48px;
+                                                    background-color: rgba(0,0,0,0.7);
+                                                    border-radius: 14px;
+                                                    display: flex;
+                                                    align-items: center;
+                                                    justify-content: center;
+                                                `;
+                                                
+                                                // Create triangle play icon
+                                                const triangle = document.createElement('div');
+                                                triangle.style.cssText = `
+                                                    width: 0;
+                                                    height: 0;
+                                                    border-style: solid;
+                                                    border-width: 12px 0 12px 20px;
+                                                    border-color: transparent transparent transparent #fff;
+                                                    margin-left: 4px;
+                                                `;
+                                                
+                                                playButton.appendChild(triangle);
+                                                overlay.appendChild(playButton);
+                                                
+                                                // Position the overlay correctly
+                                                const parent = iframe.parentElement;
+                                                if (parent && parent.style.position !== 'absolute' && parent.style.position !== 'relative') {
+                                                    parent.style.position = 'relative';
+                                                }
+                                                
+                                                // Insert overlay after the iframe
+                                                if (iframe.nextSibling) {
+                                                    iframe.parentNode.insertBefore(overlay, iframe.nextSibling);
+                                                } else {
+                                                    iframe.parentNode.appendChild(overlay);
+                                                }
                                             }
-                                            let url = new URL(originalSrc);
-                                            url.searchParams.set('autoplay', '1'); url.searchParams.set('mute', '1');
-                                            url.searchParams.set('controls', '0'); url.searchParams.set('showinfo', '0');
-                                            url.searchParams.set('rel', '0'); url.searchParams.set('iv_load_policy', '3');
-                                            url.searchParams.set('playsinline', '1'); url.searchParams.set('enablejsapi', '1');
-                                            let videoId = '';
-                                            if (url.searchParams.has('v')) videoId = url.searchParams.get('v');
-                                            else if (url.pathname.includes('/embed/')) {
-                                                const pathParts = url.pathname.split('/embed/');
-                                                if (pathParts.length > 1) videoId = pathParts[1].split(/[?\/]/)[0];
-                                            } else if (url.hostname.includes('youtube.com') && url.pathname.startsWith('/v/')) { // for some old /v/ type URLs
-                                                videoId = url.pathname.substring(3).split(/[?\/]/)[0];
-                                            }
-                                            if (videoId) {
-                                                url.searchParams.set('loop', '1'); url.searchParams.set('playlist', videoId);
-                                            } else { url.searchParams.delete('loop'); url.searchParams.delete('playlist'); }
-                                            const newSrc = url.toString();
-                                            if (iframe.getAttribute('src') !== newSrc) iframe.setAttribute('src', newSrc);
-                                            iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-                                            iframe.allowFullscreen = true;
-                                        } catch(e) { console.error("  Error updating YouTube iframe src in JS:", e, "Original src was:", originalSrc); }
+                                        } catch(e) {
+                                            console.log("Error during YouTube enhancement:", e);
+                                        }
                                     }
                                 }
-                                """, {"selector": video_selector, "originalSrc": current_iframe_src_attr }
-                            )
-                            page.wait_for_timeout(3000)
-                        iframe_content_frame = iframe_element_handle.content_frame() # Re-acquire
-                        if iframe_content_frame:
-                            try:
-                                play_button_selectors_internal = ['.ytp-large-play-button', 'button[aria-label="Play"]', '.ytp-play-button[title="Play"]', 'div.ytp-cued-thumbnail-overlay-image']
-                                play_clicked = False
-                                for pb_selector in play_button_selectors_internal:
-                                    play_button_handle = iframe_content_frame.query_selector(pb_selector)
-                                    if play_button_handle and play_button_handle.is_visible():
-                                        print(f"    Found play button/overlay ({pb_selector}) in iframe, attempting to click.")
-                                        play_button_handle.click(timeout=3000)
-                                        print(f"    Clicked play button/overlay ({pb_selector}) in iframe.")
-                                        page.wait_for_timeout(2000)
-                                        play_clicked = True; break 
-                                if not play_clicked:
-                                    iframe_content_frame.evaluateHandle('() => { window.postMessage(\'{"event":"command","func":"playVideo","args":""}\', "*") }')
-                                    print("    Sent 'playVideo' postMessage as a fallback.")
-                                    page.wait_for_timeout(1000)
-                            except Exception as e_play: print(f"    Error clicking play button or sending postMessage in iframe {video_selector}: {e_play}")
-                        else: print(f"  Could not re-acquire content_frame for {video_selector} after src modification for play click.")
-                    else: print(f"  Could not get content_frame for {video_selector} to interact internally.")
-                    print(f"  Finished processing YouTube video: {video_selector}")
-                    page.wait_for_timeout(500)
-                print(f"Waiting {self.video_play_time}s after all YouTube video processing attempts...")
+                            """, video_selector)
+                    except Exception as e:
+                        print(f"  Error with additional YouTube handling for {video_selector}: {e}")
+                
+                # Wait for rendering to complete
+                print(f"Waiting {self.video_play_time}s after YouTube processing...")
                 time.sleep(self.video_play_time)
         except Exception as e_main:
             print(f"General error in _force_youtube_video_visibility: {e_main}")
