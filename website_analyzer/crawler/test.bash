@@ -1,7 +1,111 @@
-shot-scraper https://www.scienceofpeople.com/social-hobbies/ -o screenshot.png \
+shot-scraper https://www.nytimes.com/international/ -o screenshot.png \
   --wait-for "document.readyState === 'complete'" \
   --javascript "
     new Promise(takeShot => {
+      // Function to handle cookie consent popups
+      const handleCookieConsent = async () => {
+        console.log('Looking for cookie consent dialogs...');
+        
+        // Common cookie consent button selectors
+        const acceptButtonSelectors = [
+          'button:has-text(\"Accept\")',
+          'button:has-text(\"Accept All\")',
+          'button:has-text(\"Agree\")',
+          'button:has-text(\"OK\")',
+          'button[id*=\"accept\"]',
+          'button[class*=\"accept\"]',
+          'a[id*=\"accept\"]',
+          'a[class*=\"accept\"]',
+          '.accept-all',
+          '#accept-all',
+          '[aria-label*=\"accept\"]',
+          '[aria-label*=\"cookies\"]',
+          '.cc-accept',
+          '#cookieAcceptButton',
+          // Add selectors from the visible popup in your screenshot
+          'button.tabindex',
+          '.accept-button',
+          'button[data-action=\"accept-all\"]',
+          'button:contains(\"Accept All\")'
+        ];
+        
+        // Try each selector
+        for (const selector of acceptButtonSelectors) {
+          try {
+            const buttons = document.querySelectorAll(selector);
+            for (const button of buttons) {
+              // Check if the button is visible and contains accept text
+              const buttonText = button.textContent.toLowerCase();
+              const rect = button.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0 && 
+                  (buttonText.includes('accept') || buttonText.includes('agree'))) {
+                console.log('Found cookie accept button:', buttonText);
+                button.click();
+                console.log('Clicked cookie accept button');
+                // Wait a moment for dialog to close
+                await new Promise(r => setTimeout(r, 500));
+                return true;
+              }
+            }
+          } catch (e) {
+            // Continue trying other selectors
+          }
+        }
+        
+        // Try clicking the specific button in the example
+        try {
+          // Directly target the 'Accept All' green button based on its appearance
+          const specificAcceptButton = document.querySelector('.tabindex[aria-label=\"Accept All\"], button.tabindex:nth-child(3)');
+          if (specificAcceptButton) {
+            console.log('Found specific accept button');
+            specificAcceptButton.click();
+            console.log('Clicked specific accept button');
+            await new Promise(r => setTimeout(r, 500));
+            return true;
+          }
+        } catch (e) {
+          console.log('Error clicking specific accept button:', e);
+        }
+        
+        // If all else fails, try to remove the consent dialog from the DOM
+        try {
+          // Look for common cookie dialog containers
+          const dialogSelectors = [
+            '[id*=\"cookie\"]', 
+            '[class*=\"cookie\"]',
+            '[id*=\"consent\"]',
+            '[class*=\"consent\"]',
+            '[id*=\"privacy\"]',
+            '[class*=\"privacy\"]',
+            '.modal',
+            '#modal',
+            '.dialog',
+            '#dialog',
+            // Specific to the dialog in your screenshot
+            '[role=\"dialog\"]',
+            '.privacy-dialog',
+            '.cookie-banner'
+          ];
+          
+          for (const selector of dialogSelectors) {
+            const dialogs = document.querySelectorAll(selector);
+            for (const dialog of dialogs) {
+              if (dialog.textContent.toLowerCase().includes('cookie') || 
+                  dialog.textContent.toLowerCase().includes('privacy') ||
+                  dialog.textContent.toLowerCase().includes('data')) {
+                console.log('Found cookie dialog, removing from DOM');
+                dialog.remove();
+                return true;
+              }
+            }
+          }
+        } catch (e) {
+          console.log('Error removing cookie dialog:', e);
+        }
+        
+        return false;
+      };
+      
       // Function to extract YouTube video ID
       const getYouTubeVideoId = (url) => {
         if (!url) return null;
@@ -143,13 +247,19 @@ shot-scraper https://www.scienceofpeople.com/social-hobbies/ -o screenshot.png \
       
       // Main execution
       const main = async () => {
-        console.log('Starting YouTube thumbnail replacement process (clean version)');
+        console.log('Starting processing sequence with cookie handling');
+        
+        // First handle any cookie consent popups
+        await handleCookieConsent();
         
         // Scroll to trigger lazy loading
         await triggerLazyLoading();
         
         // Wait a moment to ensure all content has loaded
         await new Promise(r => setTimeout(r, 1000));
+        
+        // One more check for cookie dialogs
+        await handleCookieConsent();
         
         // Replace YouTube iframes with clean thumbnails
         replaceWithCleanThumbnails();
@@ -159,6 +269,9 @@ shot-scraper https://www.scienceofpeople.com/social-hobbies/ -o screenshot.png \
         
         // Clean up any YouTube branding that might still be visible
         cleanupYouTubeElements();
+        
+        // Final check for any cookie dialogs that might have appeared
+        await handleCookieConsent();
         
         // Take screenshot
         console.log('Taking screenshot with clean YouTube thumbnails');
