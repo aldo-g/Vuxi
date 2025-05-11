@@ -1,35 +1,201 @@
 const fs = require('fs-extra');
 const path = require('path');
+const sharp = require('sharp');
 
 /**
- * Prepares an image for LLM analysis
+ * Validates and cleans up structured data from LLM.
+ * 
+ * @param {Object} data - The structured data from formatting stage
+ * @returns {Object} Validated and cleaned data
+ */
+function validateStructuredData(data) {
+  const errors = [];
+  
+  // Check required top-level keys
+  const requiredKeys = ["scores", "critical_issues", "recommendations", "summary"];
+  for (const key of requiredKeys) {
+    if (!data[key]) {
+      errors.push(`Missing required key: ${key}`);
+      data[key] = key === 'summary' ? { text: '', overall_score: 5 } : [];
+    }
+  }
+  
+  // Validate scores
+  if (data.scores) {
+    for (let i = 0; i < data.scores.length; i++) {
+      const score = data.scores[i];
+      if (!score.category) score.category = `Unnamed Category ${i + 1}`;
+      if (typeof score.score !== 'number' || score.score < 1 || score.score > 10) {
+        errors.push(`Score ${i} has invalid value: ${score.score}`);
+        score.score = 5;
+      }
+      if (!score.description) score.description = 'No description provided';
+    }
+  }
+  
+  // Validate critical issues
+  if (data.critical_issues) {
+    for (let i = 0; i < data.critical_issues.length; i++) {
+      const issue = data.critical_issues[i];
+      if (!issue.id) issue.id = i + 1;
+      if (!issue.title) issue.title = `Issue ${i + 1}`;
+      if (!['High', 'Medium', 'Low'].includes(issue.severity)) {
+        issue.severity = 'Medium';
+        errors.push(`Issue ${i} has invalid severity: ${issue.severity}`);
+      }
+      if (!issue.description) issue.description = 'No description provided';
+      if (!issue.area) issue.area = 'General';
+    }
+  }
+  
+  // Validate recommendations
+  if (data.recommendations) {
+    for (let i = 0; i < data.recommendations.length; i++) {
+      const rec = data.recommendations[i];
+      if (!rec.id) rec.id = i + 1;
+      if (!rec.title) rec.title = `Recommendation ${i + 1}`;
+      if (!['High', 'Medium', 'Low'].includes(rec.impact)) {
+        rec.impact = 'Medium';
+        errors.push(`Recommendation ${i} has invalid impact: ${rec.impact}`);
+      }
+      if (!rec.description) rec.description = 'No description provided';
+      if (!rec.area) rec.area = 'General';
+    }
+  }
+  
+  // Validate summary
+  if (data.summary) {
+    if (!data.summary.text) data.summary.text = 'No summary provided';
+    if (typeof data.summary.overall_score !== 'number' || 
+        data.summary.overall_score < 1 || 
+        data.summary.overall_score > 10) {
+      errors.push(`Overall score has invalid value: ${data.summary.overall_score}`);
+      data.summary.overall_score = 5;
+    }
+    if (!data.summary.priority_action) data.summary.priority_action = 'Review and improve the website';
+  }
+  
+  // Add validation results to data
+  data._validation = {
+    valid: errors.length === 0,
+    errors: errors
+  };
+  
+  return data;
+}
+
+/**
+ * Prepares an image for LLM analysis, resizing and compressing as needed
  * @param {string} imagePath - Path to the image file
  * @returns {Promise<Object>} Image data formatted for LLM
  */
 async function prepareImageForLLM(imagePath) {
   try {
-    // Read the image file
-    const imageBuffer = await fs.readFile(imagePath);
+    // First, get image dimensions
+    const metadata = await sharp(imagePath).metadata();
+    const { width, height } = metadata;
+    
+    console.log(`  📏 Image dimensions: ${width}x${height} (${path.basename(imagePath)})`);
+    
+    // Claude's limits
+    const maxDimension = 8000;
+    const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
+    
+    let processedBuffer;
+    let format = 'jpeg'; // We'll use JPEG for better compression
+    let quality = 85; // Starting quality
+    let resizeAttempts = 0;
+    const maxResizeAttempts = 3;
+    
+    // First pass: resize if needed
+    let currentWidth = width;
+    let currentHeight = height;
+    
+    if (width > maxDimension || height > maxDimension) {
+      console.log(`  ↩️  Resizing image to fit within ${maxDimension}px limit...`);
+      
+      // Calculate new dimensions while maintaining aspect ratio
+      if (width > height) {
+        currentWidth = maxDimension;
+        currentHeight = Math.round((height / width) * maxDimension);
+      } else {
+        currentHeight = maxDimension;
+        currentWidth = Math.round((width / height) * maxDimension);
+      }
+      
+      console.log(`  📐 New dimensions: ${currentWidth}x${currentHeight}`);
+    }
+    
+    // Keep trying to reduce file size until it's under 5MB
+    while (resizeAttempts < maxResizeAttempts) {
+      // Process the image with current settings
+      const sharpInstance = sharp(imagePath)
+        .resize(currentWidth, currentHeight, {
+          kernel: sharp.kernel.lanczos3,
+          withoutEnlargement: true
+        });
+      
+      // Apply format and quality
+      if (format === 'jpeg') {
+        sharpInstance.jpeg({ quality, progressive: true });
+      } else {
+        sharpInstance.png({ compressionLevel: 9, progressive: true });
+      }
+      
+      processedBuffer = await sharpInstance.toBuffer();
+      const bufferSize = processedBuffer.length;
+      
+      console.log(`  💾 File size: ${(bufferSize / 1024 / 1024).toFixed(2)}MB (quality: ${quality}, format: ${format})`);
+      
+      if (bufferSize <= maxFileSize) {
+        console.log(`  ✅ File size within limit`);
+        break;
+      }
+      
+      resizeAttempts++;
+      
+      // If still too large, try different compression strategies
+      if (resizeAttempts < maxResizeAttempts) {
+        if (quality > 60) {
+          // First, reduce quality
+          quality -= 15;
+          console.log(`  🔻 Reducing quality to ${quality}%`);
+        } else if (format === 'jpeg' && currentWidth > 600) {
+          // Then reduce dimensions more aggressively
+          currentWidth = Math.round(currentWidth * 0.8);
+          currentHeight = Math.round(currentHeight * 0.8);
+          quality = 85; // Reset quality for smaller image
+          console.log(`  📏 Further reducing dimensions to ${currentWidth}x${currentHeight}`);
+        } else {
+          // Last resort: switch to PNG with high compression
+          format = 'png';
+          quality = 100; // PNG doesn't use quality param
+          console.log(`  🔄 Switching to PNG format with maximum compression`);
+        }
+      }
+    }
+    
+    if (processedBuffer.length > maxFileSize) {
+      console.warn(`  ⚠️  Warning: Could not reduce image size below 5MB limit. Final size: ${(processedBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+      console.warn(`  ⚠️  This image may be rejected by the API`);
+    }
     
     // Convert to base64
-    const base64Data = imageBuffer.toString('base64');
+    const base64Data = processedBuffer.toString('base64');
     
-    // Determine media type from extension
-    const ext = path.extname(imagePath).toLowerCase();
-    let mediaType = 'image/png';
-    
-    if (ext === '.jpg' || ext === '.jpeg') {
-      mediaType = 'image/jpeg';
-    } else if (ext === '.gif') {
-      mediaType = 'image/gif';
-    } else if (ext === '.webp') {
-      mediaType = 'image/webp';
-    }
+    // Use the format we ended up with
+    const mediaType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
     
     return {
       data: base64Data,
       mediaType: mediaType,
-      filename: path.basename(imagePath)
+      filename: path.basename(imagePath),
+      originalSize: metadata.size,
+      processedSize: processedBuffer.length,
+      dimensions: {
+        original: { width, height },
+        processed: { width: currentWidth, height: currentHeight }
+      }
     };
   } catch (error) {
     console.error(`Error preparing image ${imagePath}:`, error);
@@ -232,5 +398,6 @@ module.exports = {
   extractUXRecommendations,
   extractPerformanceRecommendations,
   extractPageFindings,
-  extractPageSuggestions
+  extractPageSuggestions,
+  validateStructuredData
 };

@@ -1,14 +1,17 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const { OpenAI } = require('openai');
+// Import OpenAI only when needed
+let OpenAI;
+
 const fs = require('fs-extra');
 const path = require('path');
-const { loadImage, prepareImageForLLM } = require('./utils');
-const { getAnalysisPrompt, getTechnicalPrompt } = require('./prompts/analysis-prompt');
+const { prepareImageForLLM } = require('./utils');
+const { getAnalysisPrompt } = require('./prompts/analysis-prompt');
+const { getTechnicalPrompt } = require('./prompts/technical-prompt');
 
 class LLMAnalyzer {
   constructor(options = {}) {
     this.provider = options.provider || 'anthropic';
-    this.model = options.model || 'claude-3-5-sonnet-20241022';
+    this.model = options.model || 'claude-3-7-sonnet-20250219';
     this.screenshotsDir = options.screenshotsDir;
     this.lighthouseDir = options.lighthouseDir;
     
@@ -22,6 +25,10 @@ class LLMAnalyzer {
         apiKey: process.env.ANTHROPIC_API_KEY,
       });
     } else if (this.provider === 'openai') {
+      // Only require OpenAI if we're actually using it
+      if (!OpenAI) {
+        OpenAI = require('openai').OpenAI;
+      }
       this.client = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
       });
@@ -113,32 +120,30 @@ class LLMAnalyzer {
       timestamp: new Date().toISOString(),
       provider: this.provider,
       model: this.model,
-      overview: null,
       pageAnalyses: [],
       technicalSummary: null,
-      recommendations: null
+      overview: null  // This will be generated last
     };
     
     try {
-      // 1. Generate overview analysis
-      console.log('📊 Generating overview analysis...');
-      analysis.overview = await this.generateOverviewAnalysis(analysisData);
-      
-      // 2. Analyze each page
+      // 1. Analyze each page
       console.log('📄 Analyzing individual pages...');
       for (const [index, pageData] of analysisData.entries()) {
         console.log(`   Analyzing page ${index + 1}/${analysisData.length}: ${pageData.url}`);
         const pageAnalysis = await this.analyzeIndividualPage(pageData);
-        analysis.pageAnalyses.push(pageAnalysis);
+        analysis.pageAnalyses.push({
+          url: pageData.url,
+          analysis: pageAnalysis
+        });
       }
       
-      // 3. Generate technical summary
+      // 2. Generate technical summary
       console.log('🔧 Generating technical summary...');
       analysis.technicalSummary = await this.generateTechnicalSummary(analysisData);
       
-      // 4. Generate recommendations
-      console.log('💡 Generating recommendations...');
-      analysis.recommendations = await this.generateRecommendations(analysisData);
+      // 3. Generate comprehensive overview (last step)
+      console.log('📊 Generating comprehensive overview...');
+      analysis.overview = await this.generateComprehensiveOverview(analysisData, analysis);
       
     } catch (error) {
       console.error('Error during analysis:', error);
@@ -148,27 +153,16 @@ class LLMAnalyzer {
     return analysis;
   }
   
-  async generateOverviewAnalysis(analysisData) {
-    const prompt = getAnalysisPrompt('overview', {
-      pages: analysisData.map(page => ({
-        url: page.url,
-        lighthouseScores: page.lighthouse ? {
-          performance: page.lighthouse.scores.performance?.score,
-          accessibility: page.lighthouse.scores.accessibility?.score,
-          bestPractices: page.lighthouse.scores['best-practices']?.score,
-          seo: page.lighthouse.scores.seo?.score
-        } : null
-      }))
-    });
-    
-    // For overview, we'll just use text analysis
-    return await this.callLLM(prompt, null, 'overview');
-  }
-  
   async analyzeIndividualPage(pageData) {
     const prompt = getAnalysisPrompt('page', {
       url: pageData.url,
-      lighthouse: pageData.lighthouse
+      lighthouse: pageData.lighthouse,
+      page_type: pageData.page_type || 'webpage',
+      context: {
+        org_name: process.env.ORG_NAME || 'the organization',
+        org_type: process.env.ORG_TYPE || 'non-profit',
+        org_purpose: process.env.ORG_PURPOSE || 'to encourage donations and sign-ups for trainings'
+      }
     });
     
     // Include screenshot for page analysis
@@ -188,17 +182,35 @@ class LLMAnalyzer {
     return await this.callLLM(prompt, null, 'technical summary');
   }
   
-  async generateRecommendations(analysisData) {
-    const prompt = getAnalysisPrompt('recommendations', {
-      pages: analysisData
-    });
+  async generateComprehensiveOverview(analysisData, previousAnalysis) {
+    // Prepare comprehensive context
+    const overviewData = {
+      pages: analysisData.map(page => ({
+        url: page.url,
+        lighthouseScores: page.lighthouse ? {
+          performance: page.lighthouse.scores.performance?.score,
+          accessibility: page.lighthouse.scores.accessibility?.score,
+          bestPractices: page.lighthouse.scores['best-practices']?.score,
+          seo: page.lighthouse.scores.seo?.score
+        } : null
+      })),
+      pageAnalyses: previousAnalysis.pageAnalyses,
+      technicalSummary: previousAnalysis.technicalSummary,
+      context: {
+        org_name: process.env.ORG_NAME || 'the organization',
+        org_type: process.env.ORG_TYPE || 'non-profit',
+        org_purpose: process.env.ORG_PURPOSE || 'to encourage donations and sign-ups for trainings'
+      }
+    };
     
-    // Include all screenshots for comprehensive recommendations
+    const prompt = getAnalysisPrompt('comprehensive_overview', overviewData);
+    
+    // Include all screenshots for comprehensive overview
     const screenshots = analysisData
       .filter(page => page.screenshot)
       .map(page => page.screenshot);
     
-    return await this.callLLM(prompt, screenshots, 'recommendations');
+    return await this.callLLM(prompt, screenshots, 'comprehensive overview');
   }
   
   async callLLM(prompt, screenshots = null, analysisType = 'analysis') {

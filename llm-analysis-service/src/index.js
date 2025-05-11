@@ -3,7 +3,6 @@ const path = require('path');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const { LLMAnalyzer } = require('./analyzer');
-const { processAnalysisResults } = require('./utils');
 
 // Parse command line arguments
 const argv = yargs(hideBin(process.argv))
@@ -35,7 +34,7 @@ const argv = yargs(hideBin(process.argv))
   .option('model', {
     alias: 'm',
     type: 'string',
-    default: 'claude-3-5-sonnet-20241022',
+    default: 'claude-3-7-sonnet-20250219',
     description: 'Model to use for analysis'
   })
   .argv;
@@ -73,22 +72,14 @@ async function main() {
     
     // Run analysis
     console.log('\n🔍 Running LLM analysis...');
-    const rawAnalysis = await analyzer.analyzeWebsite();
-    
-    // Process and structure the results
-    console.log('\n📊 Processing analysis results...');
-    const processedAnalysis = await processAnalysisResults(rawAnalysis, screenshots, lighthouseData);
+    const analysis = await analyzer.analyzeWebsite();
     
     // Save results
     await fs.ensureDir(argv.output);
     
-    // Save raw analysis
-    const rawAnalysisPath = path.join(argv.output, 'raw-analysis.json');
-    await fs.writeJson(rawAnalysisPath, rawAnalysis, { spaces: 2 });
-    
-    // Save processed analysis
-    const processedAnalysisPath = path.join(argv.output, 'processed-analysis.json');
-    await fs.writeJson(processedAnalysisPath, processedAnalysis, { spaces: 2 });
+    // Save analysis with timestamp
+    const analysisPath = path.join(argv.output, 'analysis.json');
+    await fs.writeJson(analysisPath, analysis, { spaces: 2 });
     
     // Save metadata
     const metadata = {
@@ -107,8 +98,7 @@ async function main() {
     // Summary
     console.log('\n🎉 Analysis completed successfully');
     console.log(`⏱️  Duration: ${metadata.duration_seconds.toFixed(2)} seconds`);
-    console.log(`📄 Raw analysis saved to: ${rawAnalysisPath}`);
-    console.log(`📄 Processed analysis saved to: ${processedAnalysisPath}`);
+    console.log(`📄 Analysis saved to: ${analysisPath}`);
     console.log(`📄 Metadata saved to: ${metadataPath}`);
     
   } catch (error) {
