@@ -5,3 +5,5 @@ venv/
 .compile-context/
 website_analyzer/common/constants.py
 logs/
+output/
+.env

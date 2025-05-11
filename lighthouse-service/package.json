@@ -1,0 +1,27 @@
+{
+    "name": "lighthouse-service",
+    "version": "1.0.0",
+    "description": "Generates Lighthouse performance reports for URLs",
+    "main": "src/index.js",
+    "type": "commonjs",
+    "scripts": {
+      "start": "node src/index.js",
+      "debug": "node --inspect=0.0.0.0:9229 src/index.js"
+    },
+    "dependencies": {
+      "lighthouse": "~10.4.0",
+      "puppeteer": "~19.11.1",
+      "yargs": "^17.7.2",
+      "fs-extra": "^11.1.1"
+    },
+    "engines": {
+      "node": ">=18"
+    },
+    "keywords": [
+      "lighthouse",
+      "performance",
+      "microservice"
+    ],
+    "author": "",
+    "license": "MIT"
+  }

@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  url-discovery:
+    build: ./url-discovery-service
+    volumes:
+      - ./data:/app/data
+    environment:
+      - START_URL=${START_URL}
+      - MAX_PAGES=${MAX_PAGES:-20}
+    command: npm start -- --url "${START_URL}" --max-pages ${MAX_PAGES:-20} --output /app/data/urls.json
+
+  screenshot-service:
+    build: ./screenshot-service
+    depends_on:
+      - url-discovery
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TIMEOUT=30000
+      - VIEWPORT_WIDTH=1440
+      - VIEWPORT_HEIGHT=900
+      - CONCURRENT=3
+    command: |
+      sh -c "
+        echo 'Waiting for URL discovery to complete...'
+        while [ ! -f /app/data/urls_simple.json ]; do sleep 1; done
+        echo 'URL discovery complete, starting screenshots...'
+        npm start -- --input /app/data/urls_simple.json --output /app/data/screenshots
+      "
+
+  lighthouse-service:
+    build: ./lighthouse-service
+    depends_on:
+      - url-discovery
+    volumes:
+      - ./data:/app/data
+    environment:
+      - CONCURRENT=2
+      - RETRIES=2
+    command: |
+      sh -c "
+        echo 'Waiting for URL discovery to complete...'
+        while [ ! -f /app/data/urls_simple.json ]; do sleep 1; done
+        echo 'URL discovery complete, starting Lighthouse audits...'
+        npm start -- --input /app/data/urls_simple.json --output /app/data/lighthouse
+      "
+
+volumes:
+  data:
+    driver: local
