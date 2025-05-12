@@ -19,23 +19,31 @@ class LLMAnalyzer {
     this.initializeClient();
   }
   
-  initializeClient() {
-    if (this.provider === 'anthropic') {
-      this.client = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-      });
-    } else if (this.provider === 'openai') {
-      // Only require OpenAI if we're actually using it
-      if (!OpenAI) {
-        OpenAI = require('openai').OpenAI;
-      }
-      this.client = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-    } else {
-      throw new Error(`Unsupported provider: ${this.provider}`);
+    initializeClient() {
+        if (this.provider === 'anthropic') {
+        // Log the API key presence for debugging
+        console.log(`API Key present: ${process.env.ANTHROPIC_API_KEY ? 'Yes' : 'No'}`);
+        
+        this.client = new Anthropic({
+            apiKey: process.env.ANTHROPIC_API_KEY,
+        });
+        
+        // Verify the client was properly initialized
+        if (!this.client) {
+            throw new Error('Failed to initialize Anthropic client');
+        }
+        } else if (this.provider === 'openai') {
+        // Only require OpenAI if we're actually using it
+        if (!OpenAI) {
+            OpenAI = require('openai').OpenAI;
+        }
+        this.client = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        });
+        } else {
+        throw new Error(`Unsupported provider: ${this.provider}`);
+        }
     }
-  }
   
   async loadScreenshots() {
     try {
