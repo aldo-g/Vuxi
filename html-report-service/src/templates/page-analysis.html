@@ -18,7 +18,7 @@
     </div>
 </div>
 
-{% if page_analysis.scores %}
+{% if page_analysis.scores and page_analysis.scores.length > 0 %}
 <div class="section">
     <h2>Scores</h2>
     {% for score in page_analysis.scores %}
@@ -36,38 +36,79 @@
 </div>
 {% endif %}
 
-{% if page_analysis.critical_flaws %}
-<div class="section">
-    <h2>Critical Issues</h2>
-    {% for flaw in page_analysis.critical_flaws %}
-    <div class="critical-issue">{{ flaw }}</div>
-    {% endfor %}
+<!-- Tab navigation -->
+<div class="tabs">
+    <div class="tab active" data-tab="tab-flaws">Critical Issues</div>
+    <div class="tab" data-tab="tab-recommendations">Recommendations</div>
+    <div class="tab" data-tab="tab-summary">Summary</div>
+    <div class="tab" data-tab="tab-full">Full Analysis</div>
 </div>
-{% endif %}
 
-{% if page_analysis.recommendations %}
-<div class="section">
-    <h2>Recommendations</h2>
-    {% for recommendation in page_analysis.recommendations %}
-    <div class="recommendation">{{ recommendation }}</div>
-    {% endfor %}
+<div id="tab-flaws" class="tab-content active">
+    {% if page_analysis.critical_flaws and page_analysis.critical_flaws.length > 0 %}
+    <div class="section">
+        <h2>Critical Issues</h2>
+        {% for flaw in page_analysis.critical_flaws %}
+        <div class="critical-issue">{{ flaw }}</div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="section">
+        <p>No critical issues were identified for this page.</p>
+    </div>
+    {% endif %}
 </div>
-{% endif %}
 
-{% if page_analysis.summary %}
-<div class="section">
-    <h2>Summary</h2>
-    <p>{{ page_analysis.summary }}</p>
+<div id="tab-recommendations" class="tab-content">
+    {% if page_analysis.recommendations and page_analysis.recommendations.length > 0 %}
+    <div class="section">
+        <h2>Recommendations</h2>
+        {% for recommendation in page_analysis.recommendations %}
+        <div class="recommendation">{{ recommendation }}</div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="section">
+        <p>No specific recommendations were provided for this page.</p>
+    </div>
+    {% endif %}
 </div>
-{% endif %}
+
+<div id="tab-summary" class="tab-content">
+    <div class="section">
+        <h2>Summary</h2>
+        {% if page_analysis.summary %}
+        <div class="analysis-result">
+            <p>{{ page_analysis.summary }}</p>
+        </div>
+        {% else %}
+        <p>No summary available for this page.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div id="tab-full" class="tab-content">
+    <div class="section">
+        <h2>Complete Analysis</h2>
+        {% if page_analysis.full_analysis %}
+        <div class="analysis-result">
+            <pre>{{ page_analysis.full_analysis }}</pre>
+        </div>
+        {% else %}
+        <p>No detailed analysis available for this page.</p>
+        {% endif %}
+    </div>
+</div>
 
 <div class="section">
     <h2>Page Screenshot</h2>
-    <img src="../{{ screenshot_path }}" alt="{{ page_type }}" class="screenshot">
+    <div class="screenshot-container">
+        <img src="../screenshots/desktop/{{ screenshot_path }}" alt="{{ page_type }}" class="screenshot">
+    </div>
 </div>
 
 <div class="navigation">
     <a href="index.html">← Back to Pages</a>
-    <a href="../index.html">Overview →</a>
+    <a href="../index.html">View Overall Analysis →</a>
 </div>
 {% endblock %}

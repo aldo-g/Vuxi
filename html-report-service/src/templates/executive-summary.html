@@ -14,12 +14,16 @@
     </div>
 </div>
 
+{% if summary_results.overview %}
 <div class="section">
-    <h2>Overview</h2>
-    <p>{{ summary_results.overview }}</p>
+    <h2>Overall Assessment</h2>
+    <div class="analysis-result">
+        <p>{{ summary_results.overview }}</p>
+    </div>
 </div>
+{% endif %}
 
-{% if summary_results.critical_issues %}
+{% if summary_results.critical_issues and summary_results.critical_issues.length > 0 %}
 <div class="section">
     <h2>Critical Issues</h2>
     {% for issue in summary_results.critical_issues %}
@@ -28,7 +32,7 @@
 </div>
 {% endif %}
 
-{% if summary_results.recommendations %}
+{% if summary_results.recommendations and summary_results.recommendations.length > 0 %}
 <div class="section">
     <h2>Key Recommendations</h2>
     {% for recommendation in summary_results.recommendations %}
@@ -37,7 +41,7 @@
 </div>
 {% endif %}
 
-{% if summary_results.strengths %}
+{% if summary_results.strengths and summary_results.strengths.length > 0 %}
 <div class="section">
     <h2>Strengths</h2>
     {% for strength in summary_results.strengths %}
@@ -49,17 +53,21 @@
 {% if summary_results.technical %}
 <div class="section">
     <h2>Technical Overview</h2>
-    <p>{{ summary_results.technical }}</p>
+    <div class="analysis-result">
+        <p>{{ summary_results.technical }}</p>
+    </div>
 </div>
 {% endif %}
 
-{% if summary_results.page_summaries %}
+{% if summary_results.page_summaries and summary_results.page_summaries.length > 0 %}
 <div class="section">
     <h2>Page Analysis Summary</h2>
     {% for page_name, summary in summary_results.page_summaries %}
     <div style="margin-bottom: 20px;">
         <h3>{{ page_name }}</h3>
-        <p>{{ summary }}</p>
+        <div class="analysis-result">
+            <p>{{ summary }}</p>
+        </div>
     </div>
     {% endfor %}
 </div>

@@ -34,8 +34,12 @@ echo "----------------------------------------"
 echo "🧹 Cleaning up existing containers..."
 docker rm -f url-discovery-temp screenshot-temp lighthouse-temp analysis-temp html-report-temp 2>/dev/null
 
-# Create output directory
-mkdir -p output
+# Create output directory structure
+mkdir -p output/urls
+mkdir -p output/screenshots
+mkdir -p output/lighthouse
+mkdir -p output/analysis
+mkdir -p output/reports
 
 # Build images with unique tags
 echo "🔨 Building containers..."
@@ -65,7 +69,8 @@ fi
 
 # Copy URLs from container
 echo "📥 Copying URL list..."
-docker cp url-discovery-temp:/tmp/urls_simple.json ./output/urls.json
+docker cp url-discovery-temp:/tmp/urls.json ./output/urls/urls.json
+docker cp url-discovery-temp:/tmp/urls_simple.json ./output/urls/urls_simple.json
 docker rm -f url-discovery-temp
 
 # 2. Run screenshot and lighthouse services concurrently
@@ -73,14 +78,15 @@ echo "📸🚦 Starting screenshots and Lighthouse audits..."
 
 # Start screenshot service
 docker run -d --name screenshot-temp screenshot-service-local sh -c "while true; do sleep 1; done"
-docker cp ./output/urls.json screenshot-temp:/tmp/urls.json
+docker cp ./output/urls/urls_simple.json screenshot-temp:/tmp/urls.json
 (
     echo "🖼️  Running screenshot service..."
-    if ! docker exec screenshot-temp npm start -- --input /tmp/urls.json --output /tmp/screenshots; then
+    if ! docker exec screenshot-temp npm start -- --input /tmp/urls.json --output /tmp/output; then
         echo "❌ Screenshot service failed"
     else
         echo "📥 Copying screenshots..."
-        docker cp screenshot-temp:/tmp/screenshots ./output/screenshots
+        docker cp screenshot-temp:/tmp/output/desktop ./output/screenshots/
+        docker cp screenshot-temp:/tmp/output/metadata.json ./output/screenshots/
         echo "✅ Screenshots completed"
     fi
     docker rm -f screenshot-temp
@@ -89,14 +95,16 @@ SCREENSHOT_PID=$!
 
 # Start lighthouse service
 docker run -d --name lighthouse-temp lighthouse-service-local sh -c "while true; do sleep 1; done"
-docker cp ./output/urls.json lighthouse-temp:/tmp/urls.json
+docker cp ./output/urls/urls_simple.json lighthouse-temp:/tmp/urls.json
 (
     echo "🚦 Running Lighthouse service..."
-    if ! docker exec lighthouse-temp npm start -- --input /tmp/urls.json --output /tmp/lighthouse; then
+    if ! docker exec lighthouse-temp npm start -- --input /tmp/urls.json --output /tmp/output; then
         echo "❌ Lighthouse service failed"
     else
         echo "📥 Copying Lighthouse reports..."
-        docker cp lighthouse-temp:/tmp/lighthouse ./output/lighthouse
+        docker cp lighthouse-temp:/tmp/output/reports ./output/lighthouse/
+        docker cp lighthouse-temp:/tmp/output/trimmed ./output/lighthouse/
+        docker cp lighthouse-temp:/tmp/output/lighthouse-summary.json ./output/lighthouse/
         echo "✅ Lighthouse completed"
     fi
     docker rm -f lighthouse-temp
@@ -134,15 +142,14 @@ if ! docker exec -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" analysis-temp npm sta
     --model claude-3-7-sonnet-20250219; then
     
     echo "❌ LLM analysis failed"
-    mkdir -p output/analysis
     echo "{\"error\": \"Analysis failed\", \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" > output/analysis/analysis.json
 else
     echo "✅ LLM analysis completed successfully"
     
-    # Copy the analysis output - create directory if needed
+    # Copy the analysis output
     echo "📥 Copying analysis results..."
-    mkdir -p output/analysis
-    docker cp analysis-temp:/app/data/analysis ./output/
+    docker cp analysis-temp:/app/data/analysis/analysis.json ./output/analysis/
+    docker cp analysis-temp:/app/data/analysis/analysis-metadata.json ./output/analysis/
 fi
 
 docker rm -f analysis-temp
@@ -199,9 +206,6 @@ EOF
         
         # Check if reports directory exists
         if docker exec html-report-temp ls -la /app/data/reports; then
-            # Make sure the output directory exists
-            mkdir -p output/reports
-            
             # Copy all files from the reports directory
             docker cp html-report-temp:/app/data/reports/. output/reports/
             
@@ -247,11 +251,6 @@ fi
 
 docker rm -f html-report-temp
 
-# Cleanup
-if [ -f "./output/urls.json" ]; then
-    rm ./output/urls.json
-fi
-
 echo "----------------------------------------"
 echo "✅ Analysis pipeline completed!"
 
@@ -281,6 +280,7 @@ if [ -d "output/reports" ]; then
 fi
 
 echo "📁 Results saved to:"
+echo "   - URLs: output/urls/"
 echo "   - Screenshots: output/screenshots/desktop/"
 echo "   - Lighthouse reports: output/lighthouse/reports/"
 echo "   - Lighthouse trimmed: output/lighthouse/trimmed/"

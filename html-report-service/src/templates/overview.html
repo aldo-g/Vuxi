@@ -3,63 +3,77 @@
 {% block content %}
 <h1>Website Analysis Overview</h1>
 
-<div class="info-grid">
-    <div class="info-card">
-        <div class="info-label">Organization</div>
-        <div class="info-value">{{ organization }}</div>
+<div class="org-info">
+    <div class="org-info-item">
+        <div class="org-info-label">Organization</div>
+        <div class="org-info-value">{{ organization }}</div>
     </div>
-    <div class="info-card">
-        <div class="info-label">Analysis Date</div>
-        <div class="info-value">{{ analysis_date }}</div>
+    <div class="org-info-item">
+        <div class="org-info-label">Analysis Date</div>
+        <div class="org-info-value">{{ analysis_date }}</div>
     </div>
-    <div class="info-card">
-        <div class="info-label">Pages Analyzed</div>
-        <div class="info-value">{{ screenshots_analyzed }}</div>
+    <div class="org-info-item">
+        <div class="org-info-label">Pages Analyzed</div>
+        <div class="org-info-value">{{ screenshots_analyzed }}</div>
     </div>
 </div>
 
-{% if overview_content.executive_summary %}
-<div class="section">
-    <h2>Executive Summary</h2>
-    <p>{{ overview_content.executive_summary }}</p>
+<div class="tabs">
+    <div class="tab active" data-tab="tab-summary">Executive Summary</div>
+    <div class="tab" data-tab="tab-findings">Key Findings</div>
+    <div class="tab" data-tab="tab-recommendations">Recommendations</div>
 </div>
-{% endif %}
 
-{% if overview_content.key_findings %}
-<div class="section">
-    <h2>Key Findings</h2>
-    {% for finding in overview_content.key_findings %}
-    <div class="list-item">{{ finding }}</div>
-    {% endfor %}
+<div id="tab-summary" class="tab-content active">
+    {% if overview_content.executive_summary %}
+    <div class="section">
+        <h2>Executive Summary</h2>
+        <div class="analysis-result">
+            <p>{{ overview_content.executive_summary }}</p>
+        </div>
+    </div>
+    {% endif %}
 </div>
-{% endif %}
 
-{% if overview_content.strategic_recommendations %}
-<div class="section">
-    <h2>Strategic Recommendations</h2>
-    {% for recommendation in overview_content.strategic_recommendations %}
-    <div class="recommendation">{{ recommendation }}</div>
-    {% endfor %}
-</div>
-{% endif %}
+<div id="tab-findings" class="tab-content">
+    {% if overview_content.key_findings %}
+    <div class="section">
+        <h2>Key Findings</h2>
+        {% for finding in overview_content.key_findings %}
+        <div class="list-item">{{ finding }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
-{% if overview_content.theme_assessment %}
-<div class="section">
-    <h2>Theme Assessment</h2>
-    {% for item in overview_content.theme_assessment %}
-    <div class="list-item">{{ item }}</div>
-    {% endfor %}
+    {% if overview_content.theme_assessment %}
+    <div class="section">
+        <h2>Theme Assessment</h2>
+        {% for item in overview_content.theme_assessment %}
+        <div class="list-item">{{ item }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
-{% endif %}
 
-{% if overview_content.implementation_roadmap %}
-<div class="section">
-    <h2>Implementation Roadmap</h2>
-    {% for item in overview_content.implementation_roadmap %}
-    <div class="list-item">{{ item }}</div>
-    {% endfor %}
+<div id="tab-recommendations" class="tab-content">
+    {% if overview_content.strategic_recommendations %}
+    <div class="section">
+        <h2>Strategic Recommendations</h2>
+        {% for recommendation in overview_content.strategic_recommendations %}
+        <div class="recommendation">{{ recommendation }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if overview_content.implementation_roadmap %}
+    <div class="section">
+        <h2>Implementation Roadmap</h2>
+        {% for item in overview_content.implementation_roadmap %}
+        <div class="list-item">{{ item }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
-{% endif %}
 
 <div class="navigation">
     <a href="pages/index.html">View Individual Pages →</a>

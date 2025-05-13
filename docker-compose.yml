@@ -46,6 +46,78 @@ services:
         npm start -- --input /app/data/urls_simple.json --output /app/data/lighthouse
       "
 
+  llm-analysis-service:
+    build: ./llm-analysis-service
+    depends_on:
+      - screenshot-service
+      - lighthouse-service
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - MODEL=${MODEL:-claude-3-7-sonnet-20250219}
+    command: |
+      sh -c "
+        echo 'Waiting for screenshots and Lighthouse audits to complete...'
+        # Better check for actual files created, not just directories
+        mkdir -p /app/data/screenshots/desktop
+        while [ ! -f /app/data/screenshots/metadata.json ] || [ ! -d /app/data/lighthouse/reports ]; do 
+          echo 'Still waiting for prerequisites...'
+          # Copy screenshots to desktop subdirectory for compatibility
+          if [ -f /app/data/screenshots/metadata.json ]; then
+            cp /app/data/screenshots/*.png /app/data/screenshots/desktop/ 2>/dev/null || true
+          fi
+          sleep 5
+        done
+        # Wait a bit more to ensure all files are written
+        sleep 10
+        echo 'Prerequisites complete, starting LLM analysis...'
+        npm start -- --screenshots /app/data/screenshots --lighthouse /app/data/lighthouse --output /app/data/analysis --provider anthropic --model ${MODEL:-claude-3-7-sonnet-20250219}
+      "
+
+  formatting-service:
+    build: ./formatting-service
+    depends_on:
+      - llm-analysis-service
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - MODEL=${MODEL:-claude-3-7-sonnet-20250219}
+    command: |
+      sh -c "
+        echo 'Waiting for LLM analysis to complete...'
+        while [ ! -f /app/data/analysis/analysis.json ]; do 
+          echo 'Waiting for analysis.json...'
+          sleep 5
+        done
+        echo 'LLM analysis complete, starting formatting...'
+        npm start -- --input /app/data/analysis/analysis.json --output /app/data/analysis/structured-analysis.json --model ${MODEL:-claude-3-7-sonnet-20250219}
+      "
+
+  html-report-service:
+    build: ./html-report-service
+    depends_on:
+      - formatting-service
+    volumes:
+      - ./data:/app/data
+    command: |
+      sh -c "
+        echo 'Waiting for formatting to complete...'
+        while [ ! -f /app/data/analysis/structured-analysis.json ]; do 
+          # Fallback to the original analysis if formatting is taking too long
+          if [ -f /app/data/analysis/analysis.json ] && [ ! -f /app/data/analysis/structured-analysis.json ] && [ \$(find /app/data/analysis/analysis.json -mmin +2) ]; then
+            echo 'Formatting seems to be taking too long, proceeding with original analysis.json'
+            cp /app/data/analysis/analysis.json /app/data/analysis/structured-analysis.json
+            break
+          fi
+          echo 'Waiting for structured-analysis.json...'
+          sleep 5
+        done
+        echo 'Starting HTML report generation...'
+        npm start -- --input /app/data/analysis/structured-analysis.json --screenshots /app/data/screenshots --output /app/data/reports
+      "
+
 volumes:
   data:
     driver: local

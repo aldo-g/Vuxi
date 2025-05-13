@@ -7,3 +7,4 @@ website_analyzer/common/constants.py
 logs/
 output/
 .env
+data/
