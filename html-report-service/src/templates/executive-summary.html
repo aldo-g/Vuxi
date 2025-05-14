@@ -12,61 +12,86 @@
         <div class="info-label">Report Date</div>
         <div class="info-value">{{ report_date }}</div>
     </div>
+    <div class="info-card">
+        <div class="info-label">Overall Score</div>
+        <div class="info-value {% if overall_score >= 8 %}good{% elif overall_score >= 6 %}average{% else %}poor{% endif %}">
+            {{ overall_score }}/10
+        </div>
+    </div>
 </div>
 
-{% if summary_results.overview %}
+<!-- Performance Scores -->
+{% if scores and scores.length > 0 %}
+<div class="section">
+    <h2>Performance Scores</h2>
+    {% for score in scores %}
+    <div class="score-item">
+        <div class="score-label">{{ score.category }}</div>
+        <div class="score-bar">
+            <div class="score-fill {% if score.score >= 8 %}good{% elif score.score >= 6 %}average{% else %}poor{% endif %}" 
+                 style="width: {{ score.score * 10 }}%"></div>
+        </div>
+        <div class="score-value {% if score.score >= 8 %}good{% elif score.score >= 6 %}average{% else %}poor{% endif %}">
+            {{ score.score }}/10
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if overview %}
 <div class="section">
     <h2>Overall Assessment</h2>
     <div class="analysis-result">
-        <p>{{ summary_results.overview }}</p>
+        <p>{{ overview }}</p>
     </div>
 </div>
 {% endif %}
 
-{% if summary_results.critical_issues and summary_results.critical_issues.length > 0 %}
+{% if critical_issues and critical_issues.length > 0 %}
 <div class="section">
     <h2>Critical Issues</h2>
-    {% for issue in summary_results.critical_issues %}
+    {% for issue in critical_issues %}
     <div class="critical-issue">{{ issue }}</div>
     {% endfor %}
 </div>
 {% endif %}
 
-{% if summary_results.recommendations and summary_results.recommendations.length > 0 %}
+{% if recommendations and recommendations.length > 0 %}
 <div class="section">
     <h2>Key Recommendations</h2>
-    {% for recommendation in summary_results.recommendations %}
+    {% for recommendation in recommendations %}
     <div class="recommendation">{{ recommendation }}</div>
     {% endfor %}
 </div>
 {% endif %}
 
-{% if summary_results.strengths and summary_results.strengths.length > 0 %}
+{% if strengths and strengths.length > 0 %}
 <div class="section">
     <h2>Strengths</h2>
-    {% for strength in summary_results.strengths %}
+    {% for strength in strengths %}
     <div class="list-item">{{ strength }}</div>
     {% endfor %}
 </div>
 {% endif %}
 
-{% if summary_results.technical %}
+{% if technical_summary %}
 <div class="section">
     <h2>Technical Overview</h2>
     <div class="analysis-result">
-        <p>{{ summary_results.technical }}</p>
+        <p>{{ technical_summary }}</p>
     </div>
 </div>
 {% endif %}
 
-{% if summary_results.page_summaries and summary_results.page_summaries.length > 0 %}
+{% if page_summaries and page_summaries.length > 0 %}
 <div class="section">
     <h2>Page Analysis Summary</h2>
-    {% for page_name, summary in summary_results.page_summaries %}
+    {% for page in page_summaries %}
     <div style="margin-bottom: 20px;">
-        <h3>{{ page_name }}</h3>
+        <h3>{{ page.name }}</h3>
         <div class="analysis-result">
-            <p>{{ summary }}</p>
+            <p>{{ page.summary }}</p>
         </div>
     </div>
     {% endfor %}

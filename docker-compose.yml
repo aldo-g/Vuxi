@@ -1,6 +1,12 @@
 version: '3.8'
 
 services:
+  cleanup:
+    image: alpine:latest
+    volumes:
+      - ./data:/app/data
+    command: sh -c "echo '🧹 Cleaning up data directory...' && rm -rf /app/data/* && mkdir -p /app/data && echo '✅ Data directory cleaned'"
+
   url-discovery:
     build: ./url-discovery-service
     volumes:
