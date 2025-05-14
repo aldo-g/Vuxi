@@ -35,6 +35,10 @@ RUN npm config set registry https://registry.npmjs.org/ && \
 COPY src/ ./src/
 COPY config/ ./config/
 
+# Add entrypoint script for cleanup
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Set environment variables for Chromium
 ENV NODE_ENV=production
 ENV CHROME_PATH=/usr/bin/chromium
@@ -42,6 +46,9 @@ ENV CHROME_BIN=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV DISPLAY=:99
+
+# Use entrypoint for cleanup
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command
 CMD ["npm", "start"]
