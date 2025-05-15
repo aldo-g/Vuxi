@@ -61,7 +61,8 @@ Run the Container
 Basic usage:
 bashdocker run -v $(pwd)/data:/app/data url-discovery-service npm start -- --url https://example.com --output /app/data/urls.json
 With all options:
-bashdocker run -v $(pwd)/data:/app/data url-discovery-service npm start -- \
+bash
+docker run -v $(pwd)/data:/app/data url-discovery-service npm start -- \
   --url https://example.com \
   --output /app/data/urls.json \
   --max-pages 20 \
