@@ -1,4 +1,5 @@
 FROM node:24-bullseye
+
 # Install required dependencies for Lighthouse and Chromium
 RUN apt-get update && \
     apt-get install -y \
@@ -20,7 +21,12 @@ RUN apt-get update && \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
+    python3 \
+    python3-pip \
+    curl \
+    unzip && \
+    pip3 install awscli && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -37,7 +43,9 @@ COPY config/ ./config/
 
 # Add entrypoint script for cleanup
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY s3-download.sh /app/s3-download.sh
+COPY s3-upload.sh /app/s3-upload.sh
+RUN chmod +x /entrypoint.sh /app/s3-download.sh /app/s3-upload.sh
 
 # Set environment variables for Chromium
 ENV NODE_ENV=production
@@ -46,6 +54,10 @@ ENV CHROME_BIN=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV DISPLAY=:99
+ENV ENVIRONMENT=aws
+
+# Create data directory
+RUN mkdir -p /app/data/lighthouse/reports /app/data/lighthouse/trimmed
 
 # Use entrypoint for cleanup
 ENTRYPOINT ["/entrypoint.sh"]
