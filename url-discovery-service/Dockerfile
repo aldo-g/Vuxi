@@ -1,4 +1,4 @@
-# Add this to your Dockerfile in url-discovery-service
+# Use the ARM64 Playwright image
 FROM mcr.microsoft.com/playwright:v1.52.0-jammy
 
 WORKDIR /app
