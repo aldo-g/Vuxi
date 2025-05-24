@@ -1,4 +1,4 @@
-cat > s3-upload.sh << 'EOF'
+# lighthouse-service/s3-upload.sh
 #!/bin/bash
 # s3-upload.sh - Uploads lighthouse reports to S3
 
@@ -8,14 +8,22 @@ if [ "$ENVIRONMENT" = "aws" ]; then
   
   # Check if the directory exists
   if [ -d "$1" ]; then
-    # Create directory structure in S3
+    # Use JOB_ID from environment or create timestamp-based one
     JOB_ID=${JOB_ID:-$(date +%Y%m%d%H%M%S)}
     S3_PATH="s3://${S3_BUCKET:-website-analyzer-data}/jobs/${JOB_ID}/lighthouse/"
     
+    echo "📤 Uploading to JOB_ID: $JOB_ID"
+    
     # Upload reports to S3
-    echo "📤 Uploading reports from $1 to $S3_PATH"
-    aws s3 cp "$1/reports" "${S3_PATH}reports" --recursive
-    aws s3 cp "$1/trimmed" "${S3_PATH}trimmed" --recursive
+    if [ -d "$1/reports" ]; then
+      echo "📤 Uploading reports from $1/reports to ${S3_PATH}reports"
+      aws s3 cp "$1/reports" "${S3_PATH}reports" --recursive
+    fi
+    
+    if [ -d "$1/trimmed" ]; then
+      echo "📤 Uploading trimmed reports from $1/trimmed to ${S3_PATH}trimmed"
+      aws s3 cp "$1/trimmed" "${S3_PATH}trimmed" --recursive
+    fi
     
     # Upload metadata if it exists
     if [ -f "$1/lighthouse-summary.json" ]; then
@@ -37,6 +45,3 @@ if [ "$ENVIRONMENT" = "aws" ]; then
 else
   echo "🖥️ Running in local environment, skipping S3 upload"
 fi
-EOF
-
-chmod +x s3-upload.sh
