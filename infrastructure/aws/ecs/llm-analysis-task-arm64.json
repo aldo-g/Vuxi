@@ -1,0 +1,67 @@
+{
+    "family": "llm-analysis-task",
+    "networkMode": "awsvpc",
+    "executionRoleArn": "arn:aws:iam::907929922976:role/ecsTaskExecutionRole",
+    "taskRoleArn": "arn:aws:iam::907929922976:role/ecsTaskRole",
+    "containerDefinitions": [
+      {
+        "name": "llm-analysis-container",
+        "image": "907929922976.dkr.ecr.eu-west-1.amazonaws.com/llm-analysis-service:arm64-latest",
+        "essential": true,
+        "logConfiguration": {
+          "logDriver": "awslogs",
+          "options": {
+            "awslogs-group": "/ecs/llm-analysis-task",
+            "awslogs-region": "eu-west-1",
+            "awslogs-stream-prefix": "ecs"
+          }
+        },
+        "environment": [
+          {
+            "name": "ENVIRONMENT",
+            "value": "aws"
+          },
+          {
+            "name": "S3_BUCKET",
+            "value": "website-analyzer-data"
+          },
+          {
+            "name": "AWS_REGION",
+            "value": "eu-west-1"
+          },
+          {
+            "name": "MODEL",
+            "value": "claude-3-7-sonnet-20250219"
+          }
+        ],
+        "secrets": [
+          {
+            "name": "ANTHROPIC_API_KEY",
+            "valueFrom": "arn:aws:secretsmanager:eu-west-1:907929922976:secret:anthropic-api-key-7pc69j:ANTHROPIC_API_KEY::"
+          }
+        ],
+        "command": [
+          "npm", 
+          "start", 
+          "--", 
+          "--screenshots", 
+          "/app/data/screenshots", 
+          "--lighthouse", 
+          "/app/data/lighthouse", 
+          "--output", 
+          "/app/data/analysis",
+          "--provider",
+          "anthropic"
+        ]
+      }
+    ],
+    "requiresCompatibilities": [
+      "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "2048",
+    "runtimePlatform": {
+      "cpuArchitecture": "ARM64",
+      "operatingSystemFamily": "LINUX"
+    }
+  }

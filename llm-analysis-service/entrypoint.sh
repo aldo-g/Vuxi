@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Define the output path - adjust if your command uses a different path
+# Define the output path
 OUTPUT_DIR="/app/data/analysis"
 
 # Check if analysis directory exists and clean up analysis files
@@ -14,5 +14,17 @@ fi
 # Make sure the directory exists
 mkdir -p $OUTPUT_DIR
 
+# Download prerequisites from S3 if in AWS environment
+if [ "$ENVIRONMENT" = "aws" ]; then
+  echo "🔄 Downloading screenshots and lighthouse data from S3..."
+  /app/s3-download.sh
+fi
+
 # Execute the command passed to docker run
-exec "$@"
+"$@"
+
+# Upload results to S3 if in AWS environment
+if [ "$ENVIRONMENT" = "aws" ]; then
+  echo "🔄 Uploading analysis results to S3..."
+  /app/s3-upload.sh "$OUTPUT_DIR"
+fi

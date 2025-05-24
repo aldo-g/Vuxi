@@ -14,5 +14,17 @@ fi
 # Make sure the directory exists
 mkdir -p "/app/data/analysis"
 
-# Execute the command passed to docker run
-exec "$@"
+# Download prerequisites from S3 if in AWS environment
+if [ "$ENVIRONMENT" = "aws" ]; then
+  echo "🔄 Downloading analysis data from S3..."
+  /app/s3-download.sh
+fi
+
+# Run the command (without exec to allow for subsequent steps)
+"$@"
+
+# Upload results to S3 if in AWS environment
+if [ "$ENVIRONMENT" = "aws" ]; then
+  echo "🔄 Uploading structured analysis to S3..."
+  /app/s3-upload.sh "$OUTPUT_FILE"
+fi
