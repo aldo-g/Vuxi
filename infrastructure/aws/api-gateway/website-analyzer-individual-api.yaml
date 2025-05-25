@@ -1,0 +1,156 @@
+openapi: 3.0.1
+info:
+  title: Website Analyzer Individual Services API
+  description: API for running individual website analysis services
+  version: 1.0.0
+
+paths:
+  /url-discovery:
+    post:
+      summary: Discover URLs from a website
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri }
+                maxPages: { type: integer, default: 20 }
+                jobId: { type: string, description: "Optional custom job ID" }
+                timeout: { type: integer, default: 30000 }
+                waitTime: { type: integer, default: 2 }
+                excludePatterns: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: URL discovery started
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:907929922976:function:url-discovery/invocations
+
+  /screenshots:
+    post:
+      summary: Capture website screenshots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobId: { type: string, description: "Job ID with existing URLs" }
+                customUrls: { type: array, items: { type: string }, description: "Or provide URLs directly" }
+                timeout: { type: integer, default: 30000 }
+                viewport: { type: string, default: "1440x900" }
+                concurrent: { type: integer, default: 3 }
+      responses:
+        '200':
+          description: Screenshot capture started
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:907929922976:function:screenshots/invocations
+
+  /lighthouse:
+    post:
+      summary: Run Lighthouse performance audits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobId: { type: string, description: "Job ID with existing URLs" }
+                customUrls: { type: array, items: { type: string }, description: "Or provide URLs directly" }
+                concurrent: { type: integer, default: 1 }
+                retries: { type: integer, default: 2 }
+      responses:
+        '200':
+          description: Lighthouse audits started
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:907929922976:function:lighthouse/invocations
+
+  /llm-analysis:
+    post:
+      summary: Run AI-powered UX/UI analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jobId]
+              properties:
+                jobId: { type: string, description: "Job ID with screenshots and lighthouse data" }
+                provider: { type: string, enum: [anthropic, openai], default: anthropic }
+                model: { type: string, default: "claude-3-7-sonnet-20250219" }
+      responses:
+        '200':
+          description: LLM analysis started
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:907929922976:function:llm-analysis/invocations
+
+  /formatting:
+    post:
+      summary: Format raw analysis into structured data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jobId]
+              properties:
+                jobId: { type: string, description: "Job ID with existing analysis.json" }
+                model: { type: string, default: "claude-3-7-sonnet-20250219" }
+      responses:
+        '200':
+          description: Formatting started
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:907929922976:function:formatting/invocations
+
+  /html-reports:
+    post:
+      summary: Generate HTML reports
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jobId]
+              properties:
+                jobId: { type: string, description: "Job ID with structured analysis and screenshots" }
+      responses:
+        '200':
+          description: HTML report generation started
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:907929922976:function:html-reports/invocations
+
+  /job/{jobId}/status:
+    get:
+      summary: Get job status (works for any service)
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:907929922976:function:job-status/invocations

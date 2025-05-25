@@ -1,0 +1,9 @@
+{
+  "name": "url-discovery-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function for URL discovery service",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-ecs": "^3.600.0"
+  }
+}
