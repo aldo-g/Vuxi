@@ -10,3 +10,26 @@ output/
 data/
 awscliv2.zip
 /aws/
+
+# AWS SAM build artifacts
+.aws-sam/
+samconfig.toml
+
+# Node modules (if any)
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+EOF
