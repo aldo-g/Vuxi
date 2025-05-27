@@ -10,7 +10,7 @@ class ScreenshotService {
       height: options.viewport?.height || 900
     };
     this.timeout = options.timeout || 30000;
-    this.concurrent = options.concurrent || 3;
+    this.concurrent = options.concurrent || 4; // Increased from 3 to 4
   }
 
   async captureAll(urls) {
@@ -18,6 +18,7 @@ class ScreenshotService {
     console.log(`📋 URLs to capture: ${urls.length}`);
     console.log(`📁 Output: ${this.outputDir}`);
     console.log(`📐 Viewport: ${this.viewport.width}x${this.viewport.height}`);
+    console.log(`🔀 Concurrency: ${this.concurrent} screenshots at once`);
     
     const startTime = Date.now();
     
@@ -25,7 +26,7 @@ class ScreenshotService {
       // Ensure output directory exists
       await fs.ensureDir(this.outputDir);
       
-      // Initialize capture service
+      // Initialize capture service (but don't init browser yet)
       const screenshotCapture = new ScreenshotCapture(this.outputDir, {
         width: this.viewport.width,
         height: this.viewport.height,
@@ -37,12 +38,21 @@ class ScreenshotService {
       const batchSize = this.concurrent;
       
       for (let i = 0; i < urls.length; i += batchSize) {
-        console.log(`\n📦 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urls.length/batchSize)}`);
-        const batchResults = await this.processBatch(urls, i, screenshotCapture, batchSize);
+        const batchNum = Math.floor(i/batchSize) + 1;
+        const totalBatches = Math.ceil(urls.length/batchSize);
+        const currentBatch = urls.slice(i, i + batchSize);
+        
+        console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${currentBatch.length} URLs concurrently)`);
+        
+        const batchStartTime = Date.now();
+        const batchResults = await this.processBatchConcurrent(currentBatch, i, screenshotCapture);
+        const batchDuration = (Date.now() - batchStartTime) / 1000;
+        
         allResults.push(...batchResults);
         
         // Progress update
         const completed = Math.min(i + batchSize, urls.length);
+        console.log(`  ⚡ Batch completed in ${batchDuration.toFixed(2)}s`);
         console.log(`✅ Completed ${completed}/${urls.length} URLs`);
       }
       
@@ -54,7 +64,7 @@ class ScreenshotService {
       const failed = allResults.filter(r => !r.success);
       const duration = (Date.now() - startTime) / 1000;
       
-      // Save metadata to match your data structure
+      // Save metadata
       const metadata = {
         timestamp: new Date().toISOString(),
         duration_seconds: duration,
@@ -74,6 +84,8 @@ class ScreenshotService {
       
       // Summary
       console.log('\n🎉 Screenshot service completed');
+      console.log(`⚡ Speed: ${(successful.length / duration).toFixed(1)} screenshots/second`);
+      console.log(`🔀 Concurrency efficiency: ${this.concurrent}x parallel processing`);
       console.log(`⏱️  Duration: ${duration.toFixed(2)} seconds`);
       console.log(`✅ Successful: ${successful.length}/${urls.length}`);
       console.log(`❌ Failed: ${failed.length}/${urls.length}`);
@@ -107,18 +119,42 @@ class ScreenshotService {
     }
   }
 
-  async processBatch(urls, startIndex, screenshotCapture, batchSize) {
-    const batch = urls.slice(startIndex, startIndex + batchSize);
-    const results = await Promise.allSettled(
-      batch.map((url, i) => screenshotCapture.captureUrl(url, startIndex + i))
+  async processBatchConcurrent(urls, startIndex, screenshotCapture) {
+    // Create promises for concurrent screenshot capture
+    const promises = urls.map((url, i) => 
+      this.captureWithRetry(screenshotCapture, url, startIndex + i)
     );
     
+    // Process all screenshots in this batch concurrently
+    const results = await Promise.allSettled(promises);
+    
+    // Convert results to our expected format
     return results.map((result, i) => ({
-      url: batch[i],
+      url: urls[i],
       success: result.status === 'fulfilled',
       data: result.status === 'fulfilled' ? result.value : null,
       error: result.status === 'rejected' ? result.reason.message : null
     }));
+  }
+
+  async captureWithRetry(screenshotCapture, url, index, maxRetries = 2) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await screenshotCapture.captureUrl(url, index);
+      } catch (error) {
+        lastError = error;
+        console.log(`  ⚠️  [${index}] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          // Wait a bit before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+    
+    throw lastError;
   }
 }
 

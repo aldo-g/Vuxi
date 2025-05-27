@@ -5,8 +5,10 @@ const { URLCrawler } = require('./crawler');
 class URLDiscoveryService {
   constructor(options = {}) {
     this.maxPages = options.maxPages || 50;
-    this.timeout = options.timeout || 30000;
-    this.waitTime = options.waitTime || 2;
+    this.timeout = options.timeout || 8000;
+    this.waitTime = options.waitTime || 0.5;
+    this.concurrency = options.concurrency || 3;
+    this.fastMode = options.fastMode !== false;
     this.excludePatterns = options.excludePatterns || [];
     this.outputDir = options.outputDir || './data';
   }
@@ -15,29 +17,31 @@ class URLDiscoveryService {
     console.log('🔍 URL Discovery Service Starting...');
     console.log(`🌐 Starting URL: ${startUrl}`);
     console.log(`🎯 Max pages: ${this.maxPages}`);
+    console.log(`⚡ Fast mode: ${this.fastMode ? 'ENABLED' : 'disabled'}`);
+    console.log(`🔀 Concurrency: ${this.concurrency} pages at once`);
+    console.log(`⏰ Timeout: ${this.timeout}ms per page`);
+    console.log(`⏳ Wait time: ${this.waitTime}s`);
     console.log(`📁 Output: ${this.outputDir}`);
     
     const startTime = Date.now();
     
     try {
-      // Parse exclude patterns (if they're strings, convert to RegExp)
       const excludePatterns = this.excludePatterns.map(pattern => {
         return typeof pattern === 'string' ? new RegExp(pattern) : pattern;
       });
       
-      // Initialize crawler
       const crawler = new URLCrawler({
         maxPages: this.maxPages,
         timeout: this.timeout,
         waitTime: this.waitTime,
+        concurrency: this.concurrency,
+        fastMode: this.fastMode,
         excludePatterns: excludePatterns
       });
       
-      // Discover URLs
-      console.log('\n🕷️  Starting to crawl...');
+      console.log('\n⚡ Starting CONCURRENT crawl...');
       const results = await crawler.crawl(startUrl);
       
-      // Prepare output data
       const outputData = {
         timestamp: new Date().toISOString(),
         startUrl: startUrl,
@@ -52,13 +56,17 @@ class URLDiscoveryService {
           duplicatesRemoved: results.stats.duplicatesRemoved
         },
         urls: results.urls,
-        excludePatterns: this.excludePatterns
+        excludePatterns: this.excludePatterns,
+        settings: {
+          fastMode: this.fastMode,
+          concurrency: this.concurrency,
+          timeout: this.timeout,
+          waitTime: this.waitTime
+        }
       };
       
-      // Ensure output directory exists
       await fs.ensureDir(this.outputDir);
       
-      // Save to data directory (matching your structure)
       const urlsPath = path.join(this.outputDir, 'urls.json');
       const simpleUrlsPath = path.join(this.outputDir, 'urls_simple.json');
       
@@ -67,8 +75,9 @@ class URLDiscoveryService {
       
       const duration = (Date.now() - startTime) / 1000;
       
-      // Summary
       console.log('\n🎉 URL Discovery completed successfully');
+      console.log(`⚡ Speed: ${(results.urls.length / duration).toFixed(1)} URLs/second`);
+      console.log(`🔀 Concurrency: ${this.concurrency}x parallel processing`);
       console.log(`⏱️  Duration: ${duration.toFixed(2)} seconds`);
       console.log(`🔗 Total URLs discovered: ${results.urls.length}`);
       console.log(`📋 Pages crawled: ${results.stats.pagesCrawled}`);

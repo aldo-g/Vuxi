@@ -29,7 +29,12 @@ class ScreenshotCapture {
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-gpu'
+          '--disable-gpu',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--memory-pressure-off', // Help with concurrent operations
+          '--max_old_space_size=4096' // Increase memory limit
         ]
       });
     }
@@ -45,6 +50,7 @@ class ScreenshotCapture {
   
   async captureUrl(url, index) {
     const startTime = Date.now();
+    let context = null;
     
     try {
       // Ensure browser is initialized
@@ -52,10 +58,13 @@ class ScreenshotCapture {
       
       console.log(`📸 [${index}] Capturing: ${url}`);
       
-      // Create new browser context for isolation
-      const context = await this.browser.newContext({
+      // Create new browser context for isolation with optimized settings
+      context = await this.browser.newContext({
         viewport: this.viewport,
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        // Optimize for concurrent operations
+        reducedMotion: 'reduce',
+        colorScheme: 'light'
       });
       
       const page = await context.newPage();
@@ -75,8 +84,8 @@ class ScreenshotCapture {
       console.log(`  ✨ Applying enhancements...`);
       await this.enhancer.enhance(page);
       
-      // Wait a bit more for dynamic content
-      await page.waitForTimeout(2000);
+      // Reduced wait time for concurrent operations
+      await page.waitForTimeout(1500); // Reduced from 2000ms
       
       // Generate filename and path
       const filename = createFilename(url, index);
@@ -89,9 +98,6 @@ class ScreenshotCapture {
         fullPage: true,
         type: 'png'
       });
-      
-      // Close context
-      await context.close();
       
       const duration = Date.now() - startTime;
       console.log(`  ✅ Success in ${duration}ms: ${filename}`);
@@ -108,15 +114,16 @@ class ScreenshotCapture {
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`  ❌ Error after ${duration}ms: ${error.message}`);
-      
-      // Ensure context is closed even on error
-      try {
-        if (context) await context.close();
-      } catch (closeError) {
-        console.error(`  ⚠️  Error closing context: ${closeError.message}`);
-      }
-      
       throw error;
+    } finally {
+      // Ensure context is closed even on error
+      if (context) {
+        try {
+          await context.close();
+        } catch (closeError) {
+          console.error(`  ⚠️  Error closing context: ${closeError.message}`);
+        }
+      }
     }
   }
 }

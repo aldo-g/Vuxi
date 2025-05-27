@@ -4,9 +4,11 @@ const { isValidUrl, normalizeUrl, isSameDomain, shouldExcludeUrl, createDeduplic
 class URLCrawler {
   constructor(options = {}) {
     this.maxPages = options.maxPages || 50;
-    this.timeout = options.timeout || 30000;
-    this.waitTime = options.waitTime || 2;
+    this.timeout = options.timeout || 8000;
+    this.waitTime = options.waitTime || 0.5;
+    this.concurrency = options.concurrency || 3;
     this.excludePatterns = options.excludePatterns || [];
+    this.fastMode = options.fastMode !== false;
     
     this.visitedUrls = new Set();
     this.discoveredUrls = new Set();
@@ -23,37 +25,30 @@ class URLCrawler {
   
   async extractLinks(page, baseUrl) {
     try {
+      // Wait a moment for any dynamic content to load
+      await page.waitForTimeout(500);
+      
       const links = await page.evaluate(() => {
-        // Get all links
         return Array.from(document.querySelectorAll('a[href]')).map(link => link.href);
       });
       
-      // Filter and normalize links
+      console.log(`    🔍 Raw links found: ${links.length}`);
+      
       const validLinks = [];
       for (const link of links) {
-        // Skip invalid URLs
         if (!isValidUrl(link)) continue;
-        
-        // Skip non-HTTP protocols
         if (!link.startsWith('http://') && !link.startsWith('https://')) continue;
-        
-        // Skip external links (different domain)
         if (!isSameDomain(baseUrl, link)) continue;
         
-        // Normalize URL
         const normalizedUrl = normalizeUrl(link);
-        
-        // Skip if should be excluded
         if (shouldExcludeUrl(normalizedUrl, this.excludePatterns)) continue;
         
-        // Check for duplicates using deduplication key
         const dedupKey = createDeduplicationKey(normalizedUrl);
         if (this.deduplicationKeys.has(dedupKey)) {
           this.stats.duplicatesSkipped++;
           continue;
         }
         
-        // Skip if already discovered
         if (this.discoveredUrls.has(normalizedUrl)) continue;
         
         validLinks.push(normalizedUrl);
@@ -68,78 +63,130 @@ class URLCrawler {
     }
   }
   
-  async crawlPage(page, url) {
+  async crawlPage(browser, url, pageIndex) {
+    let page = null;
     try {
-      console.log(`  📄 Crawling: ${url}`);
+      page = await browser.newPage();
       
-      // Navigate to page
+      // Balanced resource blocking - keep CSS for navigation, block heavy resources
+      if (this.fastMode) {
+        await page.route('**/*', (route) => {
+          const request = route.request();
+          const resourceType = request.resourceType();
+          
+          // Only block images and media, keep CSS and fonts for navigation
+          if (['image', 'media'].includes(resourceType)) {
+            route.abort();
+          } else {
+            route.continue();
+          }
+        });
+      }
+      
+      console.log(`  📄 [${pageIndex}] Crawling: ${url}`);
+      
       const response = await page.goto(url, {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
         timeout: this.timeout
       });
       
       if (!response || response.status() >= 400) {
-        console.log(`  ⚠️  Warning: HTTP ${response ? response.status() : 'unknown'} for ${url}`);
+        console.log(`  ⚠️  [${pageIndex}] Warning: HTTP ${response ? response.status() : 'unknown'} for ${url}`);
         this.stats.pagesSkipped++;
         return [];
       }
       
-      // Wait for additional content
-      await page.waitForTimeout(this.waitTime * 1000);
+      // Small wait for dynamic content
+      if (this.waitTime > 0) {
+        await page.waitForTimeout(this.waitTime * 1000);
+      }
       
-      // Extract links
       const newLinks = await this.extractLinks(page, url);
-      console.log(`  🔗 Found ${newLinks.length} new links`);
+      console.log(`  🔗 [${pageIndex}] Found ${newLinks.length} new links`);
       
       this.stats.pagesCrawled++;
       return newLinks;
       
     } catch (error) {
-      console.error(`  ❌ Error crawling ${url}:`, error.message);
+      console.error(`  ❌ [${pageIndex}] Error crawling ${url}:`, error.message);
       this.stats.errors++;
       return [];
+    } finally {
+      if (page) {
+        await page.close().catch(() => {});
+      }
     }
+  }
+  
+  async processBatch(browser, urls, startIndex) {
+    const promises = urls.map((url, i) => 
+      this.crawlPage(browser, url, startIndex + i + 1)
+    );
+    
+    const results = await Promise.allSettled(promises);
+    
+    const allNewLinks = [];
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled') {
+        allNewLinks.push(...result.value);
+      } else {
+        console.error(`Batch error for ${urls[i]}:`, result.reason.message);
+        this.stats.errors++;
+      }
+    });
+    
+    return allNewLinks;
   }
   
   async crawl(startUrl) {
     const browser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+        '--disable-background-networking',
+        '--disable-sync',
+        '--disable-default-apps',
+        '--no-first-run',
+        '--disable-extensions'
+      ]
     });
     
     try {
-      // Normalize start URL
       const normalizedStartUrl = normalizeUrl(startUrl);
       this.urlsToVisit.push(normalizedStartUrl);
       this.discoveredUrls.add(normalizedStartUrl);
       this.deduplicationKeys.add(createDeduplicationKey(normalizedStartUrl));
       
-      console.log(`🚀 Starting crawl from: ${normalizedStartUrl}`);
+      console.log(`🚀 Starting concurrent crawl (${this.concurrency} parallel) from: ${normalizedStartUrl}`);
       
-      // Create browser context
-      const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (compatible; URLDiscoveryBot/1.0)'
-      });
+      let processedCount = 0;
       
-      const page = await context.newPage();
-      
-      // Crawl pages
-      let crawledCount = 0;
-      while (this.urlsToVisit.length > 0 && crawledCount < this.maxPages) {
-        const currentUrl = this.urlsToVisit.shift();
+      while (this.urlsToVisit.length > 0 && processedCount < this.maxPages) {
+        const batchSize = Math.min(this.concurrency, this.urlsToVisit.length, this.maxPages - processedCount);
+        const currentBatch = [];
         
-        // Skip if already visited
-        if (this.visitedUrls.has(currentUrl)) {
-          continue;
+        for (let i = 0; i < batchSize; i++) {
+          const url = this.urlsToVisit.shift();
+          if (!this.visitedUrls.has(url)) {
+            this.visitedUrls.add(url);
+            currentBatch.push(url);
+          }
         }
         
-        this.visitedUrls.add(currentUrl);
-        crawledCount++;
+        if (currentBatch.length === 0) continue;
         
-        console.log(`\n[${crawledCount}/${this.maxPages}] Processing...`);
+        console.log(`\n[Batch ${Math.floor(processedCount/this.concurrency) + 1}] Processing ${currentBatch.length} URLs concurrently...`);
         
-        // Crawl page and get new links
-        const newLinks = await this.crawlPage(page, currentUrl);
+        const batchStartTime = Date.now();
+        const newLinks = await this.processBatch(browser, currentBatch, processedCount);
+        const batchDuration = (Date.now() - batchStartTime) / 1000;
         
         // Add new links to queue
         for (const link of newLinks) {
@@ -148,22 +195,19 @@ class URLCrawler {
           }
         }
         
-        // Progress update
-        console.log(`  📊 Queue: ${this.urlsToVisit.length} | Discovered: ${this.discoveredUrls.size} | Visited: ${this.visitedUrls.size} | Duplicates skipped: ${this.stats.duplicatesSkipped}`);
+        processedCount += currentBatch.length;
+        
+        console.log(`  ⚡ Batch completed in ${batchDuration.toFixed(2)}s`);
+        console.log(`  📊 Queue: ${this.urlsToVisit.length} | Discovered: ${this.discoveredUrls.size} | Visited: ${this.visitedUrls.size} | Duplicates: ${this.stats.duplicatesSkipped}`);
       }
       
-      await context.close();
-      
-      // Final deduplication of all discovered URLs
       const finalUrls = deduplicateUrls(Array.from(this.discoveredUrls));
       
-      // Calculate final stats
       this.stats.duration = (Date.now() - this.stats.startTime) / 1000;
       this.stats.finalUrlCount = finalUrls.length;
       this.stats.totalUrlsDiscovered = this.discoveredUrls.size;
       this.stats.duplicatesRemoved = this.discoveredUrls.size - finalUrls.length;
       
-      // Return results
       return {
         urls: finalUrls,
         stats: this.stats

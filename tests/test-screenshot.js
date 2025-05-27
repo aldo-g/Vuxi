@@ -13,8 +13,8 @@ async function testScreenshotService() {
     if (await fs.pathExists(urlsPath)) {
       console.log('📥 Loading URLs from previous URL discovery...');
       const urls = await fs.readJson(urlsPath);
-      // Take just the first 3 URLs for testing
-      testUrls = urls.slice(0, 50);
+      // Take all URLs for testing, but limit to reasonable number
+      testUrls = urls.slice(0, Math.min(urls.length, 10)); // Max 10 for testing
       console.log(`   Found ${urls.length} URLs, using first ${testUrls.length} for testing`);
     } else {
       console.log('📝 No URLs found, using test URLs...');
@@ -28,12 +28,12 @@ async function testScreenshotService() {
     console.log('📋 URLs to capture:');
     testUrls.forEach((url, i) => console.log(`   ${i + 1}. ${url}`));
     
-    // Initialize service
+    // Initialize service with higher concurrency
     const service = new ScreenshotService({
       outputDir: './data/screenshots',
       viewport: { width: 1440, height: 900 },
       timeout: 30000,
-      concurrent: 2  // Keep it low for testing
+      concurrent: 4  // Increased concurrency
     });
     
     // Capture screenshots

@@ -5,10 +5,8 @@ const { createFilename } = require('./utils');
 const { trimReport } = require('./report-trimmer');
 const lighthouseConfig = require('./config/lighthouse-config');
 
-// Import lighthouse with multiple fallback methods
 let lighthouse;
 try {
-  // Try ESM-style import
   const lighthouseModule = require('lighthouse');
   lighthouse = lighthouseModule.default || lighthouseModule;
 } catch (err) {
@@ -18,7 +16,7 @@ try {
 class LighthouseAuditor {
   constructor(options = {}) {
     this.outputDir = options.outputDir;
-    this.retries = options.retries || 2;
+    this.retries = options.retries || 1;
     this.browser = null;
     
     // Create output directories
@@ -30,37 +28,48 @@ class LighthouseAuditor {
   }
   
   async initBrowser() {
-    // Always create a fresh browser instance for each audit
-    if (this.browser) {
-      await this.closeBrowser();
+    if (!this.browser) {
+      console.log('🚀 Launching optimized Lighthouse browser...');
+      
+      // Super optimized browser launch
+      const launchOptions = {
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--disable-features=VizDisplayCompositor,TranslateUI,BlinkGenPropertyTrees',
+          '--disable-background-networking',
+          '--disable-sync',
+          '--disable-default-apps',
+          '--no-first-run',
+          '--disable-extensions',
+          '--disable-component-extensions-with-background-pages',
+          '--disable-client-side-phishing-detection',
+          '--disable-hang-monitor',
+          '--disable-popup-blocking',
+          '--disable-prompt-on-repost',
+          '--disable-background-downloads',
+          '--disable-add-to-shelf',
+          '--disable-datasaver-prompt',
+          '--disable-domain-reliability',
+          '--disable-features=AudioServiceOutOfProcess',
+          '--aggressive-cache-discard',
+          '--memory-pressure-off',
+          '--max_old_space_size=4096'
+        ]
+      };
+      
+      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      }
+      
+      this.browser = await puppeteer.launch(launchOptions);
     }
-    
-    console.log('🚀 Launching fresh Puppeteer browser...');
-    
-    // Browser launch options - let Puppeteer find the browser automatically
-    const launchOptions = {
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--window-size=1440,900',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding'
-      ]
-    };
-    
-    // Only set executablePath if explicitly provided via environment variable
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
-    // Otherwise let Puppeteer auto-detect the browser
-    
-    this.browser = await puppeteer.launch(launchOptions);
   }
   
   async closeBrowser() {
@@ -80,31 +89,56 @@ class LighthouseAuditor {
     let attempt = 0;
     let lastError = null;
     
-    // Check if lighthouse was imported correctly
     if (typeof lighthouse !== 'function') {
       throw new Error('Lighthouse module is not properly imported');
     }
     
     while (attempt < this.retries) {
       attempt++;
-      console.log(`🚦 [${index}] Auditing (attempt ${attempt}/${this.retries}): ${url}`);
+      console.log(`🚦 [${index}] Auditing: ${url}`);
       
       try {
-        // Get a fresh browser for each attempt
         await this.initBrowser();
         
-        // Get browser endpoint
         const browserEndpoint = this.browser.wsEndpoint();
         const port = new URL(browserEndpoint).port;
         
-        // Run Lighthouse with clean configuration
+        // Ultra-fast Lighthouse configuration
         const result = await lighthouse(url, {
           port: parseInt(port),
           output: 'json',
           logLevel: 'error',
           disableStorageReset: false,
           onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
-          clearStorage: true
+          clearStorage: true,
+          // Maximum speed optimizations
+          skipAudits: [
+            'screenshot-thumbnails',
+            'final-screenshot',
+            'full-page-screenshot',
+            'largest-contentful-paint-element',
+            'layout-shift-elements',
+            'long-tasks',
+            'bootup-time',
+            'uses-long-cache-ttl',
+            'total-byte-weight',
+            'uses-optimized-images',
+            'uses-webp-images',
+            'uses-text-compression',
+            'unused-css-rules',
+            'unused-javascript',
+            'modern-image-formats',
+            'uses-rel-preconnect',
+            'server-response-time',
+            'redirects',
+            'installable-manifest',
+            'apple-touch-icon',
+            'splash-screen',
+            'themed-omnibox',
+            'content-width',
+            'viewport',
+            'without-javascript'
+          ]
         }, lighthouseConfig);
         
         if (!result || !result.lhr) {
@@ -120,7 +154,7 @@ class LighthouseAuditor {
         const fullReportPath = path.join(this.reportsDir, jsonFilename);
         await fs.writeJson(fullReportPath, result.lhr, { spaces: 2 });
         
-        // Trim and save essential data
+        // Trim and save ultra-minimal essential data
         const trimmedReport = trimReport(result.lhr);
         const trimmedReportPath = path.join(this.trimmedDir, trimmedFilename);
         await fs.writeJson(trimmedReportPath, trimmedReport, { spaces: 2 });
@@ -128,7 +162,7 @@ class LighthouseAuditor {
         const duration = Date.now() - startTime;
         console.log(`  ✅ Success in ${duration}ms: ${jsonFilename}`);
         
-        // Safely extract key metrics with error handling
+        // Extract metrics with error handling
         let metrics = {};
         let scores = {};
         
@@ -139,7 +173,6 @@ class LighthouseAuditor {
           scores = result.lhr.categories || {};
         } catch (metricsError) {
           console.warn('Error extracting metrics:', metricsError.message);
-          // Continue with empty metrics rather than failing
         }
         
         const returnData = {
@@ -163,9 +196,6 @@ class LighthouseAuditor {
           attempt: attempt
         };
         
-        // Close browser after successful audit
-        await this.closeBrowser();
-        
         return returnData;
         
       } catch (error) {
@@ -173,18 +203,13 @@ class LighthouseAuditor {
         const duration = Date.now() - startTime;
         console.error(`  ❌ Error (attempt ${attempt}/${this.retries}) after ${duration}ms: ${error.message}`);
         
-        // Ensure browser is closed on error
-        await this.closeBrowser();
-        
         if (attempt < this.retries) {
-          // Wait before retry
           console.log(`  ⏳ Waiting before retry...`);
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
     }
     
-    // All attempts failed
     throw new Error(`Failed to audit ${url} after ${this.retries} attempts: ${lastError.message}`);
   }
 }

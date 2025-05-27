@@ -5,17 +5,19 @@ const { URLDiscoveryService } = require('../src/services/url-discovery');
 async function testURLDiscoveryService() {
   console.log('🧪 Testing URL Discovery Service...\n');
   
-  // Initialize service with test configuration
+  // Initialize service with aggressive concurrent settings
   const service = new URLDiscoveryService({
     maxPages: 50,
-    timeout: 30000,
-    waitTime: 2,
-    outputDir: './data'  // Use your existing data dir
+    timeout: 5000,        // 5 seconds max per page
+    waitTime: 0,          // No waiting
+    concurrency: 4,       // Process 4 pages simultaneously
+    fastMode: true,       // Enable all optimizations
+    outputDir: './data'
   });
   
   try {
     // Test with Edinburgh Peace Institute
-    const result = await service.discover('https://edinburghpeaceinstitute.org');
+    const result = await service.discover('https://www.edinburghpeaceinstitute.org');
     
     if (result.success) {
       console.log('✅ URL Discovery test PASSED');
