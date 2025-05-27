@@ -1,3 +1,5 @@
+require('dotenv').config(); // Load environment variables
+
 const Anthropic = require('@anthropic-ai/sdk');
 // Import OpenAI only when needed
 let OpenAI;
@@ -11,7 +13,8 @@ const { getTechnicalPrompt } = require('./prompts/technical-prompt');
 class LLMAnalyzer {
   constructor(options = {}) {
     this.provider = options.provider || 'anthropic';
-    this.model = options.model || 'claude-3-7-sonnet-20250219';
+    this.model = options.model || process.env.ANTHROPIC_MODEL || 'claude-3-7-sonnet-20250219';
+    this.concurrency = options.concurrency || 3; // Add concurrency for page analyses
     this.screenshotsDir = options.screenshotsDir;
     this.lighthouseDir = options.lighthouseDir;
     
@@ -21,19 +24,22 @@ class LLMAnalyzer {
   
     initializeClient() {
         if (this.provider === 'anthropic') {
-        // Log the API key presence for debugging
-        console.log(`API Key present: ${process.env.ANTHROPIC_API_KEY ? 'Yes' : 'No'}`);
+        // Check for API key in environment
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+            throw new Error('ANTHROPIC_API_KEY environment variable is required. Please set it in your .env file.');
+        }
+        
+        console.log(`API Key loaded from environment: ${apiKey.substring(0, 8)}...`);
         
         this.client = new Anthropic({
-            apiKey: process.env.ANTHROPIC_API_KEY,
+            apiKey: apiKey,
         });
         
-        // Verify the client was properly initialized
         if (!this.client) {
             throw new Error('Failed to initialize Anthropic client');
         }
         } else if (this.provider === 'openai') {
-        // Only require OpenAI if we're actually using it
         if (!OpenAI) {
             OpenAI = require('openai').OpenAI;
         }
@@ -128,28 +134,23 @@ class LLMAnalyzer {
       timestamp: new Date().toISOString(),
       provider: this.provider,
       model: this.model,
+      concurrency: this.concurrency,
       pageAnalyses: [],
       technicalSummary: null,
-      overview: null  // This will be generated last
+      overview: null
     };
     
     try {
-      // 1. Analyze each page
-      console.log('📄 Analyzing individual pages...');
-      for (const [index, pageData] of analysisData.entries()) {
-        console.log(`   Analyzing page ${index + 1}/${analysisData.length}: ${pageData.url}`);
-        const pageAnalysis = await this.analyzeIndividualPage(pageData);
-        analysis.pageAnalyses.push({
-          url: pageData.url,
-          analysis: pageAnalysis
-        });
-      }
+      // 1. Analyze pages CONCURRENTLY
+      console.log(`📄 Analyzing ${analysisData.length} pages concurrently (${this.concurrency} at a time)...`);
+      const pageAnalyses = await this.analyzePagesConcurrently(analysisData);
+      analysis.pageAnalyses = pageAnalyses;
       
-      // 2. Generate technical summary
+      // 2. Generate technical summary (depends on all pages)
       console.log('🔧 Generating technical summary...');
       analysis.technicalSummary = await this.generateTechnicalSummary(analysisData);
       
-      // 3. Generate comprehensive overview (last step)
+      // 3. Generate comprehensive overview (depends on everything)
       console.log('📊 Generating comprehensive overview...');
       analysis.overview = await this.generateComprehensiveOverview(analysisData, analysis);
       
@@ -159,6 +160,75 @@ class LLMAnalyzer {
     }
     
     return analysis;
+  }
+  
+  async analyzePagesConcurrently(analysisData) {
+    const allResults = [];
+    const batchSize = this.concurrency;
+    
+    // Process pages in concurrent batches
+    for (let i = 0; i < analysisData.length; i += batchSize) {
+      const batch = analysisData.slice(i, i + batchSize);
+      const batchNum = Math.floor(i / batchSize) + 1;
+      const totalBatches = Math.ceil(analysisData.length / batchSize);
+      
+      console.log(`   Batch ${batchNum}/${totalBatches}: Analyzing ${batch.length} pages concurrently...`);
+      
+      const batchStartTime = Date.now();
+      
+      // Create promises for concurrent analysis
+      const promises = batch.map((pageData, index) => 
+        this.analyzeIndividualPageWithRetry(pageData, i + index)
+      );
+      
+      // Wait for all analyses in this batch to complete
+      const batchResults = await Promise.allSettled(promises);
+      
+      // Process results
+      batchResults.forEach((result, index) => {
+        const pageData = batch[index];
+        if (result.status === 'fulfilled') {
+          allResults.push({
+            url: pageData.url,
+            analysis: result.value
+          });
+        } else {
+          console.error(`   ❌ Failed to analyze ${pageData.url}: ${result.reason.message}`);
+          allResults.push({
+            url: pageData.url,
+            analysis: `Analysis failed: ${result.reason.message}`
+          });
+        }
+      });
+      
+      const batchDuration = (Date.now() - batchStartTime) / 1000;
+      console.log(`   ⚡ Batch ${batchNum} completed in ${batchDuration.toFixed(2)}s`);
+    }
+    
+    return allResults;
+  }
+  
+  async analyzeIndividualPageWithRetry(pageData, index, maxRetries = 2) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`     📄 [${index}] Analyzing: ${pageData.url} (attempt ${attempt})`);
+        return await this.analyzeIndividualPage(pageData);
+      } catch (error) {
+        lastError = error;
+        console.log(`     ⚠️  [${index}] Attempt ${attempt} failed: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          // Wait before retry with exponential backoff
+          const waitTime = 1000 * attempt;
+          console.log(`     ⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+    
+    throw lastError;
   }
   
   async analyzeIndividualPage(pageData) {
@@ -176,7 +246,7 @@ class LLMAnalyzer {
     // Include screenshot for page analysis
     const screenshots = pageData.screenshot ? [pageData.screenshot] : [];
     
-    return await this.callLLM(prompt, screenshots, 'page analysis');
+    return await this.callLLM(prompt, screenshots, `page analysis for ${pageData.url}`);
   }
   
   async generateTechnicalSummary(analysisData) {
@@ -222,7 +292,7 @@ class LLMAnalyzer {
   }
   
   async callLLM(prompt, screenshots = null, analysisType = 'analysis') {
-    console.log(`   Calling LLM for ${analysisType}...`);
+    console.log(`   🧠 Calling LLM for ${analysisType}...`);
     
     try {
       if (this.provider === 'anthropic') {
@@ -265,8 +335,6 @@ class LLMAnalyzer {
           content: prompt
         }];
         
-        // Note: OpenAI vision API has different format
-        // This is a simplified version - you'd need to adjust for images
         const response = await this.client.chat.completions.create({
           model: this.model,
           messages: messages,

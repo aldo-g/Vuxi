@@ -1,3 +1,5 @@
+require('dotenv').config(); // Load environment variables
+
 const fs = require('fs-extra');
 const path = require('path');
 const { LLMAnalyzer } = require('./analyzer');
@@ -5,7 +7,8 @@ const { LLMAnalyzer } = require('./analyzer');
 class LLMAnalysisService {
   constructor(options = {}) {
     this.provider = options.provider || 'anthropic';
-    this.model = options.model || 'claude-3-7-sonnet-20250219';
+    this.model = options.model || process.env.ANTHROPIC_MODEL || 'claude-3-7-sonnet-20250219';
+    this.concurrency = options.concurrency || 3; // Add concurrency option
     this.screenshotsDir = options.screenshotsDir || './data/screenshots';
     this.lighthouseDir = options.lighthouseDir || './data/lighthouse';
     this.outputDir = options.outputDir || './data/analysis';
@@ -17,13 +20,14 @@ class LLMAnalysisService {
     console.log(`🚦 Lighthouse: ${this.lighthouseDir}`);
     console.log(`📁 Output: ${this.outputDir}`);
     console.log(`🧠 Provider: ${this.provider} (${this.model})`);
+    console.log(`🔀 Concurrency: ${this.concurrency} pages at once`);
     
     const startTime = Date.now();
     
     try {
       // Check API key
       if (!process.env.ANTHROPIC_API_KEY && this.provider === 'anthropic') {
-        throw new Error('ANTHROPIC_API_KEY environment variable is required');
+        throw new Error('ANTHROPIC_API_KEY environment variable is required. Please add it to your .env file.');
       }
       
       // Ensure output directory exists
@@ -33,6 +37,7 @@ class LLMAnalysisService {
       const analyzer = new LLMAnalyzer({
         provider: this.provider,
         model: this.model,
+        concurrency: this.concurrency,
         screenshotsDir: this.screenshotsDir,
         lighthouseDir: this.lighthouseDir
       });
@@ -56,7 +61,7 @@ class LLMAnalysisService {
       }
       
       // Run analysis
-      console.log('\n🔍 Running LLM analysis...');
+      console.log('\n🔍 Running LLM analysis with concurrency...');
       const analysis = await analyzer.analyzeWebsite();
       
       // Save analysis with timestamp
@@ -70,6 +75,7 @@ class LLMAnalysisService {
         duration_seconds: duration,
         provider: this.provider,
         model: this.model,
+        concurrency: this.concurrency,
         screenshots_analyzed: screenshots.length,
         lighthouse_reports_analyzed: lighthouseData.length,
         analysis_version: '1.0.0'
@@ -80,6 +86,8 @@ class LLMAnalysisService {
       
       // Summary
       console.log('\n🎉 Analysis completed successfully');
+      console.log(`⚡ Speed: ${(analysis.pageAnalyses?.length || 0 / duration).toFixed(2)} pages/second`);
+      console.log(`🔀 Concurrency: ${this.concurrency}x parallel processing`);
       console.log(`⏱️  Duration: ${duration.toFixed(2)} seconds`);
       console.log(`📄 Analysis saved to: ${analysisPath}`);
       console.log(`📄 Metadata saved to: ${metadataPath}`);
