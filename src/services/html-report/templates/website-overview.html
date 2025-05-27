@@ -69,14 +69,12 @@
 {% endif %}
 
 <!-- Performance Summary -->
-{% if performance_summary %}
 <div class="section">
     <h2>Technical Performance Summary</h2>
     <div class="analysis-result">
         <p>{{ performance_summary }}</p>
     </div>
 </div>
-{% endif %}
 
 <!-- Page Analysis Summary -->
 {% if page_summaries and page_summaries.length > 0 %}
@@ -84,10 +82,16 @@
     <h2>Individual Page Summaries</h2>
     {% for page in page_summaries %}
     <div style="margin-bottom: 20px; padding: 15px; background-color: #f8fafc; border-radius: 6px; border-left: 4px solid #3b82f6;">
-        <h3 style="margin-top: 0; color: #1e293b;">{{ page.name }}</h3>
-        <p style="margin-bottom: 5px;"><strong>URL:</strong> {{ page.url }}</p>
-        <p>{{ page.summary }}</p>
-        <a href="pages/{{ page.filename }}" style="color: #3b82f6; text-decoration: none; font-weight: 500;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <h3 style="margin: 0; color: #1e293b;">{{ page.name }}</h3>
+            <div class="score-badge {% if page.score >= 8 %}good{% elif page.score >= 6 %}average{% else %}poor{% endif %}" 
+                 style="padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9em;">
+                {{ page.score }}/10
+            </div>
+        </div>
+        <p style="margin-bottom: 5px; color: #64748b; font-size: 0.9em;"><strong>URL:</strong> {{ page.url }}</p>
+        <p style="margin-bottom: 10px;">{{ page.summary }}</p>
+        <a href="{{ page.filename }}" style="color: #3b82f6; text-decoration: none; font-weight: 500;">
             View Detailed Analysis →
         </a>
     </div>
@@ -95,8 +99,18 @@
 </div>
 {% endif %}
 
-<div class="navigation">
-    <a href="pages/index.html">View All Page Analyses →</a>
-    <a href="executive-summary.html">Executive Summary →</a>
-</div>
+<style>
+.score-badge.good { 
+    background-color: #10b981; 
+    color: white; 
+}
+.score-badge.average { 
+    background-color: #f59e0b; 
+    color: white; 
+}
+.score-badge.poor { 
+    background-color: #ef4444; 
+    color: white; 
+}
+</style>
 {% endblock %}

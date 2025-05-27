@@ -19,17 +19,11 @@ class ReportGenerator {
     try {
       console.log(`🔍 Generating reports in: ${this.outputDir}`);
       
-      // Generate main overview report
+      // Generate overview report
       await this.generateOverviewReport(analysisData);
       
-      // Generate individual page reports
-      await this.generatePageReports(analysisData);
-      
-      // Generate technical summary
-      await this.generateTechnicalReport(analysisData);
-      
-      // Generate executive summary
-      await this.generateExecutiveSummary(analysisData);
+      // Generate individual page reports  
+      await this.generateIndividualPageReports(analysisData);
       
       // Copy screenshots
       await this.copyScreenshots();
@@ -54,248 +48,223 @@ class ReportGenerator {
   async generateOverviewReport(analysisData) {
     console.log('  📋 Generating overview report...');
     
-    // Process the overview analysis
-    const overview = {
-      executive_summary: analysisData.overview?.executive_summary || 'No overview available',
-      key_findings: analysisData.strengths || [],
-      strategic_recommendations: analysisData.recommendations || []
-    };
+    // Extract data from the structure
+    const overallSummary = analysisData.overall_summary || {};
+    const pageAnalyses = analysisData.page_analyses || [];
     
     const context = {
       organization: "Edinburgh Peace Institute",
       analysis_date: new Date().toLocaleDateString(),
-      overview_content: overview,
-      screenshots_analyzed: analysisData.page_analyses?.length || 0,
-      scores: analysisData.scores || []  // Pass the scores array from the JSON data
+      total_pages_analyzed: overallSummary.total_pages_analyzed || pageAnalyses.length,
+      overall_score: overallSummary.overall_score || 5,
+      executive_summary: overallSummary.executive_summary || 'No executive summary available',
+      most_critical_issues: overallSummary.most_critical_issues || [],
+      top_recommendations: overallSummary.top_recommendations || [],
+      key_strengths: overallSummary.key_strengths || [],
+      performance_summary: overallSummary.performance_summary || 'No performance summary available',
+      page_summaries: pageAnalyses.map(page => ({
+        name: page.page_type || page.title || 'Page',
+        url: page.url || '',
+        summary: page.summary || 'No summary available',
+        score: page.overall_score || 5,
+        filename: this.createPageFilename(page)
+      })),
+      common_styles: this.templateSystem.getCommonStyles()
     };
     
-    // Add common styles
-    context.common_styles = this.templateSystem.getCommonStyles();
-    
-    const html = this.templateSystem.render('overview.html', context);
-    const outputPath = path.join(this.outputDir, 'index.html');
+    const html = this.templateSystem.render('website-overview.html', context);
+    const outputPath = path.join(this.outputDir, 'overview.html');
     
     await fs.ensureDir(path.dirname(outputPath));
     await fs.writeFile(outputPath, html);
     console.log(`    ✅ Generated: ${outputPath}`);
   }
   
-  async generatePageReports(analysisData) {
-    console.log('  📑 Generating page reports...');
+  async generateIndividualPageReports(analysisData) {
+    console.log('  📑 Generating individual page reports...');
     
-    // Check if page analyses exist in the expected format
-    let pageAnalyses = [];
-    if (Array.isArray(analysisData.page_analyses)) {
-      pageAnalyses = analysisData.page_analyses;
-    }
+    // Get page analyses from structure
+    const pageAnalyses = analysisData.page_analyses || [];
     
-    const pagesDir = path.join(this.outputDir, 'pages');
-    await fs.ensureDir(pagesDir);
+    console.log(`    📄 Found ${pageAnalyses.length} pages to process`);
     
-    // Generate individual page reports
-    for (const page of pageAnalyses) {
+    // Generate individual page reports directly in output directory
+    for (let i = 0; i < pageAnalyses.length; i++) {
+      const page = pageAnalyses[i];
+      
+      console.log(`    📄 [${i+1}/${pageAnalyses.length}] Processing: ${page.page_type || 'Unknown'}`);
+      
+      // Clean the original analysis to remove repetitive sections
+      const cleanedAnalysis = this.cleanAnalysisContent(page.original_analysis || '');
+      
       const pageData = {
-        scores: page.scores || [], // Add scores from page data if available
-        critical_flaws: page.critical_flaws || [],
+        overall_score: page.overall_score || 5,
+        key_issues: page.key_issues || [],
         recommendations: page.recommendations || [],
         summary: page.summary || 'No summary available',
-        full_analysis: JSON.stringify(page, null, 2)
+        original_analysis: page.original_analysis || 'No detailed analysis available',
+        cleaned_analysis: cleanedAnalysis
       };
       
-      const pageName = this.sanitizeFilename(page.url || '');
+      const filename = this.createPageFilename(page);
       
       const context = {
         organization: "Edinburgh Peace Institute",
         page_url: page.url || '',
-        page_type: page.page_type || this.getPageType(page.url || ''),
+        page_type: page.page_type || this.getPageTypeFromUrl(page.url || ''),
+        page_title: page.title || page.page_type || 'Page Analysis',
         analysis_date: new Date().toLocaleDateString(),
         page_analysis: pageData,
         screenshot_path: this.findScreenshotPath(page.url || ''),
         common_styles: this.templateSystem.getCommonStyles()
       };
       
-      const html = this.templateSystem.render('page-analysis.html', context);
-      const outputPath = path.join(pagesDir, `${pageName}.html`);
+      const html = this.templateSystem.render('individual-page.html', context);
+      const outputPath = path.join(this.outputDir, filename);
       
       await fs.ensureDir(path.dirname(outputPath));
       await fs.writeFile(outputPath, html);
       console.log(`    ✅ Generated: ${outputPath}`);
     }
-    
-    // Generate pages index
-    await this.generatePagesIndex(analysisData, pageAnalyses);
   }
   
-  async generatePagesIndex(analysisData, pageAnalyses) {
-    console.log('    📄 Generating pages index...');
-    const pagesDir = path.join(this.outputDir, 'pages');
+  cleanAnalysisContent(analysis) {
+    if (!analysis) return 'No detailed analysis available';
     
-    const context = {
-      organization: "Edinburgh Peace Institute",
-      analysis_date: new Date().toLocaleDateString(),
-      pages: pageAnalyses.map(page => ({
-        name: page.page_type || this.getPageType(page.url || ''),
-        url: page.url || '',
-        filename: `${this.sanitizeFilename(page.url || '')}.html`
-      })),
-      common_styles: this.templateSystem.getCommonStyles()
-    };
+    // Split by sections and extract PAGE ROLE ANALYSIS
+    const lines = analysis.split('\n');
+    const cleanedLines = [];
+    const pageRoleLines = [];
+    let currentSection = '';
+    let skipSection = false;
+    let inPageRoleSection = false;
     
-    try {
-      const html = this.templateSystem.render('page-index.html', context);
-      const outputPath = path.join(pagesDir, 'index.html');
+    for (const line of lines) {
+      // Check if we're starting PAGE ROLE ANALYSIS section
+      if (line.includes('PAGE ROLE ANALYSIS:')) {
+        inPageRoleSection = true;
+        pageRoleLines.push(line);
+        continue;
+      }
       
-      await fs.ensureDir(path.dirname(outputPath));
-      await fs.writeFile(outputPath, html);
-      console.log(`    ✅ Generated: ${outputPath}`);
-    } catch (error) {
-      console.error(`    ❌ Error rendering pages index: ${error.message}`);
-      throw error;
-    }
-  }
-  
-  async generateTechnicalReport(analysisData) {
-    console.log('  🔧 Generating technical report...');
-    
-    const technical = {
-      performance_overview: analysisData.technical_summary || 'No technical summary available',
-      key_metrics: [],
-      optimization_opportunities: [],
-      implementation_priorities: []
-    };
-    
-    const context = {
-      organization: "Edinburgh Peace Institute",
-      analysis_date: new Date().toLocaleDateString(),
-      technical_content: technical,
-      common_styles: this.templateSystem.getCommonStyles()
-    };
-    
-    const html = this.templateSystem.render('technical-summary.html', context);
-    const outputPath = path.join(this.outputDir, 'technical-summary.html');
-    
-    await fs.ensureDir(path.dirname(outputPath));
-    await fs.writeFile(outputPath, html);
-    console.log(`    ✅ Generated: ${outputPath}`);
-  }
-  
-  async generateExecutiveSummary(analysisData) {
-    console.log('  📊 Generating executive summary...');
-    
-    // Create a simple context object with all the needed data
-    const context = {
-      organization: "Edinburgh Peace Institute",
-      report_date: new Date().toLocaleDateString(),
-      overview: analysisData.overview?.executive_summary || '',
-      overall_score: analysisData.overview?.overall_score || 5,
-      critical_issues: analysisData.critical_issues || [],
-      recommendations: analysisData.recommendations || [],
-      strengths: analysisData.strengths || [],
-      technical_summary: analysisData.technical_summary || 'No technical summary available',
-      page_summaries: [],
-      scores: analysisData.scores || []
-    };
-    
-    // Process page summaries
-    if (analysisData.page_analyses && Array.isArray(analysisData.page_analyses)) {
-      analysisData.page_analyses.forEach(page => {
-        if (page.summary) {
-          context.page_summaries.push({
-            name: page.page_type || '',
-            summary: page.summary
-          });
-        }
-      });
-    }
-    
-    // Add common styles
-    context.common_styles = this.templateSystem.getCommonStyles();
-    
-    const html = this.templateSystem.render('executive-summary.html', context);
-    const outputPath = path.join(this.outputDir, 'executive-summary.html');
-    
-    await fs.ensureDir(path.dirname(outputPath));
-    await fs.writeFile(outputPath, html);
-    console.log(`    ✅ Generated: ${outputPath}`);
-  }
-  
-  async copyScreenshots() {
-    console.log('  📸 Copying screenshots...');
-    
-    try {
-      const outputScreenshotsDir = path.join(this.outputDir, 'screenshots');
-      await fs.ensureDir(outputScreenshotsDir);
-      
-      // Create desktop directory
-      await fs.ensureDir(path.join(outputScreenshotsDir, 'desktop'));
-      
-      // Copy desktop screenshots
-      const desktopDir = path.join(this.screenshotsDir, 'desktop');
-      if (await fs.pathExists(desktopDir)) {
-        // List files in desktop directory
-        const files = await fs.readdir(desktopDir);
-        
-        // Copy each file individually
-        for (const file of files) {
-          const srcPath = path.join(desktopDir, file);
-          const destPath = path.join(outputScreenshotsDir, 'desktop', file);
-          
-          // Only copy PNG files
-          if (file.endsWith('.png')) {
-            await fs.copy(srcPath, destPath);
-            console.log(`    ✅ Copied: ${file}`);
-          }
-        }
-      } else {
-        console.log(`    ⚠️ Desktop screenshots directory not found: ${desktopDir}`);
-        
-        // Check if there are screenshots in the root screenshots directory
-        const rootScreenshots = await fs.readdir(this.screenshotsDir);
-        const pngFiles = rootScreenshots.filter(file => file.endsWith('.png'));
-        
-        if (pngFiles.length > 0) {
-          console.log(`    ℹ️ Found ${pngFiles.length} PNG files in root screenshots directory, copying them...`);
-          
-          for (const file of pngFiles) {
-            const srcPath = path.join(this.screenshotsDir, file);
-            const destPath = path.join(outputScreenshotsDir, 'desktop', file);
-            
-            await fs.copy(srcPath, destPath);
-            console.log(`    ✅ Copied: ${file}`);
-          }
+      // If we're in PAGE ROLE ANALYSIS section, collect those lines
+      if (inPageRoleSection) {
+        // Stop collecting when we hit another major section or end
+        if (line.includes('CRITICAL FLAWS:') || 
+            line.includes('ACTIONABLE RECOMMENDATIONS:') || 
+            line.includes('SUMMARY:')) {
+          inPageRoleSection = false;
+          skipSection = true;
+          continue;
         } else {
-          // Create a placeholder image
-          const placeholderPath = path.join(outputScreenshotsDir, 'desktop', 'placeholder.png');
-          await fs.writeFile(placeholderPath, 'Placeholder for screenshot');
-          console.log(`    ✅ Created placeholder: ${placeholderPath}`);
+          pageRoleLines.push(line);
+          continue;
         }
       }
       
-      console.log(`    ✅ Screenshots setup to: ${outputScreenshotsDir}`);
-    } catch (error) {
-      console.error(`    ❌ Error copying screenshots: ${error.message}`);
+      // Check if we're starting a section to skip
+      if (line.includes('CRITICAL FLAWS:') || 
+          line.includes('ACTIONABLE RECOMMENDATIONS:') || 
+          line.includes('SUMMARY:')) {
+        skipSection = true;
+        continue;
+      }
+      
+      // Check if we're starting a new main section (reset skip)
+      if (line.match(/^## \d+\./)) {
+        skipSection = false;
+      }
+      
+      // Add line if we're not skipping
+      if (!skipSection) {
+        cleanedLines.push(line);
+      }
     }
+    
+    // Combine PAGE ROLE ANALYSIS at the beginning, then the main content
+    const result = [];
+    if (pageRoleLines.length > 0) {
+      result.push(...pageRoleLines);
+      result.push(''); // Add spacing
+    }
+    result.push(...cleanedLines);
+    
+    return result.join('\n').trim();
   }
   
-  sanitizeFilename(url) {
+  findScreenshotPath(url) {
+    if (!url) return '000_placeholder.png';
+    
     try {
+      // Map URLs to their indexed screenshot filenames based on the pattern we see
+      const urlMappings = {
+        'https://edinburghpeaceinstitute.org/index': '000_edinburghpeaceinstitute.org_index.png',
+        'https://edinburghpeaceinstitute.org/cart': '001_edinburghpeaceinstitute.org_cart.png',
+        'https://edinburghpeaceinstitute.org/training': '002_edinburghpeaceinstitute.org_training.png',
+        'https://edinburghpeaceinstitute.org/research': '003_edinburghpeaceinstitute.org_research.png',
+        'https://edinburghpeaceinstitute.org/projects': '004_edinburghpeaceinstitute.org_projects.png',
+        'https://edinburghpeaceinstitute.org/contact-us': '005_edinburghpeaceinstitute.org_contact-us.png'
+      };
+      
+      // Check for exact match first
+      if (urlMappings[url]) {
+        return urlMappings[url];
+      }
+      
+      // Fallback: try to construct filename from URL
       const urlObj = new URL(url);
-      return urlObj.hostname.replace(/\./g, '-') + urlObj.pathname
-        .replace(/[^a-zA-Z0-9-]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .toLowerCase();
+      const domain = urlObj.hostname.replace(/^www\./, '');
+      const path = urlObj.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'index';
+      
+      // Look for a file that matches this pattern (without index prefix)
+      return `${domain}_${path}.png`;
     } catch (e) {
-      // Fallback for invalid URLs
-      return url
-        .replace(/[^a-zA-Z0-9-]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .toLowerCase() || 'page';
+      return '000_placeholder.png';
     }
   }
+
+findScreenshotPath(url) {
+  if (!url) return '000_placeholder.png';
   
-  getPageType(url) {
+  try {
+    // Map URLs to their indexed screenshot filenames based on the pattern we see
+    const urlMappings = {
+      'https://edinburghpeaceinstitute.org/index': '000_edinburghpeaceinstitute.org_index.png',
+      'https://edinburghpeaceinstitute.org/cart': '001_edinburghpeaceinstitute.org_cart.png',
+      'https://edinburghpeaceinstitute.org/training': '002_edinburghpeaceinstitute.org_training.png',
+      'https://edinburghpeaceinstitute.org/research': '003_edinburghpeaceinstitute.org_research.png',
+      'https://edinburghpeaceinstitute.org/projects': '004_edinburghpeaceinstitute.org_projects.png',
+      'https://edinburghpeaceinstitute.org/contact-us': '005_edinburghpeaceinstitute.org_contact-us.png'
+    };
+    
+    // Check for exact match first
+    if (urlMappings[url]) {
+      return urlMappings[url];
+    }
+    
+    // Fallback: try to construct filename from URL
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.replace(/^www\./, '');
+    const path = urlObj.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'index';
+    
+    // Look for a file that matches this pattern (without index prefix)
+    return `${domain}_${path}.png`;
+  } catch (e) {
+    return '000_placeholder.png';
+  }
+}
+  
+  createPageFilename(page) {
+    // Create clean filename from page type
+    const pageType = page.page_type || this.getPageTypeFromUrl(page.url || '');
+    return pageType
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') + '.html';
+  }
+  
+  getPageTypeFromUrl(url) {
     try {
       const urlObj = new URL(url);
       const path = urlObj.pathname.toLowerCase();
@@ -306,8 +275,6 @@ class ReportGenerator {
         return 'Contact Page';
       } else if (path.includes('about')) {
         return 'About Page';
-      } else if (path.includes('privacy')) {
-        return 'Privacy Policy';
       } else if (path.includes('cart')) {
         return 'Cart Page';
       } else if (path.includes('training')) {
@@ -317,13 +284,7 @@ class ReportGenerator {
       } else if (path.includes('project')) {
         return 'Projects Page';
       } else {
-        // Extract page name from URL
-        const segments = path.split('/').filter(Boolean);
-        const lastSegment = segments[segments.length - 1] || 'Page';
-        return lastSegment
-          .split('-')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
+        return 'Page';
       }
     } catch (e) {
       return 'Page';
@@ -331,21 +292,96 @@ class ReportGenerator {
   }
   
   findScreenshotPath(url) {
-    if (!url) return 'placeholder.png';
+    if (!url) return '000_placeholder.png';
     
     try {
-      // Extract filename pattern from URL
+      // Map URLs to their indexed screenshot filenames based on the pattern we see
+      const urlMappings = {
+        'https://edinburghpeaceinstitute.org/index': '000_edinburghpeaceinstitute.org_index.png',
+        'https://edinburghpeaceinstitute.org/cart': '001_edinburghpeaceinstitute.org_cart.png',
+        'https://edinburghpeaceinstitute.org/training': '002_edinburghpeaceinstitute.org_training.png',
+        'https://edinburghpeaceinstitute.org/research': '003_edinburghpeaceinstitute.org_research.png',
+        'https://edinburghpeaceinstitute.org/projects': '004_edinburghpeaceinstitute.org_projects.png',
+        'https://edinburghpeaceinstitute.org/contact-us': '005_edinburghpeaceinstitute.org_contact-us.png'
+      };
+      
+      // Check for exact match first
+      if (urlMappings[url]) {
+        return urlMappings[url];
+      }
+      
+      // Try some variations
+      const variations = [
+        url,
+        url.replace(/\/$/, ''), // Remove trailing slash
+        url + '/', // Add trailing slash
+      ];
+      
+      for (const variation of variations) {
+        if (urlMappings[variation]) {
+          return urlMappings[variation];
+        }
+      }
+      
+      // Fallback: try to construct filename from URL
       const urlObj = new URL(url);
       const domain = urlObj.hostname.replace(/^www\./, '');
       const path = urlObj.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'index';
       
-      // Look for common filename patterns for screenshots
-      // 1. Try index-based pattern: 000_domain_path.png
-      // 2. Try direct domain_path.png
-      // Use desktop as fallback
-      return `edinburghpeaceinstitute.org_${path}.png`;
+      // Return with potential index prefix (we'll try to find a match)
+      return `${domain}_${path}.png`;
     } catch (e) {
-      return 'placeholder.png';
+      return '000_placeholder.png';
+    }
+  }
+  
+  async copyScreenshots() {
+    console.log('  📸 Copying screenshots...');
+    
+    try {
+      const outputScreenshotsDir = path.join(this.outputDir, 'screenshots');
+      const outputDesktopDir = path.join(outputScreenshotsDir, 'desktop');
+      await fs.ensureDir(outputDesktopDir);
+      
+      // Copy desktop screenshots
+      const desktopDir = path.join(this.screenshotsDir, 'desktop');
+      if (await fs.pathExists(desktopDir)) {
+        const files = await fs.readdir(desktopDir);
+        
+        for (const file of files) {
+          if (file.endsWith('.png')) {
+            const srcPath = path.join(desktopDir, file);
+            const destPath = path.join(outputDesktopDir, file);
+            
+            await fs.copy(srcPath, destPath);
+            console.log(`    ✅ Copied: ${file}`);
+          }
+        }
+      } else {
+        console.log(`    ⚠️ Desktop screenshots directory not found: ${desktopDir}`);
+        
+        // Check root screenshots directory
+        if (await fs.pathExists(this.screenshotsDir)) {
+          const rootScreenshots = await fs.readdir(this.screenshotsDir);
+          const pngFiles = rootScreenshots.filter(file => file.endsWith('.png'));
+          
+          if (pngFiles.length > 0) {
+            console.log(`    ℹ️ Found ${pngFiles.length} PNG files in root, copying them...`);
+            
+            for (const file of pngFiles) {
+              const srcPath = path.join(this.screenshotsDir, file);
+              const destPath = path.join(outputDesktopDir, file);
+              
+              await fs.copy(srcPath, destPath);
+              console.log(`    ✅ Copied: ${file}`);
+            }
+          }
+        }
+      }
+      
+      console.log(`    ✅ Screenshots copied to: ${outputDesktopDir}`);
+    } catch (error) {
+      console.error(`    ❌ Error copying screenshots: ${error.message}`);
     }
   }
 }
