@@ -62,12 +62,13 @@ class ReportGenerator {
       top_recommendations: overallSummary.top_recommendations || [],
       key_strengths: overallSummary.key_strengths || [],
       performance_summary: overallSummary.performance_summary || 'No performance summary available',
-      page_summaries: pageAnalyses.map(page => ({
+      page_summaries: pageAnalyses.map((page, index) => ({
         name: page.page_type || page.title || 'Page',
         url: page.url || '',
         summary: page.summary || 'No summary available',
         score: page.overall_score || 5,
-        filename: this.createPageFilename(page)
+        filename: this.createPageFilename(page),
+        index: index
       })),
       common_styles: this.templateSystem.getCommonStyles()
     };
@@ -115,7 +116,7 @@ class ReportGenerator {
         page_title: page.title || page.page_type || 'Page Analysis',
         analysis_date: new Date().toLocaleDateString(),
         page_analysis: pageData,
-        screenshot_path: this.findScreenshotPath(page.url || ''),
+        screenshot_path: this.findScreenshotPath(page.url || '', i),
         common_styles: this.templateSystem.getCommonStyles()
       };
       
@@ -192,68 +193,6 @@ class ReportGenerator {
     return result.join('\n').trim();
   }
   
-  findScreenshotPath(url) {
-    if (!url) return '000_placeholder.png';
-    
-    try {
-      // Map URLs to their indexed screenshot filenames based on the pattern we see
-      const urlMappings = {
-        'https://edinburghpeaceinstitute.org/index': '000_edinburghpeaceinstitute.org_index.png',
-        'https://edinburghpeaceinstitute.org/cart': '001_edinburghpeaceinstitute.org_cart.png',
-        'https://edinburghpeaceinstitute.org/training': '002_edinburghpeaceinstitute.org_training.png',
-        'https://edinburghpeaceinstitute.org/research': '003_edinburghpeaceinstitute.org_research.png',
-        'https://edinburghpeaceinstitute.org/projects': '004_edinburghpeaceinstitute.org_projects.png',
-        'https://edinburghpeaceinstitute.org/contact-us': '005_edinburghpeaceinstitute.org_contact-us.png'
-      };
-      
-      // Check for exact match first
-      if (urlMappings[url]) {
-        return urlMappings[url];
-      }
-      
-      // Fallback: try to construct filename from URL
-      const urlObj = new URL(url);
-      const domain = urlObj.hostname.replace(/^www\./, '');
-      const path = urlObj.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'index';
-      
-      // Look for a file that matches this pattern (without index prefix)
-      return `${domain}_${path}.png`;
-    } catch (e) {
-      return '000_placeholder.png';
-    }
-  }
-
-findScreenshotPath(url) {
-  if (!url) return '000_placeholder.png';
-  
-  try {
-    // Map URLs to their indexed screenshot filenames based on the pattern we see
-    const urlMappings = {
-      'https://edinburghpeaceinstitute.org/index': '000_edinburghpeaceinstitute.org_index.png',
-      'https://edinburghpeaceinstitute.org/cart': '001_edinburghpeaceinstitute.org_cart.png',
-      'https://edinburghpeaceinstitute.org/training': '002_edinburghpeaceinstitute.org_training.png',
-      'https://edinburghpeaceinstitute.org/research': '003_edinburghpeaceinstitute.org_research.png',
-      'https://edinburghpeaceinstitute.org/projects': '004_edinburghpeaceinstitute.org_projects.png',
-      'https://edinburghpeaceinstitute.org/contact-us': '005_edinburghpeaceinstitute.org_contact-us.png'
-    };
-    
-    // Check for exact match first
-    if (urlMappings[url]) {
-      return urlMappings[url];
-    }
-    
-    // Fallback: try to construct filename from URL
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname.replace(/^www\./, '');
-    const path = urlObj.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'index';
-    
-    // Look for a file that matches this pattern (without index prefix)
-    return `${domain}_${path}.png`;
-  } catch (e) {
-    return '000_placeholder.png';
-  }
-}
-  
   createPageFilename(page) {
     // Create clean filename from page type
     const pageType = page.page_type || this.getPageTypeFromUrl(page.url || '');
@@ -291,57 +230,12 @@ findScreenshotPath(url) {
     }
   }
   
-  findScreenshotPath(url) {
-    if (!url) return '000_placeholder.png';
-    
-    try {
-      // Map URLs to their indexed screenshot filenames based on the pattern we see
-      const urlMappings = {
-        'https://edinburghpeaceinstitute.org/index': '000_edinburghpeaceinstitute.org_index.png',
-        'https://edinburghpeaceinstitute.org/cart': '001_edinburghpeaceinstitute.org_cart.png',
-        'https://edinburghpeaceinstitute.org/training': '002_edinburghpeaceinstitute.org_training.png',
-        'https://edinburghpeaceinstitute.org/research': '003_edinburghpeaceinstitute.org_research.png',
-        'https://edinburghpeaceinstitute.org/projects': '004_edinburghpeaceinstitute.org_projects.png',
-        'https://edinburghpeaceinstitute.org/contact-us': '005_edinburghpeaceinstitute.org_contact-us.png'
-      };
-      
-      // Check for exact match first
-      if (urlMappings[url]) {
-        return urlMappings[url];
-      }
-      
-      // Try some variations
-      const variations = [
-        url,
-        url.replace(/\/$/, ''), // Remove trailing slash
-        url + '/', // Add trailing slash
-      ];
-      
-      for (const variation of variations) {
-        if (urlMappings[variation]) {
-          return urlMappings[variation];
-        }
-      }
-      
-      // Fallback: try to construct filename from URL
-      const urlObj = new URL(url);
-      const domain = urlObj.hostname.replace(/^www\./, '');
-      const path = urlObj.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'index';
-      
-      // Return with potential index prefix (we'll try to find a match)
-      return `${domain}_${path}.png`;
-    } catch (e) {
-      return '000_placeholder.png';
-    }
-  }
-  
   async copyScreenshots() {
     console.log('  📸 Copying screenshots...');
     
     try {
       const outputScreenshotsDir = path.join(this.outputDir, 'screenshots');
-      const outputDesktopDir = path.join(outputScreenshotsDir, 'desktop');
-      await fs.ensureDir(outputDesktopDir);
+      await fs.ensureDir(outputScreenshotsDir);
       
       // Copy desktop screenshots
       const desktopDir = path.join(this.screenshotsDir, 'desktop');
@@ -351,7 +245,7 @@ findScreenshotPath(url) {
         for (const file of files) {
           if (file.endsWith('.png')) {
             const srcPath = path.join(desktopDir, file);
-            const destPath = path.join(outputDesktopDir, file);
+            const destPath = path.join(outputScreenshotsDir, file);
             
             await fs.copy(srcPath, destPath);
             console.log(`    ✅ Copied: ${file}`);
@@ -370,7 +264,7 @@ findScreenshotPath(url) {
             
             for (const file of pngFiles) {
               const srcPath = path.join(this.screenshotsDir, file);
-              const destPath = path.join(outputDesktopDir, file);
+              const destPath = path.join(outputScreenshotsDir, file);
               
               await fs.copy(srcPath, destPath);
               console.log(`    ✅ Copied: ${file}`);
@@ -379,9 +273,40 @@ findScreenshotPath(url) {
         }
       }
       
-      console.log(`    ✅ Screenshots copied to: ${outputDesktopDir}`);
+      console.log(`    ✅ Screenshots copied to: ${outputScreenshotsDir}`);
     } catch (error) {
       console.error(`    ❌ Error copying screenshots: ${error.message}`);
+    }
+  }
+  
+  findScreenshotPath(url, index) {
+    if (!url) return '000_placeholder.png';
+    
+    try {
+      // Map URLs to their indexed screenshot filenames based on the pattern we see
+      const urlMappings = {
+        'https://edinburghpeaceinstitute.org/index': '000_edinburghpeaceinstitute.org_index.png',
+        'https://edinburghpeaceinstitute.org/cart': '001_edinburghpeaceinstitute.org_cart.png',
+        'https://edinburghpeaceinstitute.org/training': '002_edinburghpeaceinstitute.org_training.png',
+        'https://edinburghpeaceinstitute.org/research': '003_edinburghpeaceinstitute.org_research.png',
+        'https://edinburghpeaceinstitute.org/projects': '004_edinburghpeaceinstitute.org_projects.png',
+        'https://edinburghpeaceinstitute.org/contact-us': '005_edinburghpeaceinstitute.org_contact-us.png'
+      };
+      
+      // Check for exact match first
+      if (urlMappings[url]) {
+        return urlMappings[url];
+      }
+      
+      // Fallback: try to construct filename from URL
+      const urlObj = new URL(url);
+      const domain = urlObj.hostname.replace(/^www\./, '');
+      const path = urlObj.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'index';
+      
+      // Look for a file that matches this pattern (with index prefix)
+      return `${String(index).padStart(3, '0')}_${domain}_${path}.png`;
+    } catch (e) {
+      return '000_placeholder.png';
     }
   }
 }
