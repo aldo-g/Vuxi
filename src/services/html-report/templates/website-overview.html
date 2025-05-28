@@ -8,40 +8,34 @@
     </div>
 </div>
 
-<div class="metrics-overview">
-    <div class="info-grid">
-        <div class="info-card">
-            <div class="info-label">Organization</div>
-            <div class="info-value">{{ organization }}</div>
-        </div>
-        <div class="info-card">
-            <div class="info-label">Analysis Date</div>
-            <div class="info-value">{{ analysis_date }}</div>
-        </div>
-        <div class="info-card">
-            <div class="info-label">Pages Analyzed</div>
-            <div class="info-value">{{ total_pages_analyzed }}</div>
-        </div>
-        <div class="info-card score-card">
-            <div class="info-label">Overall Score</div>
-            <div class="info-value {% if overall_score >= 8 %}status-excellent{% elif overall_score >= 6 %}status-good{% else %}status-poor{% endif %}">
-                {{ overall_score }}/10
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Key Insights & Overall Rating Side by Side -->
 <div class="insights-rating-container">
     <div class="insights-section">
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">Key Insights</h2>
-                <div class="section-badge primary">Executive Summary</div>
+                <h2 class="section-title">Executive Summary</h2>
             </div>
             <div class="section-content">
                 <div class="insights-content">
                     <p class="summary-text">{{ executive_summary }}</p>
+                    
+                    <!-- Analysis Metadata -->
+                    <div class="analysis-metadata">
+                        <div class="metadata-grid">
+                            <div class="metadata-item">
+                                <span class="metadata-label">Organization</span>
+                                <span class="metadata-value"><strong>{{ organization }}</strong></span>
+                            </div>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Analysis Date</span>
+                                <span class="metadata-value"><strong>{{ analysis_date }}</strong></span>
+                            </div>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Pages Analyzed</span>
+                                <span class="metadata-value"><strong>{{ total_pages_analyzed }}</strong></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -51,7 +45,6 @@
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">Overall Rating</h2>
-                <div class="section-badge">Performance Metric</div>
             </div>
             <div class="section-content">
                 <div class="rating-display">
@@ -74,8 +67,8 @@
                         <div class="interpretation-title status-good">Good</div>
                         <div class="interpretation-desc">Solid performance with improvement opportunities</div>
                         {% else %}
-                        <div class="interpretation-title status-poor">Needs Work</div>
-                        <div class="interpretation-desc">Significant issues requiring attention</div>
+                        <div class="interpretation-title status-needs-work">Requires Attention</div>
+                        <div class="interpretation-desc">Significant opportunities for improvement</div>
                         {% endif %}
                     </div>
                 </div>
@@ -84,80 +77,117 @@
     </div>
 </div>
 
-<!-- Critical Issues -->
-{% if most_critical_issues and most_critical_issues.length > 0 %}
-<div class="section issues-section">
-    <div class="section-header">
-        <h2 class="section-title">Critical Issues</h2>
-        <div class="section-badge danger">{{ most_critical_issues.length }} Issues</div>
+<!-- Professional Analysis Tabs -->
+<div class="analysis-tabs">
+    <div class="tabs">
+        <div class="tab active" data-tab="tab-issues">
+            <span>Critical Issues</span>
+            {% if most_critical_issues and most_critical_issues.length > 0 %}
+            <span class="tab-badge danger-badge">{{ most_critical_issues.length }}</span>
+            {% endif %}
+        </div>
+        <div class="tab" data-tab="tab-recommendations">
+            <span>Strategic Recommendations</span>
+            {% if top_recommendations and top_recommendations.length > 0 %}
+            <span class="tab-badge success-badge">{{ top_recommendations.length }}</span>
+            {% endif %}
+        </div>
+        <div class="tab" data-tab="tab-strengths">
+            <span>Key Strengths</span>
+            {% if key_strengths and key_strengths.length > 0 %}
+            <span class="tab-badge success-badge">{{ key_strengths.length }}</span>
+            {% endif %}
+        </div>
+        <div class="tab" data-tab="tab-performance">
+            <span>Technical Performance</span>
+        </div>
     </div>
-    <div class="section-content">
-        <div class="issues-grid">
-            {% for issue in most_critical_issues %}
-            <div class="issue-item critical-issue">
-                <div class="issue-number">{{ loop.index }}</div>
-                <div class="issue-content">
-                    <div class="issue-text">{{ issue }}</div>
-                    <div class="issue-priority">High Priority</div>
+
+    <!-- Critical Issues Tab -->
+    <div id="tab-issues" class="tab-content active">
+        <div class="section-content">
+            {% if most_critical_issues and most_critical_issues.length > 0 %}
+            <div class="issues-grid">
+                {% for issue in most_critical_issues %}
+                <div class="issue-item critical-issue">
+                    <div class="issue-number">{{ loop.index }}</div>
+                    <div class="issue-content">
+                        <div class="issue-text">{{ issue }}</div>
+                        <div class="issue-meta">
+                            <span class="issue-priority">High Priority</span>
+                        </div>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="success-state">
+                <div class="success-title">No Critical Issues Identified</div>
+                <div class="success-desc">The website analysis did not identify any critical issues requiring immediate attention.</div>
+            </div>
+            {% endif %}
         </div>
     </div>
-</div>
-{% endif %}
 
-<!-- Strategic Recommendations -->
-{% if top_recommendations and top_recommendations.length > 0 %}
-<div class="section recommendations-section">
-    <div class="section-header">
-        <h2 class="section-title">Strategic Recommendations</h2>
-        <div class="section-badge success">{{ top_recommendations.length }} Actions</div>
-    </div>
-    <div class="section-content">
-        <div class="recommendations-grid">
-            {% for recommendation in top_recommendations %}
-            <div class="recommendation-item recommendation">
-                <div class="recommendation-number">{{ loop.index }}</div>
-                <div class="recommendation-content">
-                    <div class="recommendation-text">{{ recommendation }}</div>
-                    <div class="recommendation-impact">High Impact</div>
+    <!-- Strategic Recommendations Tab -->
+    <div id="tab-recommendations" class="tab-content">
+        <div class="section-content">
+            {% if top_recommendations and top_recommendations.length > 0 %}
+            <div class="recommendations-grid">
+                {% for recommendation in top_recommendations %}
+                <div class="recommendation-item recommendation">
+                    <div class="recommendation-number">{{ loop.index }}</div>
+                    <div class="recommendation-content">
+                        <div class="recommendation-text">{{ recommendation }}</div>
+                        <div class="recommendation-meta">
+                            <span class="recommendation-impact">High Impact</span>
+                        </div>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-title">No Strategic Recommendations</div>
+                <div class="empty-desc">No specific strategic recommendations were provided in this analysis.</div>
+            </div>
+            {% endif %}
         </div>
     </div>
-</div>
-{% endif %}
 
-<!-- Key Strengths -->
-{% if key_strengths and key_strengths.length > 0 %}
-<div class="section strengths-section">
-    <div class="section-header">
-        <h2 class="section-title">Key Strengths</h2>
-        <div class="section-badge success">{{ key_strengths.length }} Strengths</div>
-    </div>
-    <div class="section-content">
-        <div class="strengths-grid">
-            {% for strength in key_strengths %}
-            <div class="strength-item">
-                <div class="strength-content">{{ strength }}</div>
+    <!-- Key Strengths Tab -->
+    <div id="tab-strengths" class="tab-content">
+        <div class="section-content">
+            {% if key_strengths and key_strengths.length > 0 %}
+            <div class="strengths-grid">
+                {% for strength in key_strengths %}
+                <div class="strength-item">
+                    <div class="strength-content">{{ strength }}</div>
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-title">No Key Strengths Identified</div>
+                <div class="empty-desc">No specific strengths were highlighted in this analysis.</div>
+            </div>
+            {% endif %}
         </div>
     </div>
-</div>
-{% endif %}
 
-<!-- Technical Performance -->
-<div class="section performance-section">
-    <div class="section-header">
-        <h2 class="section-title">Technical Performance</h2>
-        <div class="section-badge">Technical Analysis</div>
-    </div>
-    <div class="section-content">
-        <div class="performance-content">
-            <p class="performance-text">{{ performance_summary }}</p>
+    <!-- Technical Performance Tab -->
+    <div id="tab-performance" class="tab-content">
+        <div class="section-content">
+            <div class="performance-content">
+                {% if performance_summary %}
+                <p class="performance-text">{{ performance_summary }}</p>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-title">Technical Performance Data</div>
+                    <div class="empty-desc">Technical performance analysis is not available for this report.</div>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -178,7 +208,7 @@
                         <h3 class="page-name">{{ page.name }}</h3>
                         <div class="page-url">{{ page.url }}</div>
                     </div>
-                    <div class="page-score {% if page.score >= 8 %}status-excellent{% elif page.score >= 6 %}status-good{% else %}status-poor{% endif %}">
+                    <div class="page-score {% if page.score >= 8 %}status-excellent{% elif page.score >= 6 %}status-good{% else %}status-needs-work{% endif %}">
                         {{ page.score }}
                     </div>
                 </div>
@@ -219,15 +249,6 @@
     line-height: 1.6;
 }
 
-/* Metrics Overview */
-.metrics-overview {
-    margin-bottom: var(--space-10);
-}
-
-.score-card {
-    border: 2px solid var(--color-primary-light);
-}
-
 /* Key Insights & Rating Layout */
 .insights-rating-container {
     display: grid;
@@ -244,6 +265,41 @@
     font-size: var(--font-size-lg);
     line-height: 1.7;
     color: var(--color-gray-700);
+    margin-bottom: var(--space-6);
+}
+
+/* Analysis Metadata Styling */
+.analysis-metadata {
+    border-top: 1px solid var(--color-gray-200);
+    padding-top: var(--space-4);
+    margin-top: var(--space-4);
+}
+
+.metadata-grid {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.metadata-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+}
+
+.metadata-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-500);
+    font-weight: var(--font-weight-medium);
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.metadata-value {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-700);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.4;
 }
 
 /* Rating Display */
@@ -317,6 +373,109 @@
     line-height: 1.5;
 }
 
+/* Professional Tabs */
+.analysis-tabs {
+    margin-bottom: var(--space-10);
+}
+
+.tabs {
+    display: flex;
+    border-bottom: 1px solid var(--color-gray-200);
+    background: var(--color-gray-50);
+    overflow-x: auto;
+}
+
+.tab {
+    padding: var(--space-4) var(--space-6);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-weight: var(--font-weight-medium);
+    color: var(--color-gray-600);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: transparent;
+}
+
+.tab:hover {
+    color: var(--color-primary);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.tab.active {
+    background: #ffffff;
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    border-top: 1px solid var(--color-gray-200);
+    border-left: 1px solid var(--color-gray-200);
+    border-right: 1px solid var(--color-gray-200);
+    margin-bottom: -1px;
+}
+
+.tab-content {
+    display: none;
+    background: #ffffff;
+    border: 1px solid var(--color-gray-200);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.tab-badge {
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-base);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    min-width: 18px;
+    text-align: center;
+}
+
+.tab-badge.danger-badge {
+    background: #c53030; /* Professional red */
+    color: white;
+}
+
+.tab-badge.success-badge {
+    background: var(--color-success);
+    color: white;
+}
+
+/* Tab Content Styling */
+.tab-content .section-content {
+    padding: var(--space-8);
+}
+
+/* States for Empty/Success Content */
+.empty-state, .success-state {
+    text-align: center;
+    padding: var(--space-12);
+}
+
+.empty-title, .success-title {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-800);
+    margin-bottom: var(--space-2);
+}
+
+.empty-desc, .success-desc {
+    color: var(--color-gray-600);
+    max-width: 400px;
+    margin: 0 auto;
+    line-height: 1.5;
+}
+
+.success-state {
+    background: var(--color-success-light);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-success);
+}
+
 /* Professional Section Styling */
 .section {
     margin-bottom: var(--space-8);
@@ -335,9 +494,46 @@
 }
 
 .section-badge.danger {
-    background: var(--color-danger-light);
-    color: var(--color-danger-dark);
-    border-color: var(--color-danger);
+    background: #fed7d7; /* Softer red background */
+    color: #c53030; /* Professional red text */
+    border-color: #fc8181;
+}
+
+/* Consistent Status Classes */
+.status-excellent {
+    color: var(--color-success-dark);
+    background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-base);
+    border: 1px solid #10b981;
+    display: inline-block;
+}
+
+.status-good {
+    color: var(--color-success-dark);
+    background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-base);
+    border: 1px solid #10b981;
+    display: inline-block;
+}
+
+.status-needs-work {
+    color: #c53030; /* Professional red */
+    background: linear-gradient(135deg, #feb2b2 0%, #fed7d7 100%);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-base);
+    border: 1px solid #fc8181;
+    display: inline-block;
+}
+
+.status-poor {
+    color: #c53030; /* Professional red */
+    background: linear-gradient(135deg, #feb2b2 0%, #fed7d7 100%);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-base);
+    border: 1px solid #fc8181;
+    display: inline-block;
 }
 
 /* Issues Grid */
@@ -353,7 +549,7 @@
 }
 
 .issue-number {
-    background: var(--color-danger);
+    background: #c53030; /* Professional red */
     color: white;
     width: 28px;
     height: 28px;
@@ -377,12 +573,37 @@
     line-height: 1.5;
 }
 
+.issue-meta {
+    display: flex;
+    gap: var(--space-3);
+}
+
 .issue-priority {
-    color: var(--color-danger-dark);
+    background: #fed7d7; /* Softer red background */
+    color: #c53030; /* Professional red text */
+    border: 1px solid #fc8181;
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-base);
+}
+
+/* Updated Critical Issue styling */
+.critical-issue {
+    background: #ffffff;
+    border: 1px solid #fed7d7; /* Softer red border */
+    border-left: 3px solid #c53030; /* Professional red accent */
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    margin-bottom: var(--space-4);
+    transition: all var(--transition-fast);
+}
+
+.critical-issue:hover {
+    box-shadow: var(--shadow-sm);
+    border-left-width: 4px;
 }
 
 /* Recommendations Grid */
@@ -422,18 +643,40 @@
     line-height: 1.5;
 }
 
+.recommendation-meta {
+    display: flex;
+    gap: var(--space-3);
+}
+
 .recommendation-impact {
     color: var(--color-success-dark);
+    background: var(--color-success-light);
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-base);
 }
 
 /* Strengths Grid */
 .strengths-grid {
     display: grid;
     gap: var(--space-3);
+}
+
+.strength-item {
+    background: #ffffff;
+    border: 1px solid var(--color-success-light);
+    border-left: 3px solid var(--color-success);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    transition: all var(--transition-fast);
+}
+
+.strength-item:hover {
+    box-shadow: var(--shadow-sm);
 }
 
 .strength-content {
@@ -505,22 +748,6 @@
     border: 1px solid var(--color-gray-200);
 }
 
-.page-score.status-excellent { 
-    background: var(--color-success-light); 
-    color: var(--color-success-dark);
-    border-color: var(--color-success);
-}
-.page-score.status-good { 
-    background: var(--color-success-light); 
-    color: var(--color-success-dark);
-    border-color: var(--color-success);
-}
-.page-score.status-poor { 
-    background: var(--color-danger-light); 
-    color: var(--color-danger-dark);
-    border-color: var(--color-danger);
-}
-
 .page-summary {
     color: var(--color-gray-600);
     line-height: 1.5;
@@ -576,6 +803,17 @@
         text-align: left;
         max-width: 200px;
     }
+    
+    /* Tab responsiveness */
+    .tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .tab {
+        min-width: 120px;
+        flex-shrink: 0;
+    }
 }
 
 @media (max-width: 768px) {
@@ -602,11 +840,54 @@
         text-align: center;
         max-width: none;
     }
+    
+    .metadata-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-1);
+    }
+    
+    .metadata-label {
+        min-width: auto;
+    }
+    
+    /* Mobile tab adjustments */
+    .tab {
+        padding: var(--space-3) var(--space-4);
+        min-width: 100px;
+        font-size: var(--font-size-sm);
+    }
+    
+    .tab-content .section-content {
+        padding: var(--space-6);
+    }
+    
+    .empty-state, .success-state {
+        padding: var(--space-8);
+    }
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Professional tab functionality
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            tab.classList.add('active');
+            const tabId = tab.getAttribute('data-tab');
+            const targetContent = document.getElementById(tabId);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+        });
+    });
+    
     // Animate score ring
     setTimeout(() => {
         const scoreRing = document.querySelector('.score-ring-progress');
@@ -624,7 +905,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (score >= 6) {
                 scoreRing.style.stroke = 'var(--color-warning)';
             } else {
-                scoreRing.style.stroke = 'var(--color-danger)';
+                scoreRing.style.stroke = '#c53030'; // Professional red
             }
         }
     }, 800);
