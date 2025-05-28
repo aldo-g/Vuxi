@@ -17,6 +17,15 @@ You MUST return ONLY valid JSON with this EXACT structure (no additional text, n
   "page_type": "Homepage",
   "title": "Descriptive page title",
   "overall_score": 7,
+  "section_scores": {
+    "first_impression_clarity": 5,
+    "goal_alignment": 3,
+    "visual_design": 6,
+    "content_quality": 5,
+    "usability_accessibility": 4,
+    "conversion_optimization": 2,
+    "technical_execution": 6
+  },
   "key_issues": [
     "Most important issue 1",
     "Most important issue 2",
@@ -34,6 +43,8 @@ CRITICAL:
 - Return ONLY the JSON object
 - No code blocks, no \`\`\`json\`\`\`, no extra text
 - overall_score must be a number 1-10
+- section_scores should contain individual scores for each analysis section (1-10 each)
+- If you cannot find section scores, omit the section_scores object entirely
 - All arrays must contain strings
 - Extract 3-5 most important issues and recommendations`,
 

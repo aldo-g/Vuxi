@@ -130,8 +130,12 @@ class Formatter {
       // Try multiple JSON parsing methods
       const parsed = this.parseJSON(formattedText, pageAnalysis.url);
       
+      // Extract section scores from original analysis
+      const sectionScores = this.extractSectionScores(pageAnalysis.analysis);
+      
       return {
         ...parsed,
+        section_scores: sectionScores,
         url: pageAnalysis.url,
         original_analysis: pageAnalysis.analysis
       };
@@ -140,6 +144,63 @@ class Formatter {
       console.error(`     ❌ LLM call failed for ${pageAnalysis.url}:`, error.message);
       throw error;
     }
+  }
+  
+  extractSectionScores(analysisText) {
+    const scores = {};
+    
+    if (!analysisText) {
+      return scores;
+    }
+    
+    // Define the sections we're looking for and their clean names
+    const sectionMappings = {
+      'FIRST IMPRESSION & CLARITY': 'first_impression_clarity',
+      'GOAL ALIGNMENT': 'goal_alignment', 
+      'VISUAL DESIGN': 'visual_design',
+      'CONTENT QUALITY': 'content_quality',
+      'USABILITY & ACCESSIBILITY': 'usability_accessibility',
+      'CONVERSION OPTIMIZATION': 'conversion_optimization',
+      'TECHNICAL EXECUTION': 'technical_execution'
+    };
+    
+    // Look for patterns like "## 1. FIRST IMPRESSION & CLARITY (Score: 5/10)"
+    const scoreRegex = /##\s*\d+\.\s*([^(]+)\(Score:\s*(\d+)\/10\)/gi;
+    
+    let match;
+    while ((match = scoreRegex.exec(analysisText)) !== null) {
+      const sectionName = match[1].trim();
+      const score = parseInt(match[2]);
+      
+      // Find the matching section
+      for (const [fullName, cleanName] of Object.entries(sectionMappings)) {
+        if (sectionName.includes(fullName)) {
+          scores[cleanName] = score;
+          console.log(`     📊 Extracted score: ${fullName} = ${score}/10`);
+          break;
+        }
+      }
+    }
+    
+    // Fallback: try a more flexible pattern
+    if (Object.keys(scores).length === 0) {
+      const fallbackRegex = /([A-Z][A-Z\s&]+)\s*\(Score:\s*(\d+)\/10\)/gi;
+      
+      while ((match = fallbackRegex.exec(analysisText)) !== null) {
+        const sectionName = match[1].trim();
+        const score = parseInt(match[2]);
+        
+        for (const [fullName, cleanName] of Object.entries(sectionMappings)) {
+          if (sectionName.includes(fullName)) {
+            scores[cleanName] = score;
+            console.log(`     📊 Extracted score (fallback): ${fullName} = ${score}/10`);
+            break;
+          }
+        }
+      }
+    }
+    
+    return scores;
   }
   
   async createOverallSummary(rawAnalysisData, pageAnalyses) {
@@ -223,6 +284,7 @@ class Formatter {
       page_type: this.extractPageType(pageAnalysis.url),
       title: this.extractPageType(pageAnalysis.url),
       overall_score: this.extractScore(text) || 5,
+      section_scores: {}, // Will be filled by extractSectionScores
       key_issues: this.extractList(text, ['issues', 'problems', 'flaws']).slice(0, 5),
       recommendations: this.extractList(text, ['recommendations', 'suggestions', 'improvements']).slice(0, 5),
       summary: this.extractSummary(text) || 'Page analysis available'
@@ -242,11 +304,14 @@ class Formatter {
   }
   
   createFallbackPageAnalysis(pageAnalysis) {
+    const sectionScores = this.extractSectionScores(pageAnalysis.analysis || '');
+    
     return {
       page_type: this.extractPageType(pageAnalysis.url),
       title: this.extractPageType(pageAnalysis.url),
       url: pageAnalysis.url,
       overall_score: 5,
+      section_scores: sectionScores,
       key_issues: ['Analysis formatting failed - manual review needed'],
       recommendations: ['Review page analysis manually'],
       summary: pageAnalysis.analysis ? pageAnalysis.analysis.substring(0, 200) + '...' : 'Page analysis available',

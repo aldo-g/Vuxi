@@ -98,8 +98,13 @@ class ReportGenerator {
       // Clean the original analysis to remove repetitive sections
       const cleanedAnalysis = this.cleanAnalysisContent(page.original_analysis || '');
       
+      // Ensure section_scores is properly formatted
+      const sectionScores = page.section_scores || {};
+      console.log(`      📊 Section scores for ${page.page_type}: ${Object.keys(sectionScores).length} sections`);
+      
       const pageData = {
         overall_score: page.overall_score || 5,
+        section_scores: sectionScores,
         key_issues: page.key_issues || [],
         recommendations: page.recommendations || [],
         summary: page.summary || 'No summary available',
@@ -126,6 +131,11 @@ class ReportGenerator {
       await fs.ensureDir(path.dirname(outputPath));
       await fs.writeFile(outputPath, html);
       console.log(`    ✅ Generated: ${outputPath}`);
+      
+      // Log section scores for debugging
+      if (Object.keys(sectionScores).length > 0) {
+        console.log(`      📊 Section scores: ${Object.entries(sectionScores).map(([key, value]) => `${key}:${value}`).join(', ')}`);
+      }
     }
   }
   

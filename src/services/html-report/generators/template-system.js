@@ -10,6 +10,21 @@ class TemplateSystem {
       trimBlocks: true,
       lstripBlocks: true
     });
+    
+    // Add custom filters
+    this.addCustomFilters();
+  }
+  
+  addCustomFilters() {
+    // Add tojson filter
+    this.env.addFilter('tojson', function(obj) {
+      return JSON.stringify(obj);
+    });
+    
+    // Add safe filter alias if needed
+    this.env.addFilter('safe', function(str) {
+      return new nunjucks.runtime.SafeString(str);
+    });
   }
   
   render(templateName, context) {

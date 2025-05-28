@@ -92,6 +92,36 @@ function validateStructuredData(data) {
           errors.push(`Page analysis ${i} has invalid overall_score`);
         }
         
+        // Validate section scores if present
+        if (page.section_scores) {
+          if (typeof page.section_scores !== 'object' || Array.isArray(page.section_scores)) {
+            page.section_scores = {};
+            errors.push(`Page analysis ${i} section_scores should be an object`);
+          } else {
+            // Validate individual section scores
+            const validSections = [
+              'first_impression_clarity',
+              'goal_alignment',
+              'visual_design',
+              'content_quality',
+              'usability_accessibility',
+              'conversion_optimization',
+              'technical_execution'
+            ];
+            
+            for (const [sectionName, score] of Object.entries(page.section_scores)) {
+              if (!validSections.includes(sectionName)) {
+                errors.push(`Page analysis ${i} has invalid section name: ${sectionName}`);
+              }
+              
+              if (typeof score !== 'number' || score < 1 || score > 10) {
+                page.section_scores[sectionName] = 5;
+                errors.push(`Page analysis ${i} has invalid section score for ${sectionName}: ${score}`);
+              }
+            }
+          }
+        }
+        
         // Fix: expect key_issues not critical_flaws
         if (!Array.isArray(page.key_issues)) {
           page.key_issues = [];
