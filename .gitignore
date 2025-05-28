@@ -1,1 +1,7 @@
 .compile-context/
+report-ui/public/*.json
+report-ui/public/data/
+report-ui/public/*.json
+report-ui/public/data/
+.compile-context/
+report-ui/public/
