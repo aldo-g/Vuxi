@@ -1,0 +1,40 @@
+{
+    "name": "website-analyzer-unified",
+    "version": "1.0.0",
+    "description": "Unified website analysis tool without containers",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js",
+        "test:url-discovery": "node tests/test-url-discovery.js",
+        "test:screenshot": "node tests/test-screenshot.js",
+        "test:lighthouse": "node tests/test-lighthouse.js",
+        "test:llm-analysis": "node tests/test-llm-analysis.js",
+        "test:formatting": "node tests/test-formatting.js",
+        "test:html-report": "node tests/test-html-report.js"
+    },
+    "dependencies": {
+        "@anthropic-ai/sdk": "^0.17.1",
+        "ajv": "^8.12.0",
+        "dotenv": "^16.5.0",
+        "fs-extra": "^11.1.1",
+        "lighthouse": "~10.4.0",
+        "nunjucks": "^3.2.4",
+        "playwright": "^1.52.0",
+        "puppeteer": "~19.11.1",
+        "sharp": "^0.33.0",
+        "yargs": "^17.7.2"
+    },
+    "engines": {
+        "node": ">=18"
+    },
+    "keywords": [
+        "website-analysis",
+        "ux",
+        "ui",
+        "lighthouse",
+        "screenshots",
+        "ai-analysis"
+    ],
+    "author": "",
+    "license": "MIT"
+}
