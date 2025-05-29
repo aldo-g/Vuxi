@@ -123,6 +123,18 @@ const PageAnalysis = () => {
     return () => clearTimeout(timer);
   }, [pageData]);
 
+  // Helper function to get badge colors based on tab type
+  const getBadgeColors = (tabId: string) => {
+    switch (tabId) {
+      case 'tab-issues':
+        return 'bg-red-100 text-red-700';
+      case 'tab-recommendations':
+        return 'bg-green-100 text-green-700';
+      default:
+        return 'bg-blue-100 text-blue-700';
+    }
+  };
+
   if (!pageData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex items-center justify-center">
@@ -292,7 +304,7 @@ const PageAnalysis = () => {
                 >
                   <span>{tab.label}</span>
                   {tab.count && tab.count > 0 && (
-                    <span className="inline-flex items-center justify-center px-3 py-1 text-xs font-bold rounded-xl min-w-[24px] h-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm">
+                    <span className={`inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full min-w-[20px] h-5 ${getBadgeColors(tab.id)}`}>
                       {tab.count}
                     </span>
                   )}
@@ -446,14 +458,14 @@ const PageAnalysis = () => {
               <div className="space-y-6">
                 {pageData.recommendations.length > 0 ? (
                   pageData.recommendations.map((recommendation, index) => (
-                    <div key={index} className="flex gap-6 p-8 bg-gradient-to-r from-blue-50/80 to-blue-50/40 border border-blue-200/60 rounded-2xl hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300">
-                      <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl flex items-center justify-center text-sm font-bold shadow-lg">
+                    <div key={index} className="flex gap-6 p-8 bg-gradient-to-r from-green-50/80 to-green-50/40 border border-green-200/60 rounded-2xl hover:shadow-lg hover:shadow-green-100/50 transition-all duration-300">
+                      <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl flex items-center justify-center text-sm font-bold shadow-lg">
                         {index + 1}
                       </div>
                       <div className="flex-1">
                         <p className="text-slate-900 font-semibold leading-relaxed text-lg mb-4">{recommendation}</p>
                         <div className="flex items-center gap-3">
-                          <span className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border border-blue-300">
+                          <span className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300">
                             High Impact
                           </span>
                         </div>
