@@ -1,102 +1,245 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
-// Mock page analysis data
-const pageAnalysisData = {
-  "homepage": {
-    page_type: "Homepage",
-    title: "Edinburgh Peace Institute Homepage Analysis",
-    overall_score: 4,
-    url: "https://edinburghpeaceinstitute.org/index",
-    section_scores: {
-      first_impression_clarity: 5,
-      goal_alignment: 3,
-      visual_design: 6,
-      content_quality: 5,
-      usability_accessibility: 4,
-      conversion_optimization: 2,
-      technical_execution: 6
-    },
-    key_issues: [
-      "Missing conversion elements (donation buttons, sign-up forms)",
-      "Content hierarchy prioritizes team profiles over organization's mission and impact",
-      "No clear visual cues or pathways directing users toward donation or training options"
-    ],
-    recommendations: [
-      "Add prominent donation and training CTAs in the top section of the page",
-      "Restructure page hierarchy to prioritize impact, mission, and offerings above team information",
-      "Create a concise, scannable value proposition that clearly communicates the organization's impact"
-    ],
-    summary: "The homepage exhibits strong visual design but fails to achieve primary conversion goals. While professionally designed with quality content, it lacks strategic placement of donation opportunities and training enrollment pathways.",
-    detailed_analysis: `
-PAGE ROLE ANALYSIS:
-The homepage serves as the primary entry point for the Edinburgh Peace Institute website, responsible for making strong first impressions and guiding visitors toward key actions like donations and training enrollment.
+interface PageAnalysisDetail {
+  id: string;
+  page_type: string;
+  title: string;
+  overall_score: number;
+  url: string;
+  section_scores: { [key: string]: number };
+  key_issues: string[];
+  recommendations: string[];
+  summary: string;
+  detailed_analysis?: string;
+  raw_analysis?: string;
+  screenshot_path?: string;
+}
 
-## 1. FIRST IMPRESSION & CLARITY
+interface ReportData {
+  organization: string;
+  analysis_date: string;
+  timestamp?: string;
+  total_pages_analyzed: number;
+  overall_score: number;
+  executive_summary: string;
+  most_critical_issues: string[];
+  top_recommendations: string[];
+  key_strengths: string[];
+  performance_summary: string;
+  page_analyses: PageAnalysisDetail[];
+  metadata?: any;
+}
 
-The page makes a professional first impression with clean design and clear branding. However, the value proposition could be more prominent and actionable.
-
-- EVIDENCE: Clean, modern design with consistent branding
-- EVIDENCE: Professional photography and typography
-- Clear organizational identity but mission impact could be more prominent
-
-## 2. GOAL ALIGNMENT
-
-Moderate alignment with organizational goals. The page showcases expertise but doesn't effectively drive conversions.
-
-- EVIDENCE: Team credentials prominently displayed
-- EVIDENCE: Research projects highlighted
-- Missing strategic donation pathways and training enrollment CTAs
-
-## 3. VISUAL DESIGN
-
-Strong visual hierarchy and professional aesthetic. Good use of whitespace and typography.
-
-- EVIDENCE: Consistent color scheme and branding
-- EVIDENCE: Professional photography
-- Well-structured layout with clear sections
-
-## 4. CONTENT QUALITY
-
-High-quality content that establishes credibility and expertise in peace and conflict resolution.
-
-- EVIDENCE: Detailed team profiles with academic credentials
-- EVIDENCE: Comprehensive project descriptions
-- Content effectively demonstrates organizational expertise
-
-## 5. USABILITY & ACCESSIBILITY
-
-Generally accessible with clear navigation, though some improvement opportunities exist.
-
-- EVIDENCE: Clean navigation structure
-- EVIDENCE: Responsive design implementation
-- Could benefit from enhanced mobile optimization
-
-## 6. CONVERSION OPTIMIZATION
-
-Significant weaknesses in conversion optimization with limited pathways to desired actions.
-
-- EVIDENCE: Single donation button in navigation
-- EVIDENCE: No prominent training enrollment CTAs
-- Missing contextual calls-to-action throughout content
-
-## 7. TECHNICAL EXECUTION
-
-Strong technical implementation with good performance metrics.
-
-- EVIDENCE: Fast loading times
-- EVIDENCE: Mobile-responsive design
-- Solid technical foundation for user experience
-    `,
-    raw_analysis: "RAW ANALYSIS DATA: Homepage analysis shows strong visual design (6/10) but poor conversion optimization (2/10). Technical execution is solid (6/10) with good accessibility (4/10). Main issues include lack of donation pathways and hidden training enrollment options.",
-    screenshot_path: "homepage-screenshot.png"
+const fetchReportData = async (): Promise<ReportData> => {
+  const response = await fetch("/report-data.json");
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
+  return response.json();
+};
+
+// Helper function to extract page role analysis from detailed analysis
+const extractPageRoleAnalysis = (content: string) => {
+  const lines = content.split('\n');
+  let pageRoleContent: string[] = [];
+  let inPageRoleSection = false;
+  
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
+    
+    if (trimmedLine.toUpperCase().includes('PAGE ROLE ANALYSIS')) {
+      inPageRoleSection = true;
+    } else if (trimmedLine.startsWith('##') && inPageRoleSection) {
+      // Found next section, stop collecting
+      inPageRoleSection = false;
+    } else if (inPageRoleSection && trimmedLine && !trimmedLine.includes('EVIDENCE:')) {
+      pageRoleContent.push(trimmedLine);
+    }
+  });
+  
+  return pageRoleContent.join(' ').trim();
+};
+const parseDetailedAnalysis = (content: string, sectionScores: { [key: string]: number }) => {
+  const lines = content.split('\n');
+  const sections: Array<{
+    title: string;
+    content: string[];
+    evidence: string[];
+    score?: number;
+  }> = [];
+  
+  // Mapping between section titles and score keys
+  const titleToScoreKey: { [key: string]: string } = {
+    'FIRST IMPRESSION & CLARITY': 'first_impression_clarity',
+    'GOAL ALIGNMENT': 'goal_alignment', 
+    'VISUAL DESIGN': 'visual_design',
+    'CONTENT QUALITY': 'content_quality',
+    'USABILITY & ACCESSIBILITY': 'usability_accessibility',
+    'CONVERSION OPTIMIZATION': 'conversion_optimization',
+    'TECHNICAL EXECUTION': 'technical_execution'
+  };
+  
+  let currentSection: any = null;
+  let currentContent: string[] = [];
+  let currentEvidence: string[] = [];
+  let collectingEvidence = false;
+  
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
+    
+    // Check for section headers like "## 1. FIRST IMPRESSION & CLARITY (Score: 5/10)"
+    const sectionMatch = trimmedLine.match(/^##\s*\d+\.\s*([^(]+)(?:\(Score:\s*\d+\/\d+\))?/);
+    if (sectionMatch) {
+      // Save previous section
+      if (currentSection) {
+        currentSection.content = currentContent;
+        currentSection.evidence = currentEvidence;
+        // Try to find matching score
+        const scoreKey = titleToScoreKey[currentSection.title.toUpperCase()];
+        if (scoreKey && sectionScores[scoreKey]) {
+          currentSection.score = sectionScores[scoreKey];
+        }
+        sections.push(currentSection);
+      }
+      
+      // Start new section
+      currentSection = {
+        title: sectionMatch[1].trim(),
+        content: [],
+        evidence: [],
+        score: undefined
+      };
+      currentContent = [];
+      currentEvidence = [];
+      collectingEvidence = false;
+    }
+    // Check for evidence marker
+    else if (trimmedLine.toUpperCase().includes('EVIDENCE:')) {
+      collectingEvidence = true;
+      // Extract evidence from the same line if it exists
+      const evidenceMatch = trimmedLine.match(/EVIDENCE:\s*(.+)/i);
+      if (evidenceMatch && evidenceMatch[1]) {
+        currentEvidence.push(evidenceMatch[1]);
+      }
+    }
+    // Handle bullet points
+    else if (trimmedLine.startsWith('- ') && currentSection) {
+      const bulletContent = trimmedLine.substring(2).trim();
+      if (collectingEvidence) {
+        currentEvidence.push(bulletContent);
+      } else {
+        currentContent.push(bulletContent);
+      }
+    }
+    // Handle regular content lines (only if not collecting evidence and not empty)
+    else if (trimmedLine && currentSection && !collectingEvidence) {
+      currentContent.push(trimmedLine);
+    }
+  });
+  
+  // Save last section
+  if (currentSection) {
+    currentSection.content = currentContent;
+    currentSection.evidence = currentEvidence;
+    // Try to find matching score
+    const scoreKey = titleToScoreKey[currentSection.title.toUpperCase()];
+    if (scoreKey && sectionScores[scoreKey]) {
+      currentSection.score = sectionScores[scoreKey];
+    }
+    sections.push(currentSection);
+  }
+  
+  return sections;
 };
 
 const PageAnalysis = () => {
+const renderMarkdownContent = (content: string) => {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let currentParagraph: string[] = [];
+  let listItems: string[] = [];
+  
+  const flushParagraph = () => {
+    if (currentParagraph.length > 0) {
+      elements.push(
+        <p key={elements.length} className="text-slate-700 leading-relaxed mb-4">
+          {currentParagraph.join(' ').replace(/\*\*(.*?)\*\*/g, (_, text) => text)}
+        </p>
+      );
+      currentParagraph = [];
+    }
+  };
+  
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={elements.length} className="list-disc list-inside space-y-2 mb-6 text-slate-700">
+          {listItems.map((item, idx) => (
+            <li key={idx} className="leading-relaxed">{item}</li>
+          ))}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+  
+  lines.forEach((line, index) => {
+    const trimmedLine = line.trim();
+    
+    if (trimmedLine.startsWith('# ')) {
+      flushParagraph();
+      flushList();
+      elements.push(
+        <h1 key={elements.length} className="text-3xl font-bold text-slate-900 mb-6 mt-8 first:mt-0">
+          {trimmedLine.substring(2)}
+        </h1>
+      );
+    } else if (trimmedLine.startsWith('## ')) {
+      flushParagraph();
+      flushList();
+      elements.push(
+        <h2 key={elements.length} className="text-xl font-semibold text-slate-900 mb-4 mt-8">
+          {trimmedLine.substring(3)}
+        </h2>
+      );
+    } else if (trimmedLine.startsWith('### ')) {
+      flushParagraph();
+      flushList();
+      elements.push(
+        <h3 key={elements.length} className="text-lg font-medium text-slate-900 mb-3 mt-6">
+          {trimmedLine.substring(4)}
+        </h3>
+      );
+    } else if (trimmedLine.startsWith('- ')) {
+      flushParagraph();
+      listItems.push(trimmedLine.substring(2));
+    } else if (trimmedLine === '') {
+      flushParagraph();
+      flushList();
+    } else {
+      currentParagraph.push(trimmedLine);
+    }
+  });
+  
+  flushParagraph();
+  flushList();
+  
+  return elements;
+};
   const { pageId } = useParams();
   const [activeTab, setActiveTab] = useState("tab-detailed");
-  const pageData = pageAnalysisData[pageId as keyof typeof pageAnalysisData];
+
+  const { data: reportData, isLoading, error } = useQuery<ReportData, Error>({
+    queryKey: ["reportData"],
+    queryFn: fetchReportData,
+    staleTime: Infinity, // Never mark as stale
+    refetchOnWindowFocus: false,
+  });
+
+  // Find the specific page data from the report
+  const pageData = reportData?.page_analyses?.find(page => page.id === pageId);
 
   useEffect(() => {
     // Animate score ring
@@ -135,6 +278,45 @@ const PageAnalysis = () => {
     }
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-xl text-slate-700">Loading Page Analysis...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-gradient-to-br from-red-50 to-red-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-4">Error Loading Data</h1>
+          <p className="text-slate-600 mb-8 text-lg">Could not load the analysis data.</p>
+          <Link 
+            to="/" 
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-2xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Overview
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Page not found
   if (!pageData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex items-center justify-center">
@@ -213,7 +395,7 @@ const PageAnalysis = () => {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500 font-semibold">Analysis Date:</span>
-                  <span className="text-slate-900 font-bold">May 28, 2025</span>
+                  <span className="text-slate-900 font-bold">{reportData?.analysis_date || 'May 28, 2025'}</span>
                 </div>
               </div>
             </div>
@@ -321,101 +503,94 @@ const PageAnalysis = () => {
                 {/* Page Role Analysis Section */}
                 <div className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-2xl border border-blue-100/60 p-8">
                   <div className="flex items-center gap-4 mb-6">
-                    <div className="h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <svg className="lucide lucide-file-text h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </div>
                     <h3 className="text-2xl font-bold text-slate-900">Page Role Analysis</h3>
                   </div>
-                  <p className="text-slate-700 leading-relaxed text-lg">
-                    The homepage serves as the primary entry point for the Edinburgh Peace Institute website, responsible for making strong first impressions and guiding visitors toward key actions like donations and training enrollment.
-                  </p>
-                </div>
-
-                {/* Section Scores */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
-                  <div className="flex items-center gap-4 mb-8">
-                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-900">Performance Breakdown</h3>
-                  </div>
-
-                  <div className="grid gap-6">
-                    {Object.entries(pageData.section_scores).map(([key, score]) => {
-                      const formatName = (name: string) => name.split('_').map(word => 
-                        word.charAt(0).toUpperCase() + word.slice(1)
-                      ).join(' ');
-                      
-                      const getScoreColor = (score: number) => {
-                        if (score >= 7) return 'from-emerald-500 to-emerald-600';
-                        if (score >= 5) return 'from-amber-500 to-amber-600';
-                        return 'from-red-500 to-red-600';
-                      };
-
-                      const getScoreBg = (score: number) => {
-                        if (score >= 7) return 'bg-emerald-50 border-emerald-200 text-emerald-800';
-                        if (score >= 5) return 'bg-amber-50 border-amber-200 text-amber-800';
-                        return 'bg-red-50 border-red-200 text-red-800';
-                      };
-
-                      return (
-                        <div key={key} className="flex items-center gap-6">
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-semibold text-slate-700 mb-3">{formatName(key)}</h4>
-                            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                              <div 
-                                className={`h-full bg-gradient-to-r ${getScoreColor(score)} rounded-full transition-all duration-1000 ease-out`}
-                                style={{ width: `${(score / 10) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                          <div className={`px-4 py-2 rounded-xl text-sm font-bold border ${getScoreBg(score)}`}>
-                            {score}/10
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="prose prose-lg max-w-none">
+                    <p className="text-slate-700 leading-relaxed text-lg m-0">
+                      {pageData.detailed_analysis ? 
+                        extractPageRoleAnalysis(pageData.detailed_analysis) || 
+                        `This page serves as a ${pageData.page_type.toLowerCase()} for the ${reportData?.organization} website, responsible for ${pageData.page_type === 'Homepage' ? 'making strong first impressions and guiding visitors toward key actions like donations and training enrollment' : 'supporting the organization\'s overall user experience and conversion goals'}.` :
+                        `This page serves as a ${pageData.page_type.toLowerCase()} for the ${reportData?.organization} website.`
+                      }
+                    </p>
                   </div>
                 </div>
 
                 {/* Analysis Sections */}
                 <div className="space-y-8">
-                  {[
-                    { title: "First Impression & Clarity", content: "The page makes a professional first impression with clean design and clear branding. However, the value proposition could be more prominent and actionable.", evidence: ["Clean, modern design with consistent branding", "Professional photography and typography", "Clear organizational identity but mission impact could be more prominent"] },
-                    { title: "Goal Alignment", content: "Moderate alignment with organizational goals. The page showcases expertise but doesn't effectively drive conversions.", evidence: ["Team credentials prominently displayed", "Research projects highlighted", "Missing strategic donation pathways and training enrollment CTAs"] },
-                    { title: "Visual Design", content: "Strong visual hierarchy and professional aesthetic. Good use of whitespace and typography.", evidence: ["Consistent color scheme and branding", "Professional photography", "Well-structured layout with clear sections"] },
-                    { title: "Content Quality", content: "High-quality content that establishes credibility and expertise in peace and conflict resolution.", evidence: ["Detailed team profiles with academic credentials", "Comprehensive project descriptions", "Content effectively demonstrates organizational expertise"] },
-                    { title: "Usability & Accessibility", content: "Generally accessible with clear navigation, though some improvement opportunities exist.", evidence: ["Clean navigation structure", "Responsive design implementation", "Could benefit from enhanced mobile optimization"] },
-                    { title: "Conversion Optimization", content: "Significant weaknesses in conversion optimization with limited pathways to desired actions.", evidence: ["Single donation button in navigation", "No prominent training enrollment CTAs", "Missing contextual calls-to-action throughout content"] },
-                    { title: "Technical Execution", content: "Strong technical implementation with good performance metrics.", evidence: ["Fast loading times", "Mobile-responsive design", "Solid technical foundation for user experience"] }
-                  ].map((section, index) => (
-                    <div key={index} className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
-                      <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-3">
-                        <span className="w-8 h-8 bg-gradient-to-br from-slate-600 to-slate-700 text-white rounded-lg flex items-center justify-center text-sm font-bold">
-                          {index + 1}
-                        </span>
-                        {section.title}
-                      </h3>
-                      <p className="text-slate-700 leading-relaxed mb-6 text-lg">
-                        {section.content}
-                      </p>
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">Evidence:</h4>
-                        <div className="grid gap-3">
-                          {section.evidence.map((item, evidenceIndex) => (
-                            <div key={evidenceIndex} className="flex gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                              <div className="w-1.5 h-1.5 bg-slate-400 rounded-full mt-2.5 flex-shrink-0" />
-                              <span className="text-slate-700 leading-relaxed">{item}</span>
+                  {pageData.detailed_analysis ? 
+                    parseDetailedAnalysis(pageData.detailed_analysis, pageData.section_scores).map((section, index) => (
+                      <div key={index} className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-3">
+                          <span className={`w-8 h-8 bg-gradient-to-br ${
+                            section.score && section.score >= 7 ? 'from-emerald-500 to-emerald-600' :
+                            section.score && section.score >= 5 ? 'from-amber-500 to-amber-600' :
+                            section.score ? 'from-red-500 to-red-600' :
+                            'from-slate-600 to-slate-700'
+                          } text-white rounded-lg flex items-center justify-center text-sm font-bold shadow-lg`}>
+                            {index + 1}
+                          </span>
+                          {section.title}
+                        </h3>
+                        {section.content.length > 0 && (
+                          <div className="mb-6">
+                            <ul className="space-y-3">
+                              {section.content.map((item, contentIndex) => (
+                                <li key={contentIndex} className="flex gap-3">
+                                  <div className="w-1.5 h-1.5 bg-slate-400 rounded-full mt-2.5 flex-shrink-0" />
+                                  <span className="text-slate-700 leading-relaxed text-lg">{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {section.evidence.length > 0 && (
+                          <div className="space-y-3 mb-6">
+                            <h4 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">Evidence:</h4>
+                            <div className="grid gap-3">
+                              {section.evidence.map((item, evidenceIndex) => (
+                                <div key={evidenceIndex} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                  <span className="text-slate-700 leading-relaxed">{item}</span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
+                        {section.score && (
+                          <div className="pt-6 border-t border-slate-100">
+                            <div className="flex items-center gap-4">
+                              <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden mr-4">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                                    section.score >= 7 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' :
+                                    section.score >= 5 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
+                                    'bg-gradient-to-r from-red-500 to-red-600'
+                                  }`}
+                                  style={{ width: `${(section.score / 10) * 100}%` }}
+                                />
+                              </div>
+                              <div className={`px-3 py-1 rounded-lg text-sm font-bold border ${
+                                section.score >= 7 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+                                section.score >= 5 ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                                'bg-red-50 border-red-200 text-red-800'
+                              }`}>
+                                {section.score}/10
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
+                    )) :
+                    // Fallback to show something if no detailed analysis
+                    <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
+                      <p className="text-slate-600 text-center">No detailed analysis available for this page.</p>
                     </div>
-                  ))}
+                  }
                 </div>
               </div>
             )}
@@ -490,7 +665,7 @@ const PageAnalysis = () => {
             {activeTab === 'tab-raw' && (
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl border border-slate-200 p-8 shadow-inner">
                 <pre className="text-sm text-slate-700 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
-                  {pageData.raw_analysis}
+                  {pageData.raw_analysis || pageData.detailed_analysis || 'No raw analysis data available.'}
                 </pre>
               </div>
             )}
@@ -504,7 +679,7 @@ const PageAnalysis = () => {
                   </svg>
                 </div>
                 <h3 className="text-2xl font-bold text-slate-900 mb-3">Screenshot Not Available</h3>
-                <p className="text-slate-600 text-lg">The page screenshot is not available: {pageData.screenshot_path}</p>
+                <p className="text-slate-600 text-lg">The page screenshot is not available: {pageData.screenshot_path || 'No screenshot path provided'}</p>
               </div>
             )}
           </div>

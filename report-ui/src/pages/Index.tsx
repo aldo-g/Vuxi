@@ -39,7 +39,7 @@ interface ReportData {
 }
 
 const fetchReportData = async (): Promise<ReportData> => {
-  const response = await fetch("./report-data.json");
+  const response = await fetch("/report-data.json");
   if (!response.ok) {
     throw new Error("Network response was not ok");
   }
@@ -60,6 +60,9 @@ const Index = () => {
   const { data: reportData, isLoading, error } = useQuery<ReportData, Error>({
     queryKey: ["reportData"],
     queryFn: fetchReportData,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
   // Effect for overall score ring animation (remains the same)

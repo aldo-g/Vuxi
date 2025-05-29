@@ -15,8 +15,8 @@ export function ExecutiveSummary({ summary }: ExecutiveSummaryProps) {
     <Card className="border-gray-200 bg-white shadow-sm">
       <CardHeader className="pb-4 bg-gray-50 border-b border-gray-200">
         <CardTitle className="flex items-center gap-3 text-gray-900">
-          <div className="h-8 w-8 bg-gray-100 rounded-lg flex items-center justify-center">
-            <FileText className="h-4 w-4 text-gray-600" />
+          <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center">
+            <FileText className="h-4 w-4 text-blue-600" />
           </div>
           <span className="text-xl font-semibold">Executive Summary</span>
         </CardTitle>
