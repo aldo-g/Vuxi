@@ -18,6 +18,16 @@ interface PageAnalysisDetail {
   key_issues: string[];
   recommendations: string[];
   summary: string;
+  overall_explanation?: string;
+  sections?: Array<{
+    name: string;
+    title: string;
+    score: number;
+    summary: string;
+    points: string[];
+    evidence: string;
+    score_explanation: string;
+  }>;
   detailed_analysis?: string;
   raw_analysis?: string;
   screenshot_path?: string;

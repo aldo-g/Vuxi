@@ -12,6 +12,16 @@ interface PageAnalysisDetail {
   key_issues: string[];
   recommendations: string[];
   summary: string;
+  overall_explanation?: string;
+  sections?: Array<{
+    name: string;
+    title: string;
+    score: number;
+    summary: string;
+    points: string[];
+    evidence: string;
+    score_explanation: string;
+  }>;
   detailed_analysis?: string;
   raw_analysis?: string;
   screenshot_path?: string;
@@ -380,7 +390,7 @@ const renderMarkdownContent = (content: string) => {
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900">Page Summary</h2>
               </div>
-              <p className="text-slate-700 leading-relaxed mb-10 text-lg">
+              <p className="text-slate-700 leading-relaxed mb-6 text-lg">
                 {pageData.summary}
               </p>
               
@@ -458,6 +468,54 @@ const renderMarkdownContent = (content: string) => {
                      'Significant improvement needed'}
                   </p>
                 </div>
+                
+                {/* Score Breakdown */}
+                {pageData.overall_explanation && (
+                  <div className="mt-6 pt-6 border-t border-slate-200">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                      <div className="h-5 w-5 bg-blue-100 rounded-md flex items-center justify-center">
+                        <svg className="h-3 w-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      Score Breakdown
+                    </h3>
+                    {(() => {
+                      const helpedMatch = pageData.overall_explanation.match(/What helped:\s*([^.]*\.?)\s*What hurt:\s*(.*)$/i);
+                      if (helpedMatch) {
+                        const [, helped, hurt] = helpedMatch;
+                        return (
+                          <div className="space-y-4">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center mt-1">
+                                <svg className="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div>
+                                <span className="text-sm font-medium text-emerald-800">What helped:</span>
+                                <p className="text-slate-700 leading-relaxed text-sm mt-1">{helped.trim()}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 w-5 h-5 bg-red-100 rounded-full flex items-center justify-center mt-1">
+                                <svg className="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div>
+                                <span className="text-sm font-medium text-red-800">What hurt:</span>
+                                <p className="text-slate-700 leading-relaxed text-sm mt-1">{hurt.trim()}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return <p className="text-slate-700 leading-relaxed text-sm">{pageData.overall_explanation}</p>;
+                      }
+                    })()}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -523,7 +581,123 @@ const renderMarkdownContent = (content: string) => {
 
                 {/* Analysis Sections */}
                 <div className="space-y-8">
-                  {pageData.detailed_analysis ? 
+                  {pageData.sections ? 
+                    pageData.sections.map((section: any, index: number) => (
+                      <div key={index} className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-3">
+                          <span className={`w-8 h-8 bg-gradient-to-br ${
+                            section.score && section.score >= 7 ? 'from-emerald-500 to-emerald-600' :
+                            section.score && section.score >= 5 ? 'from-amber-500 to-amber-600' :
+                            section.score ? 'from-red-500 to-red-600' :
+                            'from-slate-600 to-slate-700'
+                          } text-white rounded-lg flex items-center justify-center text-sm font-bold shadow-lg`}>
+                            {index + 1}
+                          </span>
+                          {section.title}
+                        </h3>
+                        
+                        {/* Section Summary */}
+                        {section.summary && (
+                          <div className="mb-6">
+                            <h4 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">Summary:</h4>
+                            <p className="text-slate-700 leading-relaxed">{section.summary}</p>
+                          </div>
+                        )}
+                        
+                        {/* Key Points */}
+                        {section.points && section.points.length > 0 && (
+                          <div className="mb-6">
+                            <h4 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">Key Points:</h4>
+                            <ul className="space-y-3">
+                              {section.points.map((point: string, pointIndex: number) => (
+                                <li key={pointIndex} className="flex gap-3">
+                                  <div className="w-1.5 h-1.5 bg-slate-400 rounded-full mt-2.5 flex-shrink-0" />
+                                  <span className="text-slate-700 leading-relaxed">{point}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {/* Evidence */}
+                        {section.evidence && (
+                          <div className="mb-6">
+                            <h4 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">Evidence:</h4>
+                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                              <span className="text-slate-700 leading-relaxed">{section.evidence}</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Score Explanation */}
+                        {section.score_explanation && (
+                          <div className="mb-6">
+                            <h4 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">Score Explanation:</h4>
+                            {(() => {
+                              const helpedMatch = section.score_explanation.match(/What helped:\s*([^.]*\.?)\s*What hurt:\s*(.*)$/i);
+                              if (helpedMatch) {
+                                const [, helped, hurt] = helpedMatch;
+                                return (
+                                  <div className="space-y-4">
+                                    <div className="flex items-start gap-3">
+                                      <div className="flex-shrink-0 w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center mt-0.5">
+                                        <svg className="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                      <div>
+                                        <span className="text-sm font-medium text-emerald-800">What helped:</span>
+                                        <p className="text-slate-700 leading-relaxed mt-1">{helped.trim()}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                      <div className="flex-shrink-0 w-6 h-6 bg-red-100 rounded-full flex items-center justify-center mt-0.5">
+                                        <svg className="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                      <div>
+                                        <span className="text-sm font-medium text-red-800">What hurt:</span>
+                                        <p className="text-slate-700 leading-relaxed mt-1">{hurt.trim()}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              } else {
+                                return <p className="text-slate-700 leading-relaxed">{section.score_explanation}</p>;
+                              }
+                            })()}
+                          </div>
+                        )}
+                        
+                        {/* Score Progress Bar */}
+                        {section.score && (
+                          <div className="pt-6 border-t border-slate-100">
+                            <div className="flex items-center gap-4">
+                              <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden mr-4">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                                    section.score >= 7 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' :
+                                    section.score >= 5 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
+                                    'bg-gradient-to-r from-red-500 to-red-600'
+                                  }`}
+                                  style={{ width: `${(section.score / 10) * 100}%` }}
+                                />
+                              </div>
+                              <div className={`px-3 py-1 rounded-lg text-sm font-bold border ${
+                                section.score >= 7 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+                                section.score >= 5 ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                                'bg-red-50 border-red-200 text-red-800'
+                              }`}>
+                                {section.score}/10
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )) :
+                    // Fallback to parsing detailed_analysis if sections array is not available
+                    pageData.detailed_analysis ? 
                     parseDetailedAnalysis(pageData.detailed_analysis, pageData.section_scores).map((section, index) => (
                       <div key={index} className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
                         <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-3">
@@ -586,7 +760,7 @@ const renderMarkdownContent = (content: string) => {
                         )}
                       </div>
                     )) :
-                    // Fallback to show something if no detailed analysis
+                    // Final fallback if no detailed analysis available
                     <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
                       <p className="text-slate-600 text-center">No detailed analysis available for this page.</p>
                     </div>

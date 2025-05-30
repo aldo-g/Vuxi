@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +15,7 @@ interface PageAnalysis {
   key_issues: string[];
   recommendations: string[];
   url: string;
+  overall_explanation?: string;
 }
 
 interface PageAnalysisCardProps {
@@ -109,6 +109,54 @@ export function PageAnalysisCard({ page }: PageAnalysisCardProps) {
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-6 border-t border-gray-100">
+            {/* Score Explanation */}
+            {page.overall_explanation && (
+              <div className="space-y-4 pt-6">
+                <h4 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                  <div className="h-6 w-6 bg-blue-100 rounded-md flex items-center justify-center">
+                    <svg className="h-3 w-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  Score Analysis
+                </h4>
+                {(() => {
+                  const helpedMatch = page.overall_explanation.match(/What helped:\s*([^.]*\.?)\s*What hurt:\s*(.*)$/i);
+                  if (helpedMatch) {
+                    const [, helped, hurt] = helpedMatch;
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-shrink-0 w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center mt-0.5">
+                            <svg className="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div>
+                            <span className="text-xs font-medium text-emerald-800">What helped:</span>
+                            <p className="text-gray-700 text-xs leading-relaxed mt-1">{helped.trim()}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <div className="flex-shrink-0 w-5 h-5 bg-red-100 rounded-full flex items-center justify-center mt-0.5">
+                            <svg className="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div>
+                            <span className="text-xs font-medium text-red-800">What hurt:</span>
+                            <p className="text-gray-700 text-xs leading-relaxed mt-1">{hurt.trim()}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    return <p className="text-gray-700 text-sm leading-relaxed">{page.overall_explanation}</p>;
+                  }
+                })()}
+              </div>
+            )}
+
             {/* Section Scores */}
             <div className="space-y-4 pt-6">
               <h4 className="text-base font-semibold text-gray-800">Performance Breakdown</h4>
