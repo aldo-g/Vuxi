@@ -14,12 +14,13 @@ function validateStructuredData(data) {
         data[key] = {
           executive_summary: 'Default executive summary.',
           overall_score: 5,
+          site_score_explanation: 'Default site score explanation.', // Added default
           total_pages_analyzed: 0,
           most_critical_issues: [],
           top_recommendations: [],
           key_strengths: [],
           performance_summary: 'Default performance summary.',
-          detailed_markdown_content: 'No detailed markdown content provided for overview.' // Added default
+          detailed_markdown_content: 'No detailed markdown content provided for overview.'
         };
       } else if (key === 'page_analyses') {
         data[key] = [];
@@ -44,6 +45,11 @@ function validateStructuredData(data) {
     if (typeof summary.overall_score !== 'number' || summary.overall_score < 1 || summary.overall_score > 10) {
       summary.overall_score = 5; 
       errors.push('overall_summary.overall_score is invalid (must be number 1-10)');
+    }
+    // UPDATED: Validate site_score_explanation
+    if (!summary.site_score_explanation || typeof summary.site_score_explanation !== 'string' || summary.site_score_explanation.trim() === "") {
+      summary.site_score_explanation = 'Site score explanation not provided or invalid.';
+      errors.push('overall_summary.site_score_explanation is missing, not a string, or empty');
     }
     if (!Array.isArray(summary.most_critical_issues)) {
       summary.most_critical_issues = []; errors.push('overall_summary.most_critical_issues must be an array');
@@ -70,14 +76,9 @@ function validateStructuredData(data) {
       summary.performance_summary = 'Performance summary not provided or invalid.';
       errors.push('overall_summary.performance_summary is missing or not a string');
     }
-    // UPDATED: Validate detailed_markdown_content
     if (!summary.detailed_markdown_content || typeof summary.detailed_markdown_content !== 'string') {
       summary.detailed_markdown_content = 'Detailed markdown content for overview is missing or not a string.'; 
       errors.push('overall_summary.detailed_markdown_content is missing or not a string');
-    } else if (summary.detailed_markdown_content.trim() === "") {
-        // Allow it to be empty if explicitly set, but warn if it was just spaces
-        // errors.push('overall_summary.detailed_markdown_content is empty after trimming.'); 
-        // Decided against this error, empty might be valid if LLM provides no overview.
     }
   }
 

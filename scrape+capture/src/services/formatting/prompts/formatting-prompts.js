@@ -134,6 +134,7 @@ THE EXACT JSON STRUCTURE REQUIRED:
 {
   "executive_summary": "Craft a 2-3 paragraph executive summary. Synthesize key findings, overall website effectiveness in achieving its purpose (assume purpose is to inform, engage, and encourage action like donations/sign-ups), and the most critical areas for improvement across the entire website. This should be a concise summary derived from the 'Overall LLM Analysis Content'.",
   "overall_score": ${"`/* (number 1-10) Extract or infer an average overall website score from the 'Overall LLM Analysis Content'. Default to 6 if not explicitly found. */`"},
+  "site_score_explanation": "Provide a concise 1-2 sentence explanation for the 'overall_score' of the entire site, derived from the 'Overall LLM Analysis Content'. Focus on the primary reasons behind this score, highlighting key factors. Example: 'The site received this score due to its strong visual design but was held back by unclear navigation and weak calls to action.'",
   "total_pages_analyzed": ${pageAnalyses.length},
   "most_critical_issues": [
     "Identify and list up to 5 site-wide critical issues by summarizing them from the 'Overall LLM Analysis Content'. Example: 'Inconsistent navigation across multiple key pages.'"
@@ -151,10 +152,11 @@ THE EXACT JSON STRUCTURE REQUIRED:
 IMPORTANT RULES FOR JSON OUTPUT:
 - Adhere strictly to the JSON structure.
 - "overall_score" MUST be a number between 1 and 10.
+- "site_score_explanation" MUST be a concise 1-2 sentence string explaining the overall site score.
 - "most_critical_issues", "top_recommendations", "key_strengths" MUST be arrays of strings, summarized from the detailed markdown.
 - "detailed_markdown_content" MUST be a single string containing the complete raw markdown of the 'Overall LLM Analysis Content'. Ensure all newlines within this markdown are properly escaped as \\\\n for the JSON string.
 - All other summary string fields should be concise and derived from the 'Overall LLM Analysis Content'.
-- DO NOT use markdown (e.g., no \`\`\`, no \`*\`) within the summarized string fields like executive_summary, most_critical_issues items, etc.
+- DO NOT use markdown (e.g., no \`\`\`, no \`*\`) within the summarized string fields like executive_summary, site_score_explanation, most_critical_issues items, etc.
 - The final output MUST start with \`{\` and end with \`}\` and be parseable by JSON.parse().
 `
   };

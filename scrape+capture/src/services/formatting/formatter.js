@@ -65,7 +65,7 @@ class Formatter {
                 if (keywords.some(k => k.toLowerCase().includes('issue') || k.toLowerCase().includes('flaw')) && fixMatch) {
                     items.push({ issue: fixMatch[1].trim(), how_to_fix: fixMatch[2].trim() });
                 } else if (keywords.some(k => k.toLowerCase().includes('recommendation')) && benefitMatch) {
-                    items.push({ recommendation: benefitMatch[1].trim(), benefit: benefitMatch[2].trim() });
+                     items.push({ recommendation: benefitMatch[1].trim(), benefit: benefitMatch[2].trim() });
                 } else {
                     if (keywords.some(k => k.toLowerCase().includes('issue') || k.toLowerCase().includes('flaw'))) {
                         items.push({ issue: itemText, how_to_fix: "Details not parsed." });
@@ -166,6 +166,7 @@ class Formatter {
     return {
       executive_summary: this.extractSummaryFallback(text, 500) || 'Website analysis summary requires review.',
       overall_score: this.extractScoreFallback(text) || 5,
+      site_score_explanation: "Overall site score explanation requires manual review.", // Added fallback
       total_pages_analyzed: 0,
       most_critical_issues: this.extractListFallback(text, ['critical_issues', 'site-wide critical issue']).map(item => typeof item === 'object' ? item.issue : String(item)).slice(0, 5),
       top_recommendations: this.extractListFallback(text, ['top_recommendations', 'priority recommendation']).map(item => typeof item === 'object' ? item.recommendation : String(item)).slice(0, 5),
@@ -327,26 +328,31 @@ class Formatter {
   async createOverallSummary(rawAnalysisData, formattedPageAnalyses) {
     console.log('📊 Creating overall summary for main page...');
     const overviewContent = (rawAnalysisData && typeof rawAnalysisData.overview === 'string') ? rawAnalysisData.overview : "Comprehensive overview not available.";
-    // Create a mutable copy for the prompt to avoid modifying the original rawAnalysisData if it's used elsewhere
     const promptRawData = { ...rawAnalysisData, overview: overviewContent };
-
 
     const prompt = getFormattingPrompts().overallSummary(promptRawData, formattedPageAnalyses);
     let parsedSummary;
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 4096, // Maximize token allowance for this complex task
+        max_tokens: 4096,
         messages: [{ role: 'user', content: prompt }]
       });
       const summaryText = response.content[0].text.trim();
       parsedSummary = this.parseJSON(summaryText, 'overall summary');
       
-      // Ensure detailed_markdown_content is directly from the input if parsing provided something else or nothing
       if (!parsedSummary.detailed_markdown_content || parsedSummary.detailed_markdown_content.length < overviewContent.length * 0.8) {
           console.warn("   ⚠️  LLM did not correctly include full detailed_markdown_content. Using raw overview directly.");
           parsedSummary.detailed_markdown_content = overviewContent;
       }
+      // Ensure site_score_explanation is present, if not, use a fallback.
+      if (typeof parsedSummary.site_score_explanation !== 'string' || parsedSummary.site_score_explanation.trim() === "") {
+        console.warn("   ⚠️  LLM did not provide site_score_explanation. Using fallback.");
+        // Try to extract from detailed_markdown_content or use a generic fallback.
+        const extractedExplanation = this.extractSiteScoreExplanationFromMarkdown(overviewContent);
+        parsedSummary.site_score_explanation = extractedExplanation || "Overall site score evaluation highlights key strengths and areas needing improvement.";
+      }
+
 
     } catch (error) {
       console.error('   ❌ Failed to create overall summary via LLM:', error.message);
@@ -354,19 +360,37 @@ class Formatter {
     }
     
     const fallbackSummary = this.createFallbackOverallSummary(promptRawData, formattedPageAnalyses);
+    // Merge, prioritizing fields from LLM if valid, else from fallback
     parsedSummary = {
         ...fallbackSummary, 
         ...parsedSummary,   
         total_pages_analyzed: formattedPageAnalyses.length, 
         overall_score: typeof parsedSummary.overall_score === 'number' && parsedSummary.overall_score >=1 && parsedSummary.overall_score <=10 ? parsedSummary.overall_score : fallbackSummary.overall_score,
+        site_score_explanation: parsedSummary.site_score_explanation || fallbackSummary.site_score_explanation, // Ensure it's set
         detailed_markdown_content: parsedSummary.detailed_markdown_content || overviewContent 
     };
-    // Ensure these specific fields are arrays of strings, as per the overallSummary prompt
+
     parsedSummary.most_critical_issues = (Array.isArray(parsedSummary.most_critical_issues) ? parsedSummary.most_critical_issues.map(String) : fallbackSummary.most_critical_issues).slice(0,5);
     parsedSummary.top_recommendations = (Array.isArray(parsedSummary.top_recommendations) ? parsedSummary.top_recommendations.map(String) : fallbackSummary.top_recommendations).slice(0,5);
     parsedSummary.key_strengths = (Array.isArray(parsedSummary.key_strengths) ? parsedSummary.key_strengths.map(String) : fallbackSummary.key_strengths).slice(0,3);
 
     return parsedSummary;
+  }
+
+  extractSiteScoreExplanationFromMarkdown(markdownContent) {
+    if (!markdownContent || typeof markdownContent !== 'string') return null;
+    // Attempt to find a sentence near the overall score discussion
+    const scoreMatch = markdownContent.match(/Overall.*?Score:\s*\d+\/10\s*-\s*(.*)/i);
+    if (scoreMatch && scoreMatch[1]) {
+      return scoreMatch[1].split('.')[0] + '.'; // Get the first sentence
+    }
+    // Fallback: Look for common summary phrases if the direct score explanation isn't found
+    const executiveSummaryMatch = markdownContent.match(/## Executive Summary\s*([\s\S]*?)(?=\n##|$)/i);
+    if (executiveSummaryMatch && executiveSummaryMatch[1]) {
+        const firstSentences = executiveSummaryMatch[1].trim().split('.').slice(0,2).join('.') + '.';
+        if (firstSentences.length > 30) return firstSentences; // Return first two sentences of exec summary
+    }
+    return null;
   }
   
   createFallbackOverallSummary(rawAnalysisData, pageAnalyses) {
@@ -376,9 +400,12 @@ class Formatter {
       avgScore = Math.round(validScores.reduce((sum, score) => sum + score, 0) / validScores.length);
     }
     const overviewText = (rawAnalysisData && typeof rawAnalysisData.overview === 'string') ? rawAnalysisData.overview : "Comprehensive overview markdown not available.";
+    const fallbackSiteScoreExplanation = this.extractSiteScoreExplanationFromMarkdown(overviewText) || "Overall site performance has areas of strength and opportunities for significant improvement.";
+
     return {
       executive_summary: (rawAnalysisData.overview && typeof rawAnalysisData.overview === 'string' ? this.extractSummaryFallback(rawAnalysisData.overview, 500) : 'Overall website analysis requires review.'),
       overall_score: avgScore,
+      site_score_explanation: fallbackSiteScoreExplanation,
       total_pages_analyzed: pageAnalyses.length,
       most_critical_issues: ['Review "detailed_markdown_content" for critical issues.'],
       top_recommendations: ['Implement fixes based on manual review of "detailed_markdown_content".'],
