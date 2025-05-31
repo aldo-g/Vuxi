@@ -94,10 +94,15 @@ const fetchReportData = async (): Promise<ReportData> => {
   return data;
 };
 
+// IMPROVED COLOR GRADING WITH MORE GRANULAR SCALE
 const getScoreBoxClasses = (score: number): string => {
-  if (score >= 7) return "bg-green-100 text-green-800 border-green-300";
-  if (score >= 4) return "bg-yellow-100 text-yellow-800 border-yellow-300";
-  return "bg-red-100 text-red-800 border-red-300";
+  if (score >= 9) return "bg-emerald-100 text-emerald-800 border-emerald-300"; // Excellent (9-10)
+  if (score >= 7) return "bg-green-100 text-green-800 border-green-300"; // Good (7-8)
+  if (score >= 6) return "bg-lime-100 text-lime-800 border-lime-300"; // Above Average (6)
+  if (score >= 5) return "bg-yellow-100 text-yellow-800 border-yellow-300"; // Average (5)
+  if (score >= 4) return "bg-orange-100 text-orange-800 border-orange-300"; // Below Average (4)
+  if (score >= 2) return "bg-red-100 text-red-700 border-red-300"; // Poor (2-3)
+  return "bg-red-200 text-red-900 border-red-400"; // Very Poor (0-1)
 };
 
 const getOverallScoreStatusText = (score: number) => {
@@ -106,6 +111,7 @@ const getOverallScoreStatusText = (score: number) => {
   return "Needs Work";
 };
 
+// SIMPLIFIED COMPONENT - REMOVED CARD WRAPPER
 const MarkdownSectionRenderer: React.FC<{
     title: string;
     mainContent: string;
@@ -115,74 +121,69 @@ const MarkdownSectionRenderer: React.FC<{
     icon?: React.ElementType;
     sectionKey: string;
 }> = ({ title, mainContent, subsections, performanceSummary, goalAchievementAssessment, icon: Icon, sectionKey }) => (
-  <Card className="mb-8 shadow-lg border-slate-200/80 bg-white">
-    <CardHeader className="bg-slate-50/70 border-b border-slate-200/80 p-6">
-      <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-        {Icon && <Icon className="w-7 h-7 text-blue-600 flex-shrink-0" />}
-        {title}
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="pt-6 px-6 pb-6">
-      {mainContent && mainContent.trim() && (
-        <div className="prose prose-lg max-w-none text-slate-700 leading-relaxed mb-6 react-markdown-content">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{mainContent}</ReactMarkdown>
-        </div>
-      )}
-      
-      {sectionKey === 'key-findings' && (
-        <>
-          {goalAchievementAssessment && (
-            <div className="mt-4 mb-6 p-6 bg-indigo-50/70 border border-indigo-200/80 rounded-xl shadow-sm">
-                <div className="flex items-center gap-3 mb-3">
-                    <TargetIcon className="w-6 h-6 text-indigo-600 flex-shrink-0" />
-                    <h4 className="text-xl font-semibold text-indigo-800">Goal Achievement Assessment</h4>
-                </div>
-                <div className="prose prose-base max-w-none text-indigo-700 leading-relaxed react-markdown-content">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{goalAchievementAssessment}</ReactMarkdown>
-                </div>
-            </div>
-          )}
-          {performanceSummary && (
-            <div className="mt-4 mb-6 p-6 bg-purple-50/70 border border-purple-200/80 rounded-xl shadow-sm">
-                <div className="flex items-center gap-3 mb-3">
-                    <Zap className="w-6 h-6 text-purple-600 flex-shrink-0" />
-                    <h4 className="text-xl font-semibold text-purple-800">Performance Snapshot</h4>
-                </div>
-                <p className="text-purple-700 leading-relaxed text-base">{performanceSummary}</p>
-            </div>
-          )}
-        </>
-      )}
+  <div className="space-y-6">
+    {mainContent && mainContent.trim() && (
+      <div className="prose prose-lg max-w-none text-slate-700 leading-relaxed react-markdown-content">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{mainContent}</ReactMarkdown>
+      </div>
+    )}
+    
+    {sectionKey === 'key-findings' && (
+      <>
+        {goalAchievementAssessment && (
+          <div className="p-6 bg-indigo-50/70 border border-indigo-200/80 rounded-xl shadow-sm">
+              <div className="flex items-center gap-3 mb-3">
+                  <TargetIcon className="w-6 h-6 text-indigo-600 flex-shrink-0" />
+                  <h4 className="text-xl font-semibold text-indigo-800">Goal Achievement Assessment</h4>
+              </div>
+              <div className="prose prose-base max-w-none text-indigo-700 leading-relaxed react-markdown-content">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{goalAchievementAssessment}</ReactMarkdown>
+              </div>
+          </div>
+        )}
+      </>
+    )}
 
-      {subsections && subsections.length > 0 && (
-        <div className="space-y-4 mt-6">
-          {subsections.map((sub, idx) => (
-            <Accordion key={idx} type="single" collapsible className="w-full">
-              <AccordionItem value={`subsection-${sectionKey}-${idx}`} className="border bg-white rounded-lg shadow-sm data-[state=open]:shadow-md overflow-hidden">
-                <AccordionTrigger className="text-lg font-semibold text-slate-700 hover:text-blue-600 py-4 px-6 bg-slate-50/80 hover:bg-slate-100/90 transition-colors w-full text-left data-[state=open]:bg-slate-100 data-[state=open]:border-b border-slate-200">
-                  {sub.title}
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 pb-6 px-6">
-                  <div className="prose prose-base max-w-none text-slate-600 leading-relaxed react-markdown-content">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{sub.content}</ReactMarkdown>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          ))}
-        </div>
-      )}
-       {(!mainContent || !mainContent.trim()) && (!subsections || subsections.length === 0) && sectionKey !== 'key-findings' && (
-         <p className="text-slate-500 p-4 text-center">No specific details available for this section.</p>
-       )}
-    </CardContent>
-  </Card>
+    {subsections && subsections.length > 0 && (
+      <div className="space-y-4">
+        {subsections.map((sub, idx) => (
+          <Accordion key={idx} type="single" collapsible className="w-full">
+            <AccordionItem value={`subsection-${sectionKey}-${idx}`} className="border bg-white rounded-lg shadow-sm data-[state=open]:shadow-md overflow-hidden">
+              <AccordionTrigger className="text-lg font-semibold text-slate-700 hover:text-blue-600 py-4 px-6 bg-slate-50/80 hover:bg-slate-100/90 transition-colors w-full text-left data-[state=open]:bg-slate-100 data-[state=open]:border-b border-slate-200">
+                {sub.title}
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 pb-6 px-6">
+                <div className="prose prose-base max-w-none text-slate-600 leading-relaxed react-markdown-content">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{sub.content}</ReactMarkdown>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        ))}
+      </div>
+    )}
+
+    {/* Performance Summary moved to bottom for key-findings */}
+    {sectionKey === 'key-findings' && performanceSummary && (
+      <div className="p-6 bg-purple-50/70 border border-purple-200/80 rounded-xl shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
+              <Zap className="w-6 h-6 text-purple-600 flex-shrink-0" />
+              <h4 className="text-xl font-semibold text-purple-800">Performance Snapshot</h4>
+          </div>
+          <p className="text-purple-700 leading-relaxed text-base">{performanceSummary}</p>
+      </div>
+    )}
+
+     {(!mainContent || !mainContent.trim()) && (!subsections || subsections.length === 0) && sectionKey !== 'key-findings' && (
+       <p className="text-slate-500 p-4 text-center">No specific details available for this section.</p>
+     )}
+  </div>
 );
 
 
 const Index = () => {
   // HOOK 1
-  const [activeDetailedTab, setActiveDetailedTab] = useState("executive-summary");
+  const [activeDetailedTab, setActiveDetailedTab] = useState("key-findings");
 
   // HOOK 2 (useQuery)
   const { data: reportData, isLoading, error } = useQuery<ReportData, Error>({
@@ -358,15 +359,15 @@ const Index = () => {
   }, [reportData]);
 
 
+  // REMOVED 'executive-summary' from sectionDetails
   const sectionDetails: { [key: string]: { icon: React.ElementType; title: string } } = {
-    'executive-summary': { icon: FileText, title: "Executive Summary Details" },
     'key-findings': { icon: Lightbulb, title: "Key Findings" },
     'strategic-recommendations': { icon: ListChecks, title: "Strategic Recommendations" },
     'overall-theme-assessment': { icon: Palette, title: "Overall Theme Assessment" },
     'implementation-roadmap': { icon: Route, title: "Implementation Roadmap" },
   };
 
-  // HOOK 4 (Tab Logic)
+  // HOOK 4 (Tab Logic) - Updated default to 'key-findings'
   useEffect(() => {
     const availableParsedKeys = Object.keys(parsedDetailedSections).filter(key => sectionDetails[key]);
     if (availableParsedKeys.length > 0) {
@@ -485,47 +486,63 @@ const Index = () => {
             </Card>
           </div>
         </section>
+        
         <section className="mt-10">
-          {/* Use parsedDetailedSections state */}
+          {/* Use parsedDetailedSections state - IMPROVED TABS SECTION */}
           {Object.keys(parsedDetailedSections).length > 0 ? (
-            <Tabs value={activeDetailedTab} onValueChange={setActiveDetailedTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-8 bg-slate-200/80 p-2 rounded-xl h-auto shadow-sm">
-                {Object.keys(sectionDetails).map((key) => {
-                  const sectionInfo = sectionDetails[key];
-                  const Icon = sectionInfo?.icon;
-                  // Use parsedDetailedSections state
-                  return parsedDetailedSections[key] ? (
-                      <TabsTrigger
-                        key={key}
-                        value={key}
-                        className="flex-col sm:flex-row h-auto items-center justify-center sm:h-12 py-3 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-blue-700 data-[state=active]:font-semibold text-slate-600 hover:bg-slate-300/50 text-xs sm:text-sm transition-all rounded-lg"
-                      >
-                        {Icon && <Icon className="w-5 h-5 mr-0 mb-1 sm:mr-2 sm:mb-0 flex-shrink-0" />}
-                        {/* Use parsedDetailedSections state */}
-                        <span className="text-center sm:text-left">{sectionInfo?.title || parsedDetailedSections[key]!.title}</span>
-                      </TabsTrigger>
-                  ) : null;
-                })}
-              </TabsList>
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-lg overflow-hidden">
+              <Tabs value={activeDetailedTab} onValueChange={setActiveDetailedTab} className="w-full">
+                {/* Improved TabsList with better spacing and overflow handling */}
+                <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm px-6 py-4">
+                  <TabsList className="w-full bg-transparent p-0 h-auto gap-1 justify-start overflow-x-auto scrollbar-hide">
+                    <div className="flex gap-2 min-w-max">
+                      {Object.keys(sectionDetails).map((key) => {
+                        const sectionInfo = sectionDetails[key];
+                        const Icon = sectionInfo?.icon;
+                        // Use parsedDetailedSections state
+                        return parsedDetailedSections[key] ? (
+                          <TabsTrigger
+                            key={key}
+                            value={key}
+                            className="group flex items-center gap-3 px-6 py-4 min-h-[60px] whitespace-nowrap rounded-xl border-2 border-transparent bg-slate-100/80 hover:bg-slate-200/80 data-[state=active]:bg-white data-[state=active]:border-blue-200 data-[state=active]:shadow-lg data-[state=active]:text-blue-700 text-slate-600 font-medium transition-all duration-300 flex-shrink-0"
+                          >
+                            {Icon && (
+                              <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-200 group-data-[state=active]:bg-blue-100 flex items-center justify-center transition-colors duration-300">
+                                <Icon className="w-4 h-4 group-data-[state=active]:text-blue-600" />
+                              </div>
+                            )}
+                            <span className="text-sm font-semibold">
+                              {sectionInfo?.title || parsedDetailedSections[key]!.title}
+                            </span>
+                          </TabsTrigger>
+                        ) : null;
+                      })}
+                    </div>
+                  </TabsList>
+                </div>
 
-              {/* Use parsedDetailedSections state */}
-              {Object.keys(parsedDetailedSections).map((key) => (
-                parsedDetailedSections[key] && sectionDetails[key] && (
-                  <TabsContent key={key} value={key} className="focus-visible:ring-0 focus-visible:ring-offset-0 outline-none">
-                    <MarkdownSectionRenderer
-                        title={parsedDetailedSections[key]!.title}
-                        mainContent={parsedDetailedSections[key]!.content}
-                        subsections={parsedDetailedSections[key]!.subsections}
-                        // Use performanceSummary state
-                        performanceSummary={key === 'key-findings' ? performanceSummary : undefined}
-                        goalAchievementAssessment={key === 'key-findings' ? goalAchievementAssessmentText : undefined}
-                        icon={sectionDetails[key]!.icon}
-                        sectionKey={key}
-                    />
-                  </TabsContent>
-                )
-              ))}
-            </Tabs>
+                {/* Tab Content with proper padding */}
+                <div className="p-8">
+                  {/* Use parsedDetailedSections state */}
+                  {Object.keys(parsedDetailedSections).map((key) => (
+                    parsedDetailedSections[key] && sectionDetails[key] && (
+                      <TabsContent key={key} value={key} className="mt-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none">
+                        <MarkdownSectionRenderer
+                            title={parsedDetailedSections[key]!.title}
+                            mainContent={parsedDetailedSections[key]!.content}
+                            subsections={parsedDetailedSections[key]!.subsections}
+                            // Use performanceSummary state
+                            performanceSummary={key === 'key-findings' ? performanceSummary : undefined}
+                            goalAchievementAssessment={key === 'key-findings' ? goalAchievementAssessmentText : undefined}
+                            icon={sectionDetails[key]!.icon}
+                            sectionKey={key}
+                        />
+                      </TabsContent>
+                    )
+                  ))}
+                </div>
+              </Tabs>
+            </div>
           ) : (
             <Card className="text-center p-10 border-slate-200/80 bg-white shadow">
                 <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4"/>
