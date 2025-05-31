@@ -1,9 +1,6 @@
-/**
- * Validates structured data for individual pages + overall summary format
- */
 function validateStructuredData(data) {
   const errors = [];
-  
+
   // Check required top-level keys for NEW structure
   const requiredKeys = ["overall_summary", "page_analyses", "metadata"];
   for (const key of requiredKeys) {
@@ -29,44 +26,44 @@ function validateStructuredData(data) {
       }
     }
   }
-  
+
   // Validate overall summary
   if (data.overall_summary) {
     const summary = data.overall_summary;
-    
+
     if (!summary.executive_summary) {
       summary.executive_summary = 'Website analysis completed';
       errors.push('Missing executive_summary in overall_summary');
     }
-    
-    if (typeof summary.overall_score !== 'number' || 
-        summary.overall_score < 1 || 
+
+    if (typeof summary.overall_score !== 'number' ||
+        summary.overall_score < 1 ||
         summary.overall_score > 10) {
       summary.overall_score = 6;
       errors.push('Invalid overall_score (should be number between 1-10)');
     }
-    
+
     if (!Array.isArray(summary.most_critical_issues)) {
       summary.most_critical_issues = [];
       errors.push('most_critical_issues should be an array');
     }
-    
+
     if (!Array.isArray(summary.top_recommendations)) {
       summary.top_recommendations = [];
       errors.push('top_recommendations should be an array');
     }
-    
+
     if (!Array.isArray(summary.key_strengths)) {
       summary.key_strengths = [];
       errors.push('key_strengths should be an array');
     }
-    
+
     if (!summary.performance_summary) {
       summary.performance_summary = 'Performance evaluated';
       errors.push('Missing performance_summary');
     }
   }
-  
+
   // Validate page analyses
   if (data.page_analyses) {
     if (!Array.isArray(data.page_analyses)) {
@@ -75,23 +72,23 @@ function validateStructuredData(data) {
     } else {
       for (let i = 0; i < data.page_analyses.length; i++) {
         const page = data.page_analyses[i];
-        
+
         if (!page.page_type) {
           page.page_type = `Page ${i + 1}`;
           errors.push(`Page analysis ${i} missing page_type`);
         }
-        
+
         if (!page.url) {
           errors.push(`Page analysis ${i} missing url`);
         }
-        
-        if (typeof page.overall_score !== 'number' || 
-            page.overall_score < 1 || 
+
+        if (typeof page.overall_score !== 'number' ||
+            page.overall_score < 1 ||
             page.overall_score > 10) {
           page.overall_score = 5;
           errors.push(`Page analysis ${i} has invalid overall_score`);
         }
-        
+
         // Validate section scores if present
         if (page.section_scores) {
           if (typeof page.section_scores !== 'object' || Array.isArray(page.section_scores)) {
@@ -108,12 +105,12 @@ function validateStructuredData(data) {
               'conversion_optimization',
               'technical_execution'
             ];
-            
+
             for (const [sectionName, score] of Object.entries(page.section_scores)) {
               if (!validSections.includes(sectionName)) {
                 errors.push(`Page analysis ${i} has invalid section name: ${sectionName}`);
               }
-              
+
               if (typeof score !== 'number' || score < 1 || score > 10) {
                 page.section_scores[sectionName] = 5;
                 errors.push(`Page analysis ${i} has invalid section score for ${sectionName}: ${score}`);
@@ -121,23 +118,64 @@ function validateStructuredData(data) {
             }
           }
         }
-        
-        // Fix: expect key_issues not critical_flaws
+
+        // Validate key_issues
         if (!Array.isArray(page.key_issues)) {
           page.key_issues = [];
           errors.push(`Page analysis ${i} key_issues should be an array`);
+        } else {
+          page.key_issues.forEach((item, idx) => {
+            if (typeof item !== 'object' || item === null) {
+              errors.push(`Page analysis ${i} key_issues item ${idx} should be an object`);
+              page.key_issues[idx] = { issue: String(item), how_to_fix: "No details provided." };
+            } else {
+              if (!item.issue || typeof item.issue !== 'string') {
+                errors.push(`Page analysis ${i} key_issues item ${idx} missing or invalid 'issue' string`);
+                item.issue = "Issue not specified.";
+              }
+              // how_to_fix is optional, but if present, should be a string
+              if (item.how_to_fix && typeof item.how_to_fix !== 'string') {
+                errors.push(`Page analysis ${i} key_issues item ${idx} has invalid 'how_to_fix' (should be string)`);
+                item.how_to_fix = "Fix details are not correctly formatted.";
+              }
+              if (!item.how_to_fix) { // Ensure it exists, even if empty, for consistent access
+                item.how_to_fix = "";
+              }
+            }
+          });
         }
-        
+
+        // Validate recommendations
         if (!Array.isArray(page.recommendations)) {
           page.recommendations = [];
           errors.push(`Page analysis ${i} recommendations should be an array`);
+        } else {
+          page.recommendations.forEach((item, idx) => {
+            if (typeof item !== 'object' || item === null) {
+              errors.push(`Page analysis ${i} recommendations item ${idx} should be an object`);
+              page.recommendations[idx] = { recommendation: String(item), benefit: "No details provided." };
+            } else {
+              if (!item.recommendation || typeof item.recommendation !== 'string') {
+                errors.push(`Page analysis ${i} recommendations item ${idx} missing or invalid 'recommendation' string`);
+                item.recommendation = "Recommendation not specified.";
+              }
+              // benefit is optional, but if present, should be a string
+              if (item.benefit && typeof item.benefit !== 'string') {
+                errors.push(`Page analysis ${i} recommendations item ${idx} has invalid 'benefit' (should be string)`);
+                item.benefit = "Benefit details are not correctly formatted.";
+              }
+              if (!item.benefit) { // Ensure it exists, even if empty
+                  item.benefit = "";
+              }
+            }
+          });
         }
-        
+
         if (!page.summary) {
           page.summary = 'Page analysis available';
           errors.push(`Page analysis ${i} missing summary`);
         }
-        
+
         if (!page.title) {
           page.title = page.page_type || 'Page';
           errors.push(`Page analysis ${i} missing title`);
@@ -145,7 +183,7 @@ function validateStructuredData(data) {
       }
     }
   }
-  
+
   // Validate metadata
   if (data.metadata) {
     if (typeof data.metadata.total_pages !== 'number') {
@@ -155,7 +193,7 @@ function validateStructuredData(data) {
       data.metadata.generated_at = new Date().toISOString();
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     errors: errors,

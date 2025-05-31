@@ -51,12 +51,14 @@ function getScoringDefinitions() {
       prompt += `
       CRITICAL FLAWS:
       - Identify the 3 most significant problems (numbered)
-      - Rate each issue's severity (High/Medium/Low) 
-      - Format as: "1. [Issue title] (Severity: High) - [Description]"
-      
+      - Rate each issue's severity (High/Medium/Low)
+      - For each flaw, provide a brief "How to Fix" section detailing steps to resolve it. // ADD THIS LINE
+      - Format as: "1. [Issue title] (Severity: High) - [Description] How to Fix: [Fix details]" // MODIFY THIS LINE
+
       ACTIONABLE RECOMMENDATIONS:
       - Provide 5 specific, prioritized recommendations (numbered)
       - Rate each recommendation's impact (High/Medium/Low)
+      - For each recommendation, describe the primary "Benefit" of implementing it. // ADD THIS LINE
       - Format as: "1. [Recommendation] (Impact: High) - [Implementation details]"
       
       SUMMARY:

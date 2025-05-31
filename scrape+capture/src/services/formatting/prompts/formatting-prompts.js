@@ -5,181 +5,164 @@
 function getFormattingPrompts() {
   return {
     individualPage: (pageAnalysis) => `
-You are formatting a website page analysis for HTML display. Extract key information from this raw analysis and structure it cleanly.
+You are an expert at structuring website analysis data into PERFECT, VALID JSON.
+Extract key information from the following raw page analysis and structure it according to the JSON format specified below.
 
-For each section (1-7), you need to provide:
-1. A summary paragraph explaining overall performance in that area
-2. The bullet points from the analysis
-3. The evidence section
-4. A score explanation noting what helped vs what hurt the score
-
-PAGE ANALYSIS:
+PAGE ANALYSIS TO FORMAT:
 URL: ${pageAnalysis.url}
-Raw Analysis: ${pageAnalysis.analysis}
+Raw Analysis Content:
+${pageAnalysis.analysis}
 
-You MUST return ONLY valid JSON with this EXACT structure (no additional text, no markdown formatting):
+You MUST return ONLY a single, valid JSON object. NO additional text, NO explanations, NO markdown formatting like \`\`\`json.
+The entire response must be the JSON object itself.
 
+THE EXACT JSON STRUCTURE REQUIRED:
 {
-  "page_type": "Homepage",
-  "title": "Descriptive page title",
-  "overall_score": 7,
-  "overall_explanation": "Brief explanation of what the strongest and weakest categories were, and where the user should focus their improvement efforts for maximum impact.",
+  "page_type": "Infer a concise page type (e.g., Homepage, Contact Page, Product Detail, Article Page) based on URL and content.",
+  "title": "Create a descriptive page title based on its content (e.g., 'Training Programs Overview', 'Research Publications Listing').",
+  "overall_score": ${"`/* (number 1-10) Extract or infer the overall score for this page from the raw analysis. Default to 5 if not explicitly found. */`"},
+  "overall_explanation": "Provide a brief (1-2 sentences) explanation for the overall_score. Mention what helped the score and what hurt it. If no explicit explanation, summarize key positive and negative themes.",
   "sections": [
     {
       "name": "first_impression_clarity",
       "title": "First Impression & Clarity",
-      "score": 5,
-      "summary": "Brief paragraph summarizing overall performance in this area",
+      "score": ${"`/* (number 1-10) Score for this section. Default to 5. */`"},
+      "summary": "Summarize overall performance in this area (1-2 sentences).",
       "points": [
-        "Key point 1",
-        "Key point 2",
-        "Key point 3"
+        "Extract key positive/negative bullet point 1 for this section.",
+        "Extract key positive/negative bullet point 2 for this section."
       ],
-      "evidence": "Specific evidence supporting the analysis",
-      "score_explanation": "What helped: X. What hurt: Y."
+      "evidence": "Cite specific evidence from the raw analysis for this section (1-2 sentences).",
+      "score_explanation": "What helped the score in this section. What hurt the score in this section."
     },
     {
-      "name": "goal_alignment", 
+      "name": "goal_alignment",
       "title": "Goal Alignment",
-      "score": 3,
-      "summary": "Brief paragraph summarizing overall performance in this area",
-      "points": [
-        "Key point 1",
-        "Key point 2"
-      ],
-      "evidence": "Specific evidence supporting the analysis",
-      "score_explanation": "What helped: X. What hurt: Y."
+      "score": ${"`/* (number 1-10) Score for this section. Default to 5. */`"},
+      "summary": "Summarize overall performance in this area (1-2 sentences).",
+      "points": ["Point 1", "Point 2"],
+      "evidence": "Evidence for goal alignment.",
+      "score_explanation": "What helped/hurt score."
     },
     {
       "name": "visual_design",
-      "title": "Visual Design", 
-      "score": 6,
-      "summary": "Brief paragraph summarizing overall performance in this area",
-      "points": [
-        "Key point 1",
-        "Key point 2"
-      ],
-      "evidence": "Specific evidence supporting the analysis",
-      "score_explanation": "What helped: X. What hurt: Y."
+      "title": "Visual Design",
+      "score": ${"`/* (number 1-10) Score for this section. Default to 5. */`"},
+      "summary": "Summarize overall performance in this area (1-2 sentences).",
+      "points": ["Point 1", "Point 2"],
+      "evidence": "Evidence for visual design.",
+      "score_explanation": "What helped/hurt score."
     },
     {
       "name": "content_quality",
       "title": "Content Quality",
-      "score": 5,
-      "summary": "Brief paragraph summarizing overall performance in this area", 
-      "points": [
-        "Key point 1",
-        "Key point 2"
-      ],
-      "evidence": "Specific evidence supporting the analysis",
-      "score_explanation": "What helped: X. What hurt: Y."
+      "score": ${"`/* (number 1-10) Score for this section. Default to 5. */`"},
+      "summary": "Summarize overall performance in this area (1-2 sentences).",
+      "points": ["Point 1", "Point 2"],
+      "evidence": "Evidence for content quality.",
+      "score_explanation": "What helped/hurt score."
     },
     {
       "name": "usability_accessibility",
       "title": "Usability & Accessibility",
-      "score": 4,
-      "summary": "Brief paragraph summarizing overall performance in this area",
-      "points": [
-        "Key point 1", 
-        "Key point 2"
-      ],
-      "evidence": "Specific evidence supporting the analysis",
-      "score_explanation": "What helped: X. What hurt: Y."
+      "score": ${"`/* (number 1-10) Score for this section. Default to 5. */`"},
+      "summary": "Summarize overall performance in this area (1-2 sentences).",
+      "points": ["Point 1", "Point 2"],
+      "evidence": "Evidence for usability & accessibility.",
+      "score_explanation": "What helped/hurt score."
     },
     {
       "name": "conversion_optimization",
       "title": "Conversion Optimization",
-      "score": 2,
-      "summary": "Brief paragraph summarizing overall performance in this area",
-      "points": [
-        "Key point 1",
-        "Key point 2"
-      ],
-      "evidence": "Specific evidence supporting the analysis", 
-      "score_explanation": "What helped: X. What hurt: Y."
+      "score": ${"`/* (number 1-10) Score for this section. Default to 5. */`"},
+      "summary": "Summarize overall performance in this area (1-2 sentences).",
+      "points": ["Point 1", "Point 2"],
+      "evidence": "Evidence for conversion optimization.",
+      "score_explanation": "What helped/hurt score."
     },
     {
       "name": "technical_execution",
       "title": "Technical Execution",
-      "score": 6,
-      "summary": "Brief paragraph summarizing overall performance in this area",
-      "points": [
-        "Key point 1",
-        "Key point 2"
-      ],
-      "evidence": "Specific evidence supporting the analysis",
-      "score_explanation": "What helped: X. What hurt: Y."
+      "score": ${"`/* (number 1-10) Score for this section. Default to 5. */`"},
+      "summary": "Summarize overall performance in this area (1-2 sentences).",
+      "points": ["Point 1", "Point 2"],
+      "evidence": "Evidence for technical execution.",
+      "score_explanation": "What helped/hurt score."
     }
   ],
   "key_issues": [
-    "Most important issue 1",
-    "Most important issue 2", 
-    "Most important issue 3"
+    // IMPORTANT: Extract 0 to 8 significant key issues from the 'CRITICAL FLAWS' section of the raw analysis.
+    // Each issue should be an object: { "issue": "Issue description including severity if mentioned.", "how_to_fix": "Fix details or 'Refer to analysis'." }
+    // If no significant issues are found, provide an empty array: [].
+    // Example of one issue (if present):
+    // { "issue": "Missing Donation and Training CTAs (Severity: High)", "how_to_fix": "Add prominent, visually distinct donation and training registration buttons." }
   ],
   "recommendations": [
-    "Specific recommendation 1",
-    "Specific recommendation 2",
-    "Specific recommendation 3"
+    // IMPORTANT: Extract 0 to 8 significant actionable recommendations from the 'ACTIONABLE RECOMMENDATIONS' section of the raw analysis.
+    // Each recommendation should be an object: { "recommendation": "Recommendation description including impact if mentioned.", "benefit": "Benefit details or 'Improves user experience.'." }
+    // If no specific recommendations are warranted, provide an empty array: [].
+    // Example of one recommendation (if present):
+    // { "recommendation": "Add Primary and Secondary CTAs (Impact: High)", "benefit": "Creates clear conversion pathways aligned with organizational goals." }
   ],
-  "summary": "2-3 sentence summary of this page's analysis"
+  "summary": "Provide a 2-3 sentence overall summary of this specific page's analysis, highlighting its main strengths and weaknesses."
 }
 
-CRITICAL: 
-- Return ONLY the JSON object
-- No code blocks, no \`\`\`json\`\`\`, no extra text
-- overall_score must be a number 1-10
-- overall_explanation should identify strongest categories (scores 7+), weakest categories (scores 4-), and recommend 1-2 priority areas for improvement
-- All section scores must be numbers 1-10
-- All arrays must contain strings
-- Extract 3-5 most important issues and recommendations
-- Ensure each section has a meaningful summary paragraph that explains the score
-- Score explanations should be concise but specific about strengths and weaknesses`,
+IMPORTANT RULES FOR JSON OUTPUT:
+- Adhere strictly to the JSON structure above.
+- All scores MUST be numbers between 1 and 10.
+- "key_issues" MUST be an array of 0 to 8 objects. Each object MUST have an "issue" (string) and "how_to_fix" (string) property. If no significant issues are found, provide an empty array: [].
+- "recommendations" MUST be an array of 0 to 8 objects. Each object MUST have a "recommendation" (string) and "benefit" (string) property. If no significant recommendations are found, provide an empty array: [].
+- All other string values should be concise and directly extracted or summarized from the raw analysis.
+- If information for a field is not clearly present in the raw analysis, provide a sensible default or a note like "Not specified in analysis."
+- DO NOT use markdown (e.g., no \`\`\`, no \`*\`, no \`-\` for lists inside strings where not appropriate for the final text).
+- Ensure all strings are properly escaped for JSON if they contain special characters like quotes or newlines.
+- The final output MUST start with \`{\` and end with \`}\` and be parseable by JSON.parse().
+`,
 
     overallSummary: (rawAnalysisData, pageAnalyses) => `
-You are creating an executive summary for a website analysis. This will be the main page that summarizes findings across all pages.
+You are an expert at creating concise, structured executive summaries in PERFECT, VALID JSON.
+Based on the provided full analysis data and individual page summaries, generate an overall summary.
 
-FULL ANALYSIS DATA:
-Overview: ${JSON.stringify(rawAnalysisData.overview || 'No overview', null, 2)}
-Technical Summary: ${JSON.stringify(rawAnalysisData.technicalSummary || 'No technical summary', null, 2)}
-Total Pages: ${pageAnalyses.length}
+FULL ANALYSIS DATA (for context):
+Overview Section from LLM: ${JSON.stringify(rawAnalysisData.overview || 'No overview provided by LLM.', null, 2)}
+Technical Summary from LLM: ${JSON.stringify(rawAnalysisData.technicalSummary || 'No technical summary provided by LLM.', null, 2)}
+Number of Pages Analyzed: ${pageAnalyses.length}
 
-INDIVIDUAL PAGE SUMMARIES:
-${pageAnalyses.map(page => `- ${page.url}: ${page.summary || 'No summary available'}`).join('\n')}
+INDIVIDUAL PAGE SUMMARIES (for context):
+${pageAnalyses.map(page => `- ${page.url}: Score ${page.overall_score}/10. Summary: ${page.summary || 'No summary available.'}`).join('\n')}
 
-You MUST return ONLY valid JSON with this EXACT structure (no additional text, no markdown formatting):
+You MUST return ONLY a single, valid JSON object. NO additional text, NO explanations, NO markdown formatting like \`\`\`json.
+The entire response must be the JSON object itself.
 
+THE EXACT JSON STRUCTURE REQUIRED:
 {
-  "executive_summary": "2-3 paragraph executive summary of key findings across the entire website",
-  "overall_score": 7,
+  "executive_summary": "Craft a 2-3 paragraph executive summary. Synthesize key findings, overall website effectiveness in achieving its purpose (assume purpose is to inform, engage, and encourage action like donations/sign-ups), and the most critical areas for improvement across the entire website.",
+  "overall_score": ${"`/* (number 1-10) Calculate or infer an average overall website score based on individual page scores. Default to 6 if pages are unavailable or scores are inconsistent. */`"},
   "total_pages_analyzed": ${pageAnalyses.length},
   "most_critical_issues": [
-    "Site-wide critical issue 1",
-    "Site-wide critical issue 2",
-    "Site-wide critical issue 3",
-    "Site-wide critical issue 4",
-    "Site-wide critical issue 5"
+    "Identify and list up to 5 site-wide critical issues by synthesizing common themes from individual page issues or the LLM's overview. Example: 'Inconsistent navigation across multiple key pages.'",
+    "Another site-wide critical issue."
   ],
   "top_recommendations": [
-    "Priority recommendation 1", 
-    "Priority recommendation 2",
-    "Priority recommendation 3",
-    "Priority recommendation 4",
-    "Priority recommendation 5"
+    "Identify and list up to 5 high-priority, site-wide recommendations. Example: 'Standardize call-to-action button design and placement for better conversion.'",
+    "Another top site-wide recommendation."
   ],
   "key_strengths": [
-    "What the website does well 1",
-    "What the website does well 2",
-    "What the website does well 3"
+    "Identify and list up to 3 key strengths of the website based on positive themes from page analyses or the LLM overview. Example: 'Clear and professional visual design on most pages.'",
+    "Another key strength."
   ],
-  "performance_summary": "1-2 sentence technical performance overview"
+  "performance_summary": "Provide a 1-2 sentence overview of the website's technical performance, drawing from the technical summary if available, or state 'Technical performance data should be reviewed for detailed insights.'."
 }
 
-CRITICAL:
-- Return ONLY the JSON object
-- No code blocks, no \`\`\`json\`\`\`, no extra text
-- overall_score must be a number 1-10
-- Focus on SITE-WIDE issues, not page-specific details
-- All arrays must contain strings`
+IMPORTANT RULES FOR JSON OUTPUT:
+- Adhere strictly to the JSON structure.
+- "overall_score" MUST be a number between 1 and 10.
+- All arrays (most_critical_issues, top_recommendations, key_strengths) MUST contain strings. These should be general site-wide themes, not the detailed object structures from individual pages.
+- Focus on SITE-WIDE themes and insights, not page-specific details unless they represent a broader pattern.
+- If specific site-wide themes are hard to extract, provide more generic but still useful statements based on common web best practices, framed as observations from the (general) analysis.
+- DO NOT use markdown (e.g., no \`\`\`, no \`*\`, no \`-\` for lists inside strings where not appropriate for the final text).
+- The final output MUST start with \`{\` and end with \`}\` and be parseable by JSON.parse().
+`
   };
 }
 
