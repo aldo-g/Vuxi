@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ExternalLink, ChevronRight, Zap, Lightbulb, ListChecks, MapIcon, Palette, Trophy, Route, FileText, TrendingUp, ShieldCheck, MessageSquareHeart, Target as TargetIcon, CheckCircle2, AlertTriangleIcon } from "lucide-react";
+import { ExternalLink, ChevronRight, Zap, Lightbulb, ListChecks, MapIcon, Palette, Trophy, Route, FileText, TrendingUp, ShieldCheck, MessageSquareHeart, Target as TargetIcon, CheckCircle2, AlertTriangleIcon, Info } from "lucide-react"; // Added Info icon
 import { ExecutiveSummary } from "@/components/ExecutiveSummary";
 
 // Interfaces
@@ -48,6 +48,7 @@ interface PageAnalysisDetail {
 interface OverallSummary {
   executive_summary: string;
   overall_score: number;
+  site_score_explanation?: string; // Added new field
   total_pages_analyzed: number;
   most_critical_issues: string[];
   top_recommendations: string[];
@@ -84,12 +85,13 @@ const fetchReportData = async (): Promise<ReportData> => {
     data.overall_summary = {
         executive_summary: data.overall_summary.executive_summary || "Executive summary not available.",
         overall_score: typeof data.overall_summary.overall_score === 'number' ? data.overall_summary.overall_score : 0,
+        site_score_explanation: data.overall_summary.site_score_explanation || "Site score explanation not available.", // Default for new field
         total_pages_analyzed: typeof data.overall_summary.total_pages_analyzed === 'number' ? data.overall_summary.total_pages_analyzed : (data.page_analyses?.length || 0),
         most_critical_issues: Array.isArray(data.overall_summary.most_critical_issues) ? data.overall_summary.most_critical_issues : [],
         top_recommendations: Array.isArray(data.overall_summary.top_recommendations) ? data.overall_summary.top_recommendations : [],
         key_strengths: Array.isArray(data.overall_summary.key_strengths) ? data.overall_summary.key_strengths : [],
         performance_summary: data.overall_summary.performance_summary || "Performance summary not available.",
-        detailed_markdown_content: data.overall_summary.detailed_markdown_content // This is already defaulted above
+        detailed_markdown_content: data.overall_summary.detailed_markdown_content
     };
   return data;
 };
@@ -199,6 +201,7 @@ const Index = () => {
   const [analysisDateToDisplay, setAnalysisDateToDisplay] = useState(new Date().toLocaleDateString());
   const [conciseExecutiveSummary, setConciseExecutiveSummary] = useState("Executive summary not available.");
   const [overallScore, setOverallScore] = useState(0);
+  const [siteScoreExplanation, setSiteScoreExplanation] = useState("Overall site score explanation not available."); // New state
   const [totalPagesAnalyzed, setTotalPagesAnalyzed] = useState(0);
   const [performanceSummary, setPerformanceSummary] = useState("No performance summary available.");
   const [detailedMarkdownContentState, setDetailedMarkdownContentState] = useState("# Overview Not Available\n\nThe detailed overview content could not be loaded.");
@@ -208,7 +211,7 @@ const Index = () => {
 
   // HOOK 3 (Score Ring Animation)
   useEffect(() => {
-    if (overallScore > 0) { // Check if overallScore has a valid value
+    if (overallScore > 0) { 
       const timer = setTimeout(() => {
         const scoreRing = document.querySelector('.score-ring-progress') as SVGCircleElement;
         if (scoreRing) {
@@ -218,14 +221,14 @@ const Index = () => {
 
           scoreRing.style.strokeDashoffset = offset.toString();
 
-          if (overallScore >= 8) scoreRing.style.stroke = '#22c55e';
-          else if (overallScore >= 6) scoreRing.style.stroke = '#f59e0b';
-          else scoreRing.style.stroke = '#ef4444';
+          if (overallScore >= 8) scoreRing.style.stroke = '#22c55e'; // emerald-500
+          else if (overallScore >= 6) scoreRing.style.stroke = '#f59e0b'; // amber-500
+          else scoreRing.style.stroke = '#ef4444'; // red-500
         }
-      }, 100);
+      }, 100); // Reduced delay for faster animation start
       return () => clearTimeout(timer);
     }
-  }, [overallScore]); // Depend on the overallScore state
+  }, [overallScore]); 
 
   // Effect to process data when reportData is available
   useEffect(() => {
@@ -244,6 +247,7 @@ const Index = () => {
       const {
         executive_summary: cs,
         overall_score: os = 0,
+        site_score_explanation: sse, // Destructure new field
         total_pages_analyzed: tpaValue,
         performance_summary: ps = "No performance summary available.",
         detailed_markdown_content: dmc = "# Overview Not Available\n\nThe detailed overview content could not be loaded."
@@ -251,9 +255,10 @@ const Index = () => {
 
       setConciseExecutiveSummary(cs || "Executive summary not available.");
       setOverallScore(typeof os === 'number' ? os : 0);
+      setSiteScoreExplanation(sse || "Overall site score explanation not available."); // Set new state
       setTotalPagesAnalyzed(typeof tpaValue === 'number' ? tpaValue : (metadata?.total_pages ?? page_analyses.length));
       setPerformanceSummary(ps);
-      setDetailedMarkdownContentState(dmc); // Update state for detailed markdown
+      setDetailedMarkdownContentState(dmc); 
       setPageAnalysesForDisplay(page_analyses);
 
       const mainExecSummaryP = (() => {
@@ -314,13 +319,13 @@ const Index = () => {
           commitSubSection();
           if (currentSectionKey && sections[currentSectionKey]) {
             let contentToAdd = mainSectionContentAccumulator.join('\n').trim();
-            if (currentSectionKey === 'executive-summary' && mainExecSummaryP) { // Use mainExecSummaryP
+            if (currentSectionKey === 'executive-summary' && mainExecSummaryP) { 
                 const mainParaLines = mainExecSummaryP.split('\n');
                 let tempContent = contentToAdd;
                 mainParaLines.forEach(line => {
                     const trimmedLine = line.trim();
                     const regex = new RegExp(`(^|\\n)${trimmedLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')}(\\n|$)`, 'gi');
-                    tempContent = tempContent.replace(regex, (match, p1, p2) => (p1 && p2) ? p1 : ''); // More careful removal
+                    tempContent = tempContent.replace(regex, (match, p1, p2) => (p1 && p2) ? p1 : ''); 
                 });
                 contentToAdd = tempContent.replace(/\n\s*\n/g, '\n\n').trim();
 
@@ -359,7 +364,6 @@ const Index = () => {
   }, [reportData]);
 
 
-  // REMOVED 'executive-summary' from sectionDetails
   const sectionDetails: { [key: string]: { icon: React.ElementType; title: string } } = {
     'key-findings': { icon: Lightbulb, title: "Key Findings" },
     'strategic-recommendations': { icon: ListChecks, title: "Strategic Recommendations" },
@@ -367,22 +371,20 @@ const Index = () => {
     'implementation-roadmap': { icon: Route, title: "Implementation Roadmap" },
   };
 
-  // HOOK 4 (Tab Logic) - Updated default to 'key-findings'
   useEffect(() => {
     const availableParsedKeys = Object.keys(parsedDetailedSections).filter(key => sectionDetails[key]);
     if (availableParsedKeys.length > 0) {
       if (!availableParsedKeys.includes(activeDetailedTab)) {
         setActiveDetailedTab(availableParsedKeys[0]);
       }
-    } else if (detailedMarkdownContentState && Object.keys(parsedDetailedSections).length === 0) { // Use state here
+    } else if (detailedMarkdownContentState && Object.keys(parsedDetailedSections).length === 0) { 
       const firstKeyFromDetails = Object.keys(sectionDetails)[0];
       if (firstKeyFromDetails && activeDetailedTab !== firstKeyFromDetails && !sectionDetails[activeDetailedTab]) {
            setActiveDetailedTab(firstKeyFromDetails);
       }
     }
-  }, [parsedDetailedSections, activeDetailedTab, detailedMarkdownContentState]); // Use state for detailedMarkdownContent
+  }, [parsedDetailedSections, activeDetailedTab, detailedMarkdownContentState]); 
 
-  // Conditional Rendering Logic
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100">
@@ -436,7 +438,6 @@ const Index = () => {
 
         <section className="grid lg:grid-cols-3 gap-8 mb-10">
           <div className="lg:col-span-2">
-            {/* Use state variables for ExecutiveSummary */}
             <ExecutiveSummary summary={{ executive_summary: mainExecutiveSummaryParagraph || conciseExecutiveSummary, overall_score: overallScore, total_pages_analyzed: totalPagesAnalyzed }} />
           </div>
           <div className="lg:col-span-1">
@@ -464,22 +465,33 @@ const Index = () => {
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="text-center">
-                        {/* Use overallScore state */}
                         <div className="text-3xl font-bold text-gray-900">{overallScore.toFixed(1)}</div>
                         <div className="text-sm text-gray-500 font-medium">/ 10</div>
                         </div>
                     </div>
                     </div>
                     <div className="text-center">
-                    {/* Use overallScore state */}
                     <Badge variant="outline" className={`text-xs sm:text-sm font-semibold mb-2 px-3 py-1 border ${getScoreBoxClasses(overallScore)}`}>
                         {getOverallScoreStatusText(overallScore)}
                     </Badge>
-                    <p className="text-gray-600 text-sm">
+                    <p className="text-gray-600 text-sm mb-4">
                         {overallScore >= 8 ? 'Outstanding performance' :
                         overallScore >= 6 ? 'Solid foundation with opportunities' :
                         'Significant room for improvement'}
                     </p>
+                    {/* Site Score Explanation Display START */}
+                    {siteScoreExplanation && siteScoreExplanation !== "Overall site score explanation not available." && (
+                        <div className="mt-4 pt-4 border-t border-slate-200/70">
+                             <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center justify-center gap-2">
+                                <Info size={16} className="text-blue-500" />
+                                Score Rationale
+                            </h4>
+                            <p className="text-xs text-slate-600 leading-relaxed text-center">
+                                {siteScoreExplanation}
+                            </p>
+                        </div>
+                    )}
+                    {/* Site Score Explanation Display END */}
                     </div>
                 </div>
               </CardContent>
@@ -488,18 +500,15 @@ const Index = () => {
         </section>
         
         <section className="mt-10">
-          {/* Use parsedDetailedSections state - IMPROVED TABS SECTION */}
           {Object.keys(parsedDetailedSections).length > 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-lg overflow-hidden">
               <Tabs value={activeDetailedTab} onValueChange={setActiveDetailedTab} className="w-full">
-                {/* Improved TabsList with better spacing and overflow handling */}
                 <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm px-6 py-4">
                   <TabsList className="w-full bg-transparent p-0 h-auto gap-1 justify-start overflow-x-auto scrollbar-hide">
                     <div className="flex gap-2 min-w-max">
                       {Object.keys(sectionDetails).map((key) => {
                         const sectionInfo = sectionDetails[key];
                         const Icon = sectionInfo?.icon;
-                        // Use parsedDetailedSections state
                         return parsedDetailedSections[key] ? (
                           <TabsTrigger
                             key={key}
@@ -521,9 +530,7 @@ const Index = () => {
                   </TabsList>
                 </div>
 
-                {/* Tab Content with proper padding */}
                 <div className="p-8">
-                  {/* Use parsedDetailedSections state */}
                   {Object.keys(parsedDetailedSections).map((key) => (
                     parsedDetailedSections[key] && sectionDetails[key] && (
                       <TabsContent key={key} value={key} className="mt-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none">
@@ -531,7 +538,6 @@ const Index = () => {
                             title={parsedDetailedSections[key]!.title}
                             mainContent={parsedDetailedSections[key]!.content}
                             subsections={parsedDetailedSections[key]!.subsections}
-                            // Use performanceSummary state
                             performanceSummary={key === 'key-findings' ? performanceSummary : undefined}
                             goalAchievementAssessment={key === 'key-findings' ? goalAchievementAssessmentText : undefined}
                             icon={sectionDetails[key]!.icon}
@@ -556,15 +562,12 @@ const Index = () => {
             <header className="flex items-center gap-4 mb-10 border-b border-slate-300/70 pb-6">
                 <MapIcon className="w-8 h-8 text-indigo-600 flex-shrink-0" />
                 <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">Individual Page Analyses</h2>
-                {/* Use pageAnalysesForDisplay state */}
                 {pageAnalysesForDisplay.length > 0 && (
-                // Use totalPagesAnalyzed state
                 <Badge variant="secondary" className="text-sm ml-auto bg-indigo-100 text-indigo-700 border-indigo-200 px-3 py-1.5 rounded-md">
                     {totalPagesAnalyzed} Pages
                 </Badge>
                 )}
             </header>
-            {/* Use pageAnalysesForDisplay state */}
             {pageAnalysesForDisplay.length > 0 ? (
                 <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-8">
                 {pageAnalysesForDisplay.map((page) => (
