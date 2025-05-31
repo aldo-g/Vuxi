@@ -46,14 +46,14 @@ interface PageAnalysisDetail {
 }
 
 interface OverallSummary {
-  executive_summary: string; 
+  executive_summary: string;
   overall_score: number;
   total_pages_analyzed: number;
-  most_critical_issues: string[]; 
-  top_recommendations: string[];  
-  key_strengths: string[];       
-  performance_summary: string; 
-  detailed_markdown_content: string; 
+  most_critical_issues: string[];
+  top_recommendations: string[];
+  key_strengths: string[];
+  performance_summary: string;
+  detailed_markdown_content: string;
 }
 
 interface ReportData {
@@ -106,12 +106,12 @@ const getOverallScoreStatusText = (score: number) => {
   return "Needs Work";
 };
 
-const MarkdownSectionRenderer: React.FC<{ 
-    title: string; 
-    mainContent: string; 
+const MarkdownSectionRenderer: React.FC<{
+    title: string;
+    mainContent: string;
     subsections: Array<{ title: string; content: string }>;
-    performanceSummary?: string; 
-    goalAchievementAssessment?: string; 
+    performanceSummary?: string;
+    goalAchievementAssessment?: string;
     icon?: React.ElementType;
     sectionKey: string;
 }> = ({ title, mainContent, subsections, performanceSummary, goalAchievementAssessment, icon: Icon, sectionKey }) => (
@@ -181,8 +181,10 @@ const MarkdownSectionRenderer: React.FC<{
 
 
 const Index = () => {
-  const [activeDetailedTab, setActiveDetailedTab] = useState("executive-summary"); 
+  // HOOK 1
+  const [activeDetailedTab, setActiveDetailedTab] = useState("executive-summary");
 
+  // HOOK 2 (useQuery)
   const { data: reportData, isLoading, error } = useQuery<ReportData, Error>({
     queryKey: ["reportData"],
     queryFn: fetchReportData,
@@ -191,27 +193,195 @@ const Index = () => {
     retry: 1,
   });
 
+  // States for data derived from reportData
+  const [organizationName, setOrganizationName] = useState("Analysis Report");
+  const [analysisDateToDisplay, setAnalysisDateToDisplay] = useState(new Date().toLocaleDateString());
+  const [conciseExecutiveSummary, setConciseExecutiveSummary] = useState("Executive summary not available.");
+  const [overallScore, setOverallScore] = useState(0);
+  const [totalPagesAnalyzed, setTotalPagesAnalyzed] = useState(0);
+  const [performanceSummary, setPerformanceSummary] = useState("No performance summary available.");
+  const [detailedMarkdownContentState, setDetailedMarkdownContentState] = useState("# Overview Not Available\n\nThe detailed overview content could not be loaded.");
+  const [pageAnalysesForDisplay, setPageAnalysesForDisplay] = useState<PageAnalysisDetail[]>([]);
+  const [mainExecutiveSummaryParagraph, setMainExecutiveSummaryParagraph] = useState("");
+  const [parsedDetailedSections, setParsedDetailedSections] = useState<{ [key: string]: { title: string; content: string; subsections: Array<{title:string; content:string}> } }>({});
+
+  // HOOK 3 (Score Ring Animation)
   useEffect(() => {
-    if (reportData?.overall_summary?.overall_score) {
+    if (overallScore > 0) { // Check if overallScore has a valid value
       const timer = setTimeout(() => {
         const scoreRing = document.querySelector('.score-ring-progress') as SVGCircleElement;
         if (scoreRing) {
-          const score = reportData.overall_summary.overall_score;
           const circumference = 2 * Math.PI * 45;
-          const progress = (score / 10) * circumference;
+          const progress = (overallScore / 10) * circumference;
           const offset = circumference - progress;
-          
+
           scoreRing.style.strokeDashoffset = offset.toString();
-          
-          if (score >= 8) scoreRing.style.stroke = '#22c55e';
-          else if (score >= 6) scoreRing.style.stroke = '#f59e0b';
+
+          if (overallScore >= 8) scoreRing.style.stroke = '#22c55e';
+          else if (overallScore >= 6) scoreRing.style.stroke = '#f59e0b';
           else scoreRing.style.stroke = '#ef4444';
         }
       }, 100);
       return () => clearTimeout(timer);
     }
+  }, [overallScore]); // Depend on the overallScore state
+
+  // Effect to process data when reportData is available
+  useEffect(() => {
+    if (reportData && reportData.overall_summary && reportData.metadata) {
+      const {
+        organization: orgFromData = "Analysis Report",
+        overall_summary,
+        page_analyses = [],
+        metadata,
+        timestamp
+      } = reportData;
+
+      setOrganizationName(metadata?.organization_name || orgFromData);
+      setAnalysisDateToDisplay(metadata?.generated_at ? new Date(metadata.generated_at).toLocaleDateString() : (timestamp ? new Date(timestamp).toLocaleDateString() : new Date().toLocaleDateString()));
+
+      const {
+        executive_summary: cs,
+        overall_score: os = 0,
+        total_pages_analyzed: tpaValue,
+        performance_summary: ps = "No performance summary available.",
+        detailed_markdown_content: dmc = "# Overview Not Available\n\nThe detailed overview content could not be loaded."
+      } = overall_summary;
+
+      setConciseExecutiveSummary(cs || "Executive summary not available.");
+      setOverallScore(typeof os === 'number' ? os : 0);
+      setTotalPagesAnalyzed(typeof tpaValue === 'number' ? tpaValue : (metadata?.total_pages ?? page_analyses.length));
+      setPerformanceSummary(ps);
+      setDetailedMarkdownContentState(dmc); // Update state for detailed markdown
+      setPageAnalysesForDisplay(page_analyses);
+
+      const mainExecSummaryP = (() => {
+        if (!dmc) return cs || "";
+        const execSummaryMatch = dmc.match(/^## EXECUTIVE SUMMARY\s*([\s\S]*?)(?=\n\n(?:## KEY FINDINGS|## STRATEGIC RECOMMENDATIONS|### Goal Achievement Assessment|$))/i);
+
+        if (execSummaryMatch && execSummaryMatch[1]) {
+            const summaryBlock = execSummaryMatch[1].trim();
+            const paragraphs = summaryBlock.split(/\n\s*\n+/);
+            let extracted = "";
+            let paragraphCount = 0;
+            for (const p of paragraphs) {
+                const trimmedP = p.trim();
+                if (trimmedP && !trimmedP.startsWith("**Overall Effectiveness Score:") && !trimmedP.startsWith("###") && trimmedP.length > 30 && paragraphCount < 2) {
+                    extracted += (extracted ? "\n\n" : "") + trimmedP;
+                    paragraphCount++;
+                }
+                if(paragraphCount >=1 && !trimmedP.startsWith("-")) break;
+                 if(paragraphCount >=2) break;
+            }
+            return extracted || cs || "";
+        }
+        return cs || "";
+      })();
+      setMainExecutiveSummaryParagraph(mainExecSummaryP);
+
+      const parsedSections = (() => {
+        if (!dmc) return {};
+        const sections: { [key: string]: { title: string; content: string; subsections: Array<{title:string; content:string}> } } = {};
+        const lines = dmc.split('\n');
+        let currentSectionKey: string | null = null;
+        let currentSectionTitle: string | null = null;
+        let currentSubsectionTitle: string | null = null;
+        let mainSectionContentAccumulator: string[] = [];
+        let subSectionContentAccumulator: string[] = [];
+
+        const normalizeKey = (title: string) => title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+        const commitSubSection = () => {
+          if (currentSubsectionTitle && currentSectionKey && sections[currentSectionKey]) {
+            if (currentSectionKey === 'executive-summary' &&
+                (currentSubsectionTitle.toLowerCase().includes('key strengths') ||
+                 currentSubsectionTitle.toLowerCase().includes('critical weaknesses') ||
+                 currentSubsectionTitle.toLowerCase().includes('goal achievement assessment'))) {
+              // Skip
+            } else {
+                sections[currentSectionKey].subsections.push({
+                  title: currentSubsectionTitle,
+                  content: subSectionContentAccumulator.join('\n').trim()
+                });
+            }
+          }
+          subSectionContentAccumulator = [];
+          currentSubsectionTitle = null;
+        };
+
+        const commitMainSection = () => {
+          commitSubSection();
+          if (currentSectionKey && sections[currentSectionKey]) {
+            let contentToAdd = mainSectionContentAccumulator.join('\n').trim();
+            if (currentSectionKey === 'executive-summary' && mainExecSummaryP) { // Use mainExecSummaryP
+                const mainParaLines = mainExecSummaryP.split('\n');
+                let tempContent = contentToAdd;
+                mainParaLines.forEach(line => {
+                    const trimmedLine = line.trim();
+                    const regex = new RegExp(`(^|\\n)${trimmedLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')}(\\n|$)`, 'gi');
+                    tempContent = tempContent.replace(regex, (match, p1, p2) => (p1 && p2) ? p1 : ''); // More careful removal
+                });
+                contentToAdd = tempContent.replace(/\n\s*\n/g, '\n\n').trim();
+
+                 contentToAdd = contentToAdd.replace(/(\n\n)?\*\*Goal Achievement Assessment:\*\*[\s\S]*?(?=\n\n##|$)/i, '').trim();
+            }
+            sections[currentSectionKey].content = contentToAdd;
+          }
+          mainSectionContentAccumulator = [];
+        };
+
+        for (const line of lines) {
+          if (line.startsWith('## ')) {
+            commitMainSection();
+            currentSectionTitle = line.substring(3).trim();
+            currentSectionKey = normalizeKey(currentSectionTitle);
+            if (!currentSectionKey) continue;
+            sections[currentSectionKey] = { title: currentSectionTitle, content: '', subsections: [] };
+          } else if (line.startsWith('### ')) {
+            commitSubSection();
+            if (currentSectionKey) {
+              currentSubsectionTitle = line.substring(4).trim();
+            }
+          } else if (currentSectionKey) {
+            if (currentSubsectionTitle) {
+              subSectionContentAccumulator.push(line);
+            } else {
+              mainSectionContentAccumulator.push(line);
+            }
+          }
+        }
+        commitMainSection();
+        return sections;
+      })();
+      setParsedDetailedSections(parsedSections);
+    }
   }, [reportData]);
 
+
+  const sectionDetails: { [key: string]: { icon: React.ElementType; title: string } } = {
+    'executive-summary': { icon: FileText, title: "Executive Summary Details" },
+    'key-findings': { icon: Lightbulb, title: "Key Findings" },
+    'strategic-recommendations': { icon: ListChecks, title: "Strategic Recommendations" },
+    'overall-theme-assessment': { icon: Palette, title: "Overall Theme Assessment" },
+    'implementation-roadmap': { icon: Route, title: "Implementation Roadmap" },
+  };
+
+  // HOOK 4 (Tab Logic)
+  useEffect(() => {
+    const availableParsedKeys = Object.keys(parsedDetailedSections).filter(key => sectionDetails[key]);
+    if (availableParsedKeys.length > 0) {
+      if (!availableParsedKeys.includes(activeDetailedTab)) {
+        setActiveDetailedTab(availableParsedKeys[0]);
+      }
+    } else if (detailedMarkdownContentState && Object.keys(parsedDetailedSections).length === 0) { // Use state here
+      const firstKeyFromDetails = Object.keys(sectionDetails)[0];
+      if (firstKeyFromDetails && activeDetailedTab !== firstKeyFromDetails && !sectionDetails[activeDetailedTab]) {
+           setActiveDetailedTab(firstKeyFromDetails);
+      }
+    }
+  }, [parsedDetailedSections, activeDetailedTab, detailedMarkdownContentState]); // Use state for detailedMarkdownContent
+
+  // Conditional Rendering Logic
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100">
@@ -222,8 +392,8 @@ const Index = () => {
       </div>
     );
   }
-  
-  if (error || !reportData || !reportData.overall_summary) { 
+
+  if (error || !reportData || !reportData.overall_summary) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100/30">
         <div className="text-center p-8 bg-white shadow-xl rounded-2xl max-w-lg">
@@ -244,147 +414,7 @@ const Index = () => {
     );
   }
 
-  const {
-    organization = "Analysis Report",
-    overall_summary,
-    page_analyses = [],
-    metadata,
-    timestamp
-  } = reportData as ReportData; 
-
-  const analysisDateToDisplay = metadata?.generated_at ? new Date(metadata.generated_at).toLocaleDateString() : (timestamp ? new Date(timestamp).toLocaleDateString() : new Date().toLocaleDateString());
-
-  const {
-    executive_summary: concise_executive_summary, // Renamed to avoid conflict with parsed
-    overall_score = 0,
-    performance_summary = "No performance summary available.", 
-    detailed_markdown_content = "# Overview Not Available\n\nThe detailed overview content could not be loaded."
-  } = overall_summary;
-  
-  const totalPagesAnalyzed = metadata?.total_pages ?? page_analyses.length;
-
-  const mainExecutiveSummaryParagraph = (() => {
-    if (!detailed_markdown_content) return "";
-    const execSummaryMatch = detailed_markdown_content.match(/^## EXECUTIVE SUMMARY\s*([\s\S]*?)(?=\n\n(?:## KEY FINDINGS|## STRATEGIC RECOMMENDATIONS|### Goal Achievement Assessment|$))/i);
-
-    if (execSummaryMatch && execSummaryMatch[1]) {
-        const summaryBlock = execSummaryMatch[1].trim();
-        // Split into paragraphs, take the first few substantial ones, excluding score lines or sub-headers.
-        const paragraphs = summaryBlock.split(/\n\s*\n+/);
-        let extracted = "";
-        let paragraphCount = 0;
-        for (const p of paragraphs) {
-            const trimmedP = p.trim();
-            if (trimmedP && !trimmedP.startsWith("**Overall Effectiveness Score:") && !trimmedP.startsWith("###") && trimmedP.length > 30 && paragraphCount < 2) {
-                extracted += (extracted ? "\n\n" : "") + trimmedP;
-                paragraphCount++;
-            }
-            if(paragraphCount >=1 && !trimmedP.startsWith("-")) break; // Stop after first main paragraph if next is not a list
-             if(paragraphCount >=2) break;
-        }
-        return extracted || concise_executive_summary; // Fallback to the short one
-    }
-    return concise_executive_summary; 
-  })();
-
-  const parsedDetailedSections = (() => {
-    if (!detailed_markdown_content) return {};
-    const sections: { [key: string]: { title: string; content: string; subsections: Array<{title:string; content:string}> } } = {};
-    const lines = detailed_markdown_content.split('\n');
-    let currentSectionKey: string | null = null;
-    let currentSectionTitle: string | null = null;
-    let currentSubsectionTitle: string | null = null;
-    let mainSectionContentAccumulator: string[] = [];
-    let subSectionContentAccumulator: string[] = [];
-
-    const normalizeKey = (title: string) => title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    
-    const commitSubSection = () => {
-      if (currentSubsectionTitle && currentSectionKey && sections[currentSectionKey]) {
-        if (currentSectionKey === 'executive-summary' && 
-            (currentSubsectionTitle.toLowerCase().includes('key strengths') || 
-             currentSubsectionTitle.toLowerCase().includes('critical weaknesses') ||
-             currentSubsectionTitle.toLowerCase().includes('goal achievement assessment'))) {
-          // Skip these as they are handled elsewhere or not part of the "details" of exec summary
-        } else {
-            sections[currentSectionKey].subsections.push({
-              title: currentSubsectionTitle,
-              content: subSectionContentAccumulator.join('\n').trim()
-            });
-        }
-      }
-      subSectionContentAccumulator = [];
-      currentSubsectionTitle = null;
-    };
-    
-    const commitMainSection = () => {
-      commitSubSection(); 
-      if (currentSectionKey && sections[currentSectionKey]) {
-        let contentToAdd = mainSectionContentAccumulator.join('\n').trim();
-        if (currentSectionKey === 'executive-summary' && mainExecutiveSummaryParagraph) {
-            // Attempt to remove the already displayed main paragraph more carefully
-            const mainParaLines = mainExecutiveSummaryParagraph.split('\n');
-            let tempContent = contentToAdd;
-            mainParaLines.forEach(line => {
-                tempContent = tempContent.replace(line.trim(), '');
-            });
-            contentToAdd = tempContent.trim();
-            // Remove "Goal Achievement Assessment" if it was part of the main content block
-             contentToAdd = contentToAdd.replace(/(\n\n)?\*\*Goal Achievement Assessment:\*\*[\s\S]*?(?=\n\n##|$)/i, '').trim();
-        }
-        sections[currentSectionKey].content = contentToAdd; // Only assign the remaining content
-      }
-      mainSectionContentAccumulator = [];
-    };
-
-    for (const line of lines) {
-      if (line.startsWith('## ')) {
-        commitMainSection(); 
-        currentSectionTitle = line.substring(3).trim();
-        currentSectionKey = normalizeKey(currentSectionTitle);
-        if (!currentSectionKey) continue; 
-        sections[currentSectionKey] = { title: currentSectionTitle, content: '', subsections: [] };
-      } else if (line.startsWith('### ')) {
-        commitSubSection(); 
-        if (currentSectionKey) { 
-          currentSubsectionTitle = line.substring(4).trim();
-        }
-      } else if (currentSectionKey) { 
-        if (currentSubsectionTitle) { 
-          subSectionContentAccumulator.push(line);
-        } else { 
-          mainSectionContentAccumulator.push(line);
-        }
-      }
-    }
-    commitMainSection(); 
-    return sections;
-  })();
-  
-  const sectionDetails: { [key: string]: { icon: React.ElementType; title: string } } = {
-    'executive-summary': { icon: FileText, title: "Executive Summary Details" },
-    'key-findings': { icon: Lightbulb, title: "Key Findings" },
-    'strategic-recommendations': { icon: ListChecks, title: "Strategic Recommendations" },
-    'overall-theme-assessment': { icon: Palette, title: "Overall Theme Assessment" },
-    'implementation-roadmap': { icon: Route, title: "Implementation Roadmap" },
-  };
-  
-  useEffect(() => {
-    const availableParsedKeys = Object.keys(parsedDetailedSections).filter(key => sectionDetails[key]);
-    if (availableParsedKeys.length > 0) {
-      if (!availableParsedKeys.includes(activeDetailedTab)) {
-        setActiveDetailedTab(availableParsedKeys[0]);
-      }
-    } else if (detailed_markdown_content && Object.keys(parsedDetailedSections).length === 0) {
-      const firstKeyFromDetails = Object.keys(sectionDetails)[0];
-      if (firstKeyFromDetails && activeDetailedTab !== firstKeyFromDetails && !sectionDetails[activeDetailedTab]) {
-           setActiveDetailedTab(firstKeyFromDetails);
-      }
-    }
-  }, [parsedDetailedSections, activeDetailedTab, detailed_markdown_content]); 
-
   const goalAchievementAssessmentText = `**Donations:** Poor (3/10) - Despite having a "Donate" button in navigation, the site lacks compelling donation appeals, impact stories, or contextual CTAs explaining why and how donations make a difference.\n\n**Training Sign-ups:** Below Average (4/10) - While training courses are well-described with strong content, the site lacks clear registration pathways, pricing information, course schedules, and compelling CTAs to drive enrollment.`;
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100">
@@ -398,14 +428,15 @@ const Index = () => {
             Website Analysis Report
           </h1>
           <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
-            Comprehensive UX/UI evaluation for <span className="font-semibold text-slate-800">{metadata?.organization_name || organization}</span>
+            Comprehensive UX/UI evaluation for <span className="font-semibold text-slate-800">{organizationName}</span>
           </p>
            <p className="text-sm text-slate-500 mt-2">Generated on: {analysisDateToDisplay}</p>
         </header>
 
         <section className="grid lg:grid-cols-3 gap-8 mb-10">
           <div className="lg:col-span-2">
-            <ExecutiveSummary summary={{ executive_summary: concise_executive_summary, overall_score, total_pages_analyzed: totalPagesAnalyzed }} />
+            {/* Use state variables for ExecutiveSummary */}
+            <ExecutiveSummary summary={{ executive_summary: mainExecutiveSummaryParagraph || conciseExecutiveSummary, overall_score: overallScore, total_pages_analyzed: totalPagesAnalyzed }} />
           </div>
           <div className="lg:col-span-1">
             <Card className="bg-white rounded-2xl border border-gray-200/60 p-6 sm:p-8 shadow-sm hover:shadow-md transition-all duration-300 h-full">
@@ -426,24 +457,26 @@ const Index = () => {
                         className="score-ring-progress"
                         cx="60" cy="60" r="45" fill="none" strokeWidth="8" strokeLinecap="round"
                         strokeDasharray={`${2 * Math.PI * 45}`}
-                        strokeDashoffset={`${2 * Math.PI * 45}`} 
+                        strokeDashoffset={`${2 * Math.PI * 45}`}
                         style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
                         />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="text-center">
-                        <div className="text-3xl font-bold text-gray-900">{overall_score.toFixed(1)}</div>
+                        {/* Use overallScore state */}
+                        <div className="text-3xl font-bold text-gray-900">{overallScore.toFixed(1)}</div>
                         <div className="text-sm text-gray-500 font-medium">/ 10</div>
                         </div>
                     </div>
                     </div>
                     <div className="text-center">
-                    <Badge variant="outline" className={`text-xs sm:text-sm font-semibold mb-2 px-3 py-1 border ${getScoreBoxClasses(overall_score)}`}>
-                        {getOverallScoreStatusText(overall_score)}
+                    {/* Use overallScore state */}
+                    <Badge variant="outline" className={`text-xs sm:text-sm font-semibold mb-2 px-3 py-1 border ${getScoreBoxClasses(overallScore)}`}>
+                        {getOverallScoreStatusText(overallScore)}
                     </Badge>
                     <p className="text-gray-600 text-sm">
-                        {overall_score >= 8 ? 'Outstanding performance' : 
-                        overall_score >= 6 ? 'Solid foundation with opportunities' : 
+                        {overallScore >= 8 ? 'Outstanding performance' :
+                        overallScore >= 6 ? 'Solid foundation with opportunities' :
                         'Significant room for improvement'}
                     </p>
                     </div>
@@ -451,35 +484,40 @@ const Index = () => {
               </CardContent>
             </Card>
           </div>
-        </section>        
+        </section>
         <section className="mt-10">
+          {/* Use parsedDetailedSections state */}
           {Object.keys(parsedDetailedSections).length > 0 ? (
             <Tabs value={activeDetailedTab} onValueChange={setActiveDetailedTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-8 bg-slate-200/80 p-2 rounded-xl h-auto shadow-sm">
                 {Object.keys(sectionDetails).map((key) => {
                   const sectionInfo = sectionDetails[key];
                   const Icon = sectionInfo?.icon;
+                  // Use parsedDetailedSections state
                   return parsedDetailedSections[key] ? (
-                      <TabsTrigger 
-                        key={key} 
-                        value={key} 
+                      <TabsTrigger
+                        key={key}
+                        value={key}
                         className="flex-col sm:flex-row h-auto items-center justify-center sm:h-12 py-3 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-blue-700 data-[state=active]:font-semibold text-slate-600 hover:bg-slate-300/50 text-xs sm:text-sm transition-all rounded-lg"
                       >
-                        {Icon && <Icon className="w-5 h-5 mr-0 mb-1 sm:mr-2 sm:mb-0 flex-shrink-0" />} 
+                        {Icon && <Icon className="w-5 h-5 mr-0 mb-1 sm:mr-2 sm:mb-0 flex-shrink-0" />}
+                        {/* Use parsedDetailedSections state */}
                         <span className="text-center sm:text-left">{sectionInfo?.title || parsedDetailedSections[key]!.title}</span>
                       </TabsTrigger>
                   ) : null;
                 })}
               </TabsList>
 
+              {/* Use parsedDetailedSections state */}
               {Object.keys(parsedDetailedSections).map((key) => (
                 parsedDetailedSections[key] && sectionDetails[key] && (
                   <TabsContent key={key} value={key} className="focus-visible:ring-0 focus-visible:ring-offset-0 outline-none">
-                    <MarkdownSectionRenderer 
-                        title={parsedDetailedSections[key]!.title} 
-                        mainContent={parsedDetailedSections[key]!.content} 
+                    <MarkdownSectionRenderer
+                        title={parsedDetailedSections[key]!.title}
+                        mainContent={parsedDetailedSections[key]!.content}
                         subsections={parsedDetailedSections[key]!.subsections}
-                        performanceSummary={key === 'key-findings' ? performance_summary : undefined}
+                        // Use performanceSummary state
+                        performanceSummary={key === 'key-findings' ? performanceSummary : undefined}
                         goalAchievementAssessment={key === 'key-findings' ? goalAchievementAssessmentText : undefined}
                         icon={sectionDetails[key]!.icon}
                         sectionKey={key}
@@ -501,15 +539,18 @@ const Index = () => {
             <header className="flex items-center gap-4 mb-10 border-b border-slate-300/70 pb-6">
                 <MapIcon className="w-8 h-8 text-indigo-600 flex-shrink-0" />
                 <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">Individual Page Analyses</h2>
-                {page_analyses.length > 0 && (
+                {/* Use pageAnalysesForDisplay state */}
+                {pageAnalysesForDisplay.length > 0 && (
+                // Use totalPagesAnalyzed state
                 <Badge variant="secondary" className="text-sm ml-auto bg-indigo-100 text-indigo-700 border-indigo-200 px-3 py-1.5 rounded-md">
                     {totalPagesAnalyzed} Pages
                 </Badge>
                 )}
             </header>
-            {page_analyses.length > 0 ? (
+            {/* Use pageAnalysesForDisplay state */}
+            {pageAnalysesForDisplay.length > 0 ? (
                 <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-8">
-                {page_analyses.map((page) => (
+                {pageAnalysesForDisplay.map((page) => (
                     <Link key={page.id} to={`/page/${page.id}`} className="group block h-full">
                     <Card className="h-full flex flex-col transition-all duration-300 ease-in-out rounded-2xl border border-gray-200/80 hover:shadow-xl group-hover:border-blue-500/80 p-0 bg-white hover:scale-[1.025] focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 outline-none">
                         <CardHeader className="p-6 pb-4">
