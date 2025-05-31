@@ -5,6 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
 
+// Updated interfaces for issues and recommendations
+interface PageIssueSummary {
+  issue: string;
+  how_to_fix?: string; // Keep optional if not used in card
+}
+
+interface PageRecommendationSummary {
+  recommendation: string;
+  benefit?: string; // Keep optional if not used in card
+}
+
 interface PageAnalysis {
   page_type: string;
   title: string;
@@ -12,8 +23,8 @@ interface PageAnalysis {
   section_scores: {
     [key: string]: number;
   };
-  key_issues: string[];
-  recommendations: string[];
+  key_issues: PageIssueSummary[]; // Updated
+  recommendations: PageRecommendationSummary[]; // Updated
   url: string;
   overall_explanation?: string;
 }
@@ -29,8 +40,8 @@ const getScoreColor = (score: number) => {
 };
 
 const getScoreBadgeVariant = (score: number) => {
-  if (score >= 7) return "default";
-  if (score >= 4) return "secondary";
+  if (score >= 7) return "default"; // Consider a success variant if you have one
+  if (score >= 4) return "secondary"; // Consider a warning variant
   return "destructive";
 };
 
@@ -63,11 +74,12 @@ export function PageAnalysisCard({ page }: PageAnalysisCardProps) {
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <ExternalLink className="h-3 w-3" />
-              <a 
-                href={page.url} 
-                target="_blank" 
+              <a
+                href={page.url}
+                target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-gray-700 transition-colors duration-200"
+                className="hover:text-gray-700 transition-colors duration-200 truncate max-w-[200px] sm:max-w-xs"
+                title={page.url}
               >
                 {page.url}
               </a>
@@ -82,11 +94,11 @@ export function PageAnalysisCard({ page }: PageAnalysisCardProps) {
                 </div>
                 <div className="space-y-1">
                   <div className="text-sm text-gray-400">/10</div>
-                  <Badge 
-                    variant={getScoreBadgeVariant(page.overall_score)} 
+                  <Badge
+                    variant={getScoreBadgeVariant(page.overall_score)}
                     className="text-xs"
                   >
-                    {page.overall_score >= 7 ? 'Good' : 
+                    {page.overall_score >= 7 ? 'Good' :
                      page.overall_score >= 4 ? 'Fair' : 'Poor'}
                   </Badge>
                 </div>
@@ -95,8 +107,8 @@ export function PageAnalysisCard({ page }: PageAnalysisCardProps) {
             <Collapsible open={isOpen} onOpenChange={setIsOpen}>
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" className="p-2 h-auto">
-                  {isOpen ? 
-                    <ChevronDown className="h-4 w-4 text-gray-600" /> : 
+                  {isOpen ?
+                    <ChevronDown className="h-4 w-4 text-gray-600" /> :
                     <ChevronRight className="h-4 w-4 text-gray-600" />
                   }
                 </Button>
@@ -172,7 +184,7 @@ export function PageAnalysisCard({ page }: PageAnalysisCardProps) {
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(score)}`}
                         style={{ width: `${(score / 10) * 100}%` }}
                       />
@@ -191,10 +203,12 @@ export function PageAnalysisCard({ page }: PageAnalysisCardProps) {
                 Key Issues
               </h4>
               <div className="space-y-2">
-                {page.key_issues.map((issue, index) => (
+                {page.key_issues.map((issueObj, index) => ( // Updated to issueObj
                   <div key={index} className="flex items-start gap-3 p-3 bg-red-50 rounded-md border border-red-100">
                     <div className="h-1 w-1 bg-red-500 rounded-full mt-2 flex-shrink-0" />
-                    <span className="text-gray-700 text-sm leading-relaxed">{issue}</span>
+                    <span className="text-gray-700 text-sm leading-relaxed">{issueObj.issue}</span>
+                    {/* Optionally, display how_to_fix if desired in the card, though it might be too much detail */}
+                    {/* {issueObj.how_to_fix && <p className="text-xs text-gray-500 mt-1">Fix: {issueObj.how_to_fix}</p>} */}
                   </div>
                 ))}
               </div>
@@ -209,12 +223,14 @@ export function PageAnalysisCard({ page }: PageAnalysisCardProps) {
                 Recommendations
               </h4>
               <div className="space-y-2">
-                {page.recommendations.map((recommendation, index) => (
+                {page.recommendations.map((recObj, index) => ( // Updated to recObj
                   <div key={index} className="flex items-start gap-3 p-3 bg-emerald-50 rounded-md border border-emerald-100">
                     <div className="h-4 w-4 bg-emerald-500 text-white rounded text-xs font-semibold flex items-center justify-center flex-shrink-0 mt-0.5">
                       {index + 1}
                     </div>
-                    <span className="text-gray-700 text-sm leading-relaxed">{recommendation}</span>
+                    <span className="text-gray-700 text-sm leading-relaxed">{recObj.recommendation}</span>
+                     {/* Optionally, display benefit if desired in the card */}
+                    {/* {recObj.benefit && <p className="text-xs text-gray-500 mt-1">Benefit: {recObj.benefit}</p>} */}
                   </div>
                 ))}
               </div>

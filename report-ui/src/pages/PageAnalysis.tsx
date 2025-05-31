@@ -2,6 +2,16 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
+interface PageIssue {
+  issue: string;
+  how_to_fix?: string;
+}
+
+interface PageRecommendation {
+  recommendation: string;
+  benefit?: string;
+}
+
 interface PageAnalysisDetail {
   id: string;
   page_type: string;
@@ -9,8 +19,8 @@ interface PageAnalysisDetail {
   overall_score: number;
   url: string;
   section_scores: { [key: string]: number };
-  key_issues: string[];
-  recommendations: string[];
+  key_issues: PageIssue[]; // Updated
+  recommendations: PageRecommendation[]; // Updated
   summary: string;
   overall_explanation?: string;
   sections?: Array<{
@@ -34,8 +44,8 @@ interface ReportData {
   total_pages_analyzed: number;
   overall_score: number;
   executive_summary: string;
-  most_critical_issues: string[];
-  top_recommendations: string[];
+  most_critical_issues: string[]; // Assuming these remain strings for the overview
+  top_recommendations: string[]; // Assuming these remain strings for the overview
   key_strengths: string[];
   performance_summary: string;
   page_analyses: PageAnalysisDetail[];
@@ -55,10 +65,10 @@ const extractPageRoleAnalysis = (content: string) => {
   const lines = content.split('\n');
   let pageRoleContent: string[] = [];
   let inPageRoleSection = false;
-  
+
   lines.forEach((line) => {
     const trimmedLine = line.trim();
-    
+
     if (trimmedLine.toUpperCase().includes('PAGE ROLE ANALYSIS')) {
       inPageRoleSection = true;
     } else if (trimmedLine.startsWith('##') && inPageRoleSection) {
@@ -68,7 +78,7 @@ const extractPageRoleAnalysis = (content: string) => {
       pageRoleContent.push(trimmedLine);
     }
   });
-  
+
   return pageRoleContent.join(' ').trim();
 };
 
@@ -80,26 +90,26 @@ const parseDetailedAnalysis = (content: string, sectionScores: { [key: string]: 
     evidence: string[];
     score?: number;
   }> = [];
-  
+
   // Mapping between section titles and score keys
   const titleToScoreKey: { [key: string]: string } = {
     'FIRST IMPRESSION & CLARITY': 'first_impression_clarity',
-    'GOAL ALIGNMENT': 'goal_alignment', 
+    'GOAL ALIGNMENT': 'goal_alignment',
     'VISUAL DESIGN': 'visual_design',
     'CONTENT QUALITY': 'content_quality',
     'USABILITY & ACCESSIBILITY': 'usability_accessibility',
     'CONVERSION OPTIMIZATION': 'conversion_optimization',
     'TECHNICAL EXECUTION': 'technical_execution'
   };
-  
+
   let currentSection: any = null;
   let currentContent: string[] = [];
   let currentEvidence: string[] = [];
   let collectingEvidence = false;
-  
+
   lines.forEach((line) => {
     const trimmedLine = line.trim();
-    
+
     // Check for section headers like "## 1. FIRST IMPRESSION & CLARITY (Score: 5/10)"
     const sectionMatch = trimmedLine.match(/^##\s*\d+\.\s*([^(]+)(?:\(Score:\s*\d+\/\d+\))?/);
     if (sectionMatch) {
@@ -114,7 +124,7 @@ const parseDetailedAnalysis = (content: string, sectionScores: { [key: string]: 
         }
         sections.push(currentSection);
       }
-      
+
       // Start new section
       currentSection = {
         title: sectionMatch[1].trim(),
@@ -149,7 +159,7 @@ const parseDetailedAnalysis = (content: string, sectionScores: { [key: string]: 
       currentContent.push(trimmedLine);
     }
   });
-  
+
   // Save last section
   if (currentSection) {
     currentSection.content = currentContent;
@@ -161,7 +171,7 @@ const parseDetailedAnalysis = (content: string, sectionScores: { [key: string]: 
     }
     sections.push(currentSection);
   }
-  
+
   return sections;
 };
 
@@ -171,7 +181,7 @@ const renderMarkdownContent = (content: string) => {
   const elements: React.ReactNode[] = [];
   let currentParagraph: string[] = [];
   let listItems: string[] = [];
-  
+
   const flushParagraph = () => {
     if (currentParagraph.length > 0) {
       elements.push(
@@ -182,7 +192,7 @@ const renderMarkdownContent = (content: string) => {
       currentParagraph = [];
     }
   };
-  
+
   const flushList = () => {
     if (listItems.length > 0) {
       elements.push(
@@ -195,10 +205,10 @@ const renderMarkdownContent = (content: string) => {
       listItems = [];
     }
   };
-  
+
   lines.forEach((line, index) => {
     const trimmedLine = line.trim();
-    
+
     if (trimmedLine.startsWith('# ')) {
       flushParagraph();
       flushList();
@@ -233,10 +243,10 @@ const renderMarkdownContent = (content: string) => {
       currentParagraph.push(trimmedLine);
     }
   });
-  
+
   flushParagraph();
   flushList();
-  
+
   return elements;
 };
   const { pageId } = useParams();
@@ -256,11 +266,11 @@ const renderMarkdownContent = (content: string) => {
   // Initialize nested tab state
   useEffect(() => {
     if (pageData) {
-      const analysisData = pageData.sections || 
-        (pageData.detailed_analysis ? 
-          parseDetailedAnalysis(pageData.detailed_analysis, pageData.section_scores) : 
+      const analysisData = pageData.sections ||
+        (pageData.detailed_analysis ?
+          parseDetailedAnalysis(pageData.detailed_analysis, pageData.section_scores) :
           []);
-      
+
       if (analysisData.length > 0) {
         setActiveNestedTab('section-0');
       }
@@ -276,9 +286,9 @@ const renderMarkdownContent = (content: string) => {
         const circumference = 2 * Math.PI * 45;
         const progress = (score / 10) * circumference;
         const offset = circumference - progress;
-        
+
         scoreRing.style.strokeDashoffset = offset.toString();
-        
+
         if (score >= 8) {
           scoreRing.style.stroke = '#10b981';
         } else if (score >= 6) {
@@ -328,8 +338,8 @@ const renderMarkdownContent = (content: string) => {
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-4">Error Loading Data</h1>
           <p className="text-slate-600 mb-8 text-lg">Could not load the analysis data.</p>
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-2xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,8 +364,8 @@ const renderMarkdownContent = (content: string) => {
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-4">Page Not Found</h1>
           <p className="text-slate-600 mb-8 text-lg">The requested page analysis could not be found.</p>
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-2xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -373,8 +383,8 @@ const renderMarkdownContent = (content: string) => {
       <div className="max-w-7xl mx-auto px-6 py-10">
         {/* Breadcrumb */}
         <div className="mb-10">
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="inline-flex items-center gap-3 text-slate-600 hover:text-blue-600 transition-all duration-300 font-medium group"
           >
             <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -409,7 +419,7 @@ const renderMarkdownContent = (content: string) => {
               <p className="text-slate-700 leading-relaxed mb-6 text-lg">
                 {pageData.summary}
               </p>
-              
+
               <div className="grid gap-6 pt-8 border-t border-slate-100">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500 font-semibold">Page Type:</span>
@@ -426,7 +436,7 @@ const renderMarkdownContent = (content: string) => {
               </div>
             </div>
           </div>
-          
+
           <div className="lg:col-span-2">
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-slate-200/60 p-10 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-slate-200/60 transition-all duration-500 h-full">
               <div className="flex items-center gap-4 mb-8">
@@ -437,7 +447,7 @@ const renderMarkdownContent = (content: string) => {
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900">Score</h2>
               </div>
-              
+
               <div className="flex flex-col items-center">
                 <div className="relative mb-8">
                   <svg className="score-ring transform -rotate-90" width="140" height="140">
@@ -469,25 +479,25 @@ const renderMarkdownContent = (content: string) => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="text-center">
                   <div className={`inline-flex items-center px-4 py-2 rounded-2xl text-sm font-bold mb-3 ${
-                    pageData.overall_score >= 8 ? 'bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200' : 
-                    pageData.overall_score >= 6 ? 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-200' : 
+                    pageData.overall_score >= 8 ? 'bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200' :
+                    pageData.overall_score >= 6 ? 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-200' :
                     'bg-gradient-to-r from-red-50 to-red-100 text-red-800 border border-red-200'
                   }`}>
                     {pageData.overall_score >= 8 ? 'Excellent' : pageData.overall_score >= 6 ? 'Good' : 'Needs Improvement'}
                   </div>
                   <p className="text-slate-600 text-sm font-medium mb-6">
-                    {pageData.overall_score >= 8 ? 'Outstanding performance' : 
-                     pageData.overall_score >= 6 ? 'Solid foundation' : 
+                    {pageData.overall_score >= 8 ? 'Outstanding performance' :
+                     pageData.overall_score >= 6 ? 'Solid foundation' :
                      'Significant improvement needed'}
                   </p>
-                  
+
                   {/* Score Progress Ring */}
                   <div className="flex justify-center mb-6">
                     <div className="w-4/5 bg-slate-100 rounded-full h-3 overflow-hidden">
-                      <div 
+                      <div
                         className={`h-full rounded-full transition-all duration-1000 ease-out ${
                           pageData.overall_score >= 8 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' :
                           pageData.overall_score >= 6 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
@@ -498,7 +508,7 @@ const renderMarkdownContent = (content: string) => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Score Explanation - moved below score bar */}
                 {pageData.overall_explanation && (
                   <div className="mt-6 pt-6 border-t border-slate-200">
@@ -517,7 +527,7 @@ const renderMarkdownContent = (content: string) => {
                         return (
                           <div className="space-y-4">
                             <div className="flex items-start gap-3">
-                              <div className="flex-shrink-0 w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center mt-1">
+                              <div className="flex-shrink-0 w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center mt-0.5">
                                 <svg className="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>
@@ -528,7 +538,7 @@ const renderMarkdownContent = (content: string) => {
                               </div>
                             </div>
                             <div className="flex items-start gap-3">
-                              <div className="flex-shrink-0 w-5 h-5 bg-red-100 rounded-full flex items-center justify-center mt-1">
+                              <div className="flex-shrink-0 w-6 h-6 bg-red-100 rounded-full flex items-center justify-center mt-0.5">
                                 <svg className="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                 </svg>
@@ -600,8 +610,8 @@ const renderMarkdownContent = (content: string) => {
                   </div>
                   <div className="prose prose-lg max-w-none">
                     <p className="text-slate-700 leading-relaxed text-lg m-0">
-                      {pageData.detailed_analysis ? 
-                        extractPageRoleAnalysis(pageData.detailed_analysis) || 
+                      {pageData.detailed_analysis ?
+                        extractPageRoleAnalysis(pageData.detailed_analysis) ||
                         `This page serves as a ${pageData.page_type.toLowerCase()} for the ${reportData?.organization} website, responsible for ${pageData.page_type === 'Homepage' ? 'making strong first impressions and guiding visitors toward key actions like donations and training enrollment' : 'supporting the organization\'s overall user experience and conversion goals'}.` :
                         `This page serves as a ${pageData.page_type.toLowerCase()} for the ${reportData?.organization} website.`
                       }
@@ -615,11 +625,11 @@ const renderMarkdownContent = (content: string) => {
                   <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm">
                     <div className="flex overflow-x-auto scrollbar-hide">
                       {(() => {
-                        const analysisData = pageData.sections || 
-                          (pageData.detailed_analysis ? 
-                            parseDetailedAnalysis(pageData.detailed_analysis, pageData.section_scores) : 
+                        const analysisData = pageData.sections ||
+                          (pageData.detailed_analysis ?
+                            parseDetailedAnalysis(pageData.detailed_analysis, pageData.section_scores) :
                             []);
-                        
+
                         return analysisData.map((section: any, index: number) => (
                           <button
                             key={index}
@@ -651,9 +661,9 @@ const renderMarkdownContent = (content: string) => {
                   {/* Nested Tab Content */}
                   <div className="p-8">
                     {(() => {
-                      const analysisData = pageData.sections || 
-                        (pageData.detailed_analysis ? 
-                          parseDetailedAnalysis(pageData.detailed_analysis, pageData.section_scores) : 
+                      const analysisData = pageData.sections ||
+                        (pageData.detailed_analysis ?
+                          parseDetailedAnalysis(pageData.detailed_analysis, pageData.section_scores) :
                           []);
 
                       if (analysisData.length === 0) {
@@ -679,7 +689,7 @@ const renderMarkdownContent = (content: string) => {
                               </span>
                               <h4 className="text-xl font-bold text-slate-900">{section.title}</h4>
                             </div>
-                            
+
                             {/* Section Summary */}
                             {section.summary && (
                               <div className="mb-6">
@@ -687,7 +697,7 @@ const renderMarkdownContent = (content: string) => {
                                 <p className="text-slate-700 leading-relaxed">{section.summary}</p>
                               </div>
                             )}
-                            
+
                             {/* Key Points */}
                             {section.points && section.points.length > 0 && (
                               <div className="mb-6">
@@ -716,7 +726,7 @@ const renderMarkdownContent = (content: string) => {
                                 </ul>
                               </div>
                             )}
-                            
+
                             {/* Evidence */}
                             {section.evidence && (
                               <div className="mb-6">
@@ -736,7 +746,7 @@ const renderMarkdownContent = (content: string) => {
                                 )}
                               </div>
                             )}
-                            
+
                             {/* Score Explanation */}
                             {section.score_explanation && (
                               <div className="mb-6">
@@ -777,13 +787,13 @@ const renderMarkdownContent = (content: string) => {
                                 })()}
                               </div>
                             )}
-                            
+
                             {/* Score Progress Bar */}
                             {section.score && (
                               <div className="pt-6 border-t border-slate-100">
                                 <div className="flex items-center gap-4">
                                   <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden mr-4">
-                                    <div 
+                                    <div
                                       className={`h-full rounded-full transition-all duration-1000 ease-out ${
                                         section.score >= 7 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' :
                                         section.score >= 5 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
@@ -815,14 +825,20 @@ const renderMarkdownContent = (content: string) => {
             {activeTab === 'tab-issues' && (
               <div className="space-y-6">
                 {pageData.key_issues.length > 0 ? (
-                  pageData.key_issues.map((issue, index) => (
+                  pageData.key_issues.map((issueObj, index) => ( // Changed to issueObj
                     <div key={index} className="flex gap-6 p-8 bg-gradient-to-r from-red-50/80 to-red-50/40 border border-red-200/60 rounded-2xl hover:shadow-lg hover:shadow-red-100/50 transition-all duration-300">
                       <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-2xl flex items-center justify-center text-sm font-bold shadow-lg">
                         {index + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="text-slate-900 font-semibold leading-relaxed text-lg mb-4">{issue}</p>
-                        <div className="flex items-center gap-3">
+                        <p className="text-slate-900 font-semibold leading-relaxed text-lg mb-2">{issueObj.issue}</p>
+                        {issueObj.how_to_fix && (
+                          <div className="mt-4 pt-3 border-t border-red-200/80">
+                            <h4 className="text-sm font-semibold text-red-700 mb-1">How to Fix:</h4>
+                            <p className="text-slate-700 text-sm leading-relaxed">{issueObj.how_to_fix}</p>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 mt-4">
                           <span className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300">
                             High Priority
                           </span>
@@ -848,14 +864,20 @@ const renderMarkdownContent = (content: string) => {
             {activeTab === 'tab-recommendations' && (
               <div className="space-y-6">
                 {pageData.recommendations.length > 0 ? (
-                  pageData.recommendations.map((recommendation, index) => (
+                  pageData.recommendations.map((recObj, index) => ( // Changed to recObj
                     <div key={index} className="flex gap-6 p-8 bg-gradient-to-r from-green-50/80 to-green-50/40 border border-green-200/60 rounded-2xl hover:shadow-lg hover:shadow-green-100/50 transition-all duration-300">
                       <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl flex items-center justify-center text-sm font-bold shadow-lg">
                         {index + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="text-slate-900 font-semibold leading-relaxed text-lg mb-4">{recommendation}</p>
-                        <div className="flex items-center gap-3">
+                        <p className="text-slate-900 font-semibold leading-relaxed text-lg mb-2">{recObj.recommendation}</p>
+                        {recObj.benefit && (
+                           <div className="mt-4 pt-3 border-t border-green-200/80">
+                            <h4 className="text-sm font-semibold text-green-700 mb-1">Benefit:</h4>
+                            <p className="text-slate-700 text-sm leading-relaxed">{recObj.benefit}</p>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 mt-4">
                           <span className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300">
                             High Impact
                           </span>
@@ -888,14 +910,30 @@ const renderMarkdownContent = (content: string) => {
 
             {/* Screenshot Tab */}
             {activeTab === 'tab-screenshot' && (
-              <div className="text-center py-20">
-                <div className="w-20 h-20 bg-gradient-to-br from-slate-50 to-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">Screenshot Not Available</h3>
-                <p className="text-slate-600 text-lg">The page screenshot is not available: {pageData.screenshot_path || 'No screenshot path provided'}</p>
+              <div className="text-center py-10">
+                 {pageData.screenshot_path ? (
+                    <img 
+                        src={`/${pageData.screenshot_path}`} // Ensure path is absolute from public root
+                        alt={`Screenshot of ${pageData.title}`} 
+                        className="max-w-full h-auto rounded-2xl border-2 border-slate-200 shadow-2xl mx-auto"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null; // prevent infinite loop
+                            target.src = "/assets/screenshots/placeholder.png"; // Fallback image
+                            target.alt = "Screenshot not found, placeholder displayed.";
+                        }}
+                    />
+                 ) : (
+                    <>
+                        <div className="w-20 h-20 bg-gradient-to-br from-slate-50 to-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900 mb-3">Screenshot Not Available</h3>
+                        <p className="text-slate-600 text-lg">{pageData.screenshot_path || 'No screenshot path provided'}</p>
+                    </>
+                 )}
               </div>
             )}
           </div>
