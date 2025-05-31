@@ -14,7 +14,6 @@ class Formatter {
     });
   }
 
-  // --- HELPER METHODS CORRECTLY DEFINED ON THE CLASS ---
   extractSectionScores(analysisText) {
     const scores = {};
     if (!analysisText || typeof analysisText !== 'string') {
@@ -37,7 +36,6 @@ class Formatter {
       for (const [key, value] of Object.entries(sectionMappings)) {
         if (sectionNameFull.includes(key)) {
           scores[value] = score;
-          // console.log(`     📊 Extracted score: ${key} = ${score}/10`);
           break;
         }
       }
@@ -49,11 +47,8 @@ class Formatter {
     const items = [];
     if (!text || typeof text !== 'string') return items;
     const lines = text.split('\n');
-    // let collecting = false; // This logic seems complex and might be error-prone for diverse text.
-    // Simplified: look for lines starting with list markers, optionally within keyword sections.
-
+    let inRelevantBlock = !keywords.length; 
     const keywordRegex = new RegExp(`(?:${keywords.join('|')}):`, 'i');
-    let inRelevantBlock = !keywords.length; // If no keywords, always "in block"
 
     for (const line of lines) {
         const trimmedLine = line.trim();
@@ -61,7 +56,6 @@ class Formatter {
             inRelevantBlock = true;
             continue;
         }
-
         if (inRelevantBlock) {
             if (trimmedLine.match(/^[-*•\d]\s/) || trimmedLine.match(/^\d+\.\s/)) {
                 let itemText = trimmedLine.replace(/^[-*•\d\.]\s*/, '').trim();
@@ -73,17 +67,16 @@ class Formatter {
                 } else if (keywords.some(k => k.toLowerCase().includes('recommendation')) && benefitMatch) {
                     items.push({ recommendation: benefitMatch[1].trim(), benefit: benefitMatch[2].trim() });
                 } else {
-                    // Fallback for items that don't match the detailed structure but are list items
                     if (keywords.some(k => k.toLowerCase().includes('issue') || k.toLowerCase().includes('flaw'))) {
-                        items.push({ issue: itemText, how_to_fix: "Details not clearly parsed." });
+                        items.push({ issue: itemText, how_to_fix: "Details not parsed." });
                     } else if (keywords.some(k => k.toLowerCase().includes('recommendation'))) {
-                        items.push({ recommendation: itemText, benefit: "Details not clearly parsed." });
+                         items.push({ recommendation: itemText, benefit: "Details not parsed." });
                     } else {
-                         items.push(itemText); // For generic lists like key_strengths
+                         items.push(itemText); 
                     }
                 }
             } else if (trimmedLine.match(/^(##|SUMMARY:|PAGE ROLE ANALYSIS:)/i) && keywords.length) {
-                 inRelevantBlock = false; // Moved this to prevent premature exit
+                 inRelevantBlock = false; 
             }
         }
     }
@@ -96,26 +89,23 @@ class Formatter {
     if (scoreMatch && scoreMatch[1]) return parseInt(scoreMatch[1], 10);
     const genericScoreMatch = text.match(/Score:\s*(\d+)\/10/i);
     if (genericScoreMatch && genericScoreMatch[1]) return parseInt(genericScoreMatch[1],10);
-    return 3; // Default fallback score
+    return 3; 
   }
 
   extractSummaryFallback(text, maxLength = 250) {
     if (!text || typeof text !== 'string') return "Summary not available.";
     const summaryMatch = text.match(/(?:SUMMARY|EXECUTIVE_SUMMARY|EXECUTIVE SUMMARY):?\s*([\s\S]*?)(?=\n\n##|\n\nPAGE ROLE ANALYSIS:|\n\nCRITICAL FLAWS:|\n\nACTIONABLE RECOMMENDATIONS:|$)/i);
-    if (summaryMatch && summaryMatch[1] && summaryMatch[1].trim().length > 20) { // Check if the extracted part is substantial
+    if (summaryMatch && summaryMatch[1] && summaryMatch[1].trim().length > 20) {
       return summaryMatch[1].replace(/Overall effectiveness score:\s*\d+\/10\s*-?/, '').replace(/Highest priority action:/, '').trim().substring(0, maxLength) + (summaryMatch[1].length > maxLength ? "..." : "");
     }
-    // A more generic approach if the specific section isn't found
     const firstMeaningfulParagraph = text.split('\n\n').find(p => p.trim().length > 50 && !p.trim().startsWith("##"));
     return firstMeaningfulParagraph ? firstMeaningfulParagraph.trim().substring(0, maxLength) + (firstMeaningfulParagraph.length > maxLength ? "..." : "") : "Summary requires manual review.";
   }
   
   extractOverallExplanationFallback(text) {
       if (!text || typeof text !== 'string') return "Explanation not available.";
-      // Try to find an explicit "overall_explanation" if the LLM tried to output it in a string.
       const explanationMatch = text.match(/(?:overall_explanation|overall explanation)[:\s]*"([^"]*)"/i);
       if (explanationMatch && explanationMatch[1]) return explanationMatch[1];
-      // Fallback to a generic statement.
       return "Overall score explanation requires manual review due to formatting issues.";
   }
 
@@ -135,24 +125,21 @@ class Formatter {
       const lastPart = parts.pop() || 'generic';
       return lastPart.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' Page';
     } catch (e) {
-      const path = url.substring(url.lastIndexOf('/') + 1);
-      const simpleName = path.split('.')[0]; // remove extension
+      const pathSegment = url.substring(url.lastIndexOf('/') + 1);
+      const simpleName = pathSegment.split('.')[0]; 
       return simpleName.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Page';
     }
   }
 
   extractSectionTextFallback(text, sectionKey) {
     if (!text || typeof text !== 'string') return null;
-    const regex = new RegExp(`"${sectionKey}"\\s*:\\s*"([^"]*)"`, 'i'); // Simple string value extraction
+    const regex = new RegExp(`"${sectionKey}"\\s*:\\s*"([^"]*)"`, 'i'); 
     const match = text.match(regex);
     if (match && match[1]) return match[1];
-
-    // More generic section extraction
     const sectionRegex = new RegExp(`(?:${sectionKey.replace("_", " ")}|${sectionKey}):\\s*([\\s\\S]*?)(?=\\n\\n[A-Z\\s]+:|$)`, 'i');
     const sectionMatch = text.match(sectionRegex);
     return sectionMatch && sectionMatch[1] ? sectionMatch[1].trim().substring(0, 200) + "..." : null;
   }
-  // --- END HELPER METHODS ---
 
   parseJSON(text, source) {
     let cleanedText = text.trim();
@@ -169,33 +156,13 @@ class Formatter {
     }
     console.warn(`     ⚠️  JSON parse failed for ${source}, using text extraction fallback.`);
     if (source === 'overall summary') {
-      return this.extractSummaryFromTextFallback(cleanedText);
+      return this.extractOverallSummaryFromTextFallback(cleanedText);
     } else {
       return this.extractPageDataFromTextFallback(cleanedText, source);
     }
   }
-
-  extractPageDataFromTextFallback(analysisText, url) {
-    const key_issue_objects = this.extractListFallback(analysisText, ['CRITICAL FLAWS', 'issues', 'problems', 'flaws']).slice(0, 5);
-    const recommendation_objects = this.extractListFallback(analysisText, ['ACTIONABLE RECOMMENDATIONS', 'recommendations', 'suggestions', 'improvements']).slice(0, 5);
-    return {
-      page_type: this.extractPageType(url),
-      title: this.extractPageType(url) || "Untitled Page (Fallback)",
-      overall_score: this.extractScoreFallback(analysisText) || 3,
-      overall_explanation: this.extractOverallExplanationFallback(analysisText) || "Detailed explanation requires manual review.",
-      sections: [],
-      section_scores: this.extractSectionScores(analysisText), // Call it here for fallback
-      key_issues: key_issue_objects.map(item =>
-        typeof item === 'object' && item.issue ? item : { issue: String(item.issue || item), how_to_fix: String(item.how_to_fix || "Fix details not parsed.") }
-      ),
-      recommendations: recommendation_objects.map(item =>
-        typeof item === 'object' && item.recommendation ? item : { recommendation: String(item.recommendation || item), benefit: String(item.benefit || "Benefit details not parsed.") }
-      ),
-      summary: this.extractSummaryFallback(analysisText, 150) || 'Page analysis summary requires manual review.'
-    };
-  }
-
-  extractSummaryFromTextFallback(text) { // For overall summary
+  
+  extractOverallSummaryFromTextFallback(text) { 
     return {
       executive_summary: this.extractSummaryFallback(text, 500) || 'Website analysis summary requires review.',
       overall_score: this.extractScoreFallback(text) || 5,
@@ -203,7 +170,28 @@ class Formatter {
       most_critical_issues: this.extractListFallback(text, ['critical_issues', 'site-wide critical issue']).map(item => typeof item === 'object' ? item.issue : String(item)).slice(0, 5),
       top_recommendations: this.extractListFallback(text, ['top_recommendations', 'priority recommendation']).map(item => typeof item === 'object' ? item.recommendation : String(item)).slice(0, 5),
       key_strengths: this.extractListFallback(text, ['key_strengths', 'website does well']).map(item => String(item)).slice(0, 3),
-      performance_summary: this.extractSectionTextFallback(text, 'performance_summary') || 'Performance details require review.'
+      performance_summary: this.extractSectionTextFallback(text, 'performance_summary') || 'Performance details require review.',
+      detailed_markdown_content: text // Include the raw text as fallback
+    };
+  }
+
+  extractPageDataFromTextFallback(analysisText, url) {
+    const key_issue_objects = this.extractListFallback(analysisText, ['CRITICAL FLAWS', 'issues', 'problems', 'flaws']).slice(0, 8);
+    const recommendation_objects = this.extractListFallback(analysisText, ['ACTIONABLE RECOMMENDATIONS', 'recommendations', 'suggestions', 'improvements']).slice(0, 8);
+    return {
+      page_type: this.extractPageType(url),
+      title: this.extractPageType(url) || "Untitled Page (Fallback)",
+      overall_score: this.extractScoreFallback(analysisText) || 3,
+      overall_explanation: this.extractOverallExplanationFallback(analysisText) || "Detailed explanation requires manual review.",
+      sections: [], 
+      section_scores: this.extractSectionScores(analysisText),
+      key_issues: key_issue_objects.map(item =>
+        typeof item === 'object' && item.issue ? item : { issue: String(item.issue || item), how_to_fix: String(item.how_to_fix || "Fix details not parsed.") }
+      ),
+      recommendations: recommendation_objects.map(item =>
+        typeof item === 'object' && item.recommendation ? item : { recommendation: String(item.recommendation || item), benefit: String(item.benefit || "Benefit details not parsed.") }
+      ),
+      summary: this.extractSummaryFallback(analysisText, 150) || 'Page analysis summary requires manual review.'
     };
   }
   
@@ -239,7 +227,7 @@ class Formatter {
         return {
           status: 'error',
           error: 'Structured data validation failed: ' + validationResult.errors.join('; '),
-          data: validationResult.data
+          data: validationResult.data 
         };
       }
     } catch (error) {
@@ -264,7 +252,7 @@ class Formatter {
       console.log(`   Batch ${batchNum}/${Math.ceil(pageAnalysesInput.length / this.concurrency)}: Formatting ${batch.length} pages...`);
       const batchStartTime = Date.now();
       const promises = batch.map((pageAnalysisItem, batchIndex) =>
-        this.formatIndividualPage(pageAnalysisItem, i + batchIndex) // Errors handled inside formatIndividualPage
+        this.formatIndividualPage(pageAnalysisItem, i + batchIndex)
       );
       const batchSettledResults = await Promise.all(promises); 
       allResults.push(...batchSettledResults);
@@ -285,19 +273,18 @@ class Formatter {
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 4000, // Increased based on your previous analysis text length
+        max_tokens: 4000, 
         messages: [{ role: 'user', content: prompt }]
       });
       const formattedText = response.content[0].text.trim();
       parsed = this.parseJSON(formattedText, pageAnalysisItem.url);
     } catch (error) {
       console.error(`     ❌ LLM call or initial parsing failed for ${pageAnalysisItem.url}:`, error.message);
-      // Fallback using the original analysis text if LLM call itself failed.
-      parsed = this.extractPageDataFromTextFallback(pageAnalysisItem.analysis, pageAnalysisItem.url);
+      parsed = this.extractPageDataFromTextFallback(pageAnalysisItem.analysis, pageAnalysisItem.url); 
     }
 
-    const sectionScores = this.extractSectionScores(pageAnalysisItem.analysis); // Use original analysis for scores
-
+    const sectionScores = this.extractSectionScores(pageAnalysisItem.analysis); 
+    
     const finalParsed = {
         page_type: parsed.page_type || this.extractPageType(pageAnalysisItem.url),
         title: parsed.title || this.extractPageType(pageAnalysisItem.url) || `Page ${index + 1}`,
@@ -312,7 +299,6 @@ class Formatter {
         section_scores: sectionScores,
     };
 
-    // Robust mapping for key_issues
     finalParsed.key_issues = (Array.isArray(parsed.key_issues) ? parsed.key_issues : []).map(issue_item => {
         if (typeof issue_item === 'string') return { issue: issue_item, how_to_fix: "Fix details require review." };
         if (typeof issue_item === 'object' && issue_item !== null) {
@@ -322,9 +308,8 @@ class Formatter {
             };
         }
         return { issue: "Invalid issue format in parsed data.", how_to_fix: "Review needed."};
-    }).slice(0,5); // Limit to 5 issues
+    }).slice(0,8); 
 
-    // Robust mapping for recommendations
     finalParsed.recommendations = (Array.isArray(parsed.recommendations) ? parsed.recommendations : []).map(rec_item => {
         if (typeof rec_item === 'string') return { recommendation: rec_item, benefit: "Benefit details require review." };
         if (typeof rec_item === 'object' && rec_item !== null) {
@@ -334,81 +319,72 @@ class Formatter {
             };
         }
         return { recommendation: "Invalid recommendation format in parsed data.", benefit: "Review needed."};
-    }).slice(0,5); // Limit to 5 recommendations
+    }).slice(0,8);
     
     return finalParsed;
   }
 
   async createOverallSummary(rawAnalysisData, formattedPageAnalyses) {
     console.log('📊 Creating overall summary for main page...');
-    const prompt = getFormattingPrompts().overallSummary(rawAnalysisData, formattedPageAnalyses);
+    const overviewContent = (rawAnalysisData && typeof rawAnalysisData.overview === 'string') ? rawAnalysisData.overview : "Comprehensive overview not available.";
+    // Create a mutable copy for the prompt to avoid modifying the original rawAnalysisData if it's used elsewhere
+    const promptRawData = { ...rawAnalysisData, overview: overviewContent };
+
+
+    const prompt = getFormattingPrompts().overallSummary(promptRawData, formattedPageAnalyses);
+    let parsedSummary;
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 3500,
+        max_tokens: 4096, // Maximize token allowance for this complex task
         messages: [{ role: 'user', content: prompt }]
       });
       const summaryText = response.content[0].text.trim();
-      let parsedSummary = this.parseJSON(summaryText, 'overall summary');
+      parsedSummary = this.parseJSON(summaryText, 'overall summary');
       
-      // Ensure all required fields exist in parsedSummary, using fallback if necessary
-      const fallbackSummary = this.createFallbackSummary(rawAnalysisData, formattedPageAnalyses);
-      parsedSummary = {
-          ...fallbackSummary, // Start with fallback defaults
-          ...parsedSummary,   // Overlay with what was successfully parsed
-          total_pages_analyzed: formattedPageAnalyses.length, // Ensure this is accurate
-          overall_score: typeof parsedSummary.overall_score === 'number' ? parsedSummary.overall_score : fallbackSummary.overall_score,
-      };
-      // Ensure arrays are arrays of strings as per the overallSummary prompt's JSON structure
-      parsedSummary.most_critical_issues = (Array.isArray(parsedSummary.most_critical_issues) ? parsedSummary.most_critical_issues : []).map(String);
-      parsedSummary.top_recommendations = (Array.isArray(parsedSummary.top_recommendations) ? parsedSummary.top_recommendations : []).map(String);
-      parsedSummary.key_strengths = (Array.isArray(parsedSummary.key_strengths) ? parsedSummary.key_strengths : []).map(String);
-
-      return parsedSummary;
+      // Ensure detailed_markdown_content is directly from the input if parsing provided something else or nothing
+      if (!parsedSummary.detailed_markdown_content || parsedSummary.detailed_markdown_content.length < overviewContent.length * 0.8) {
+          console.warn("   ⚠️  LLM did not correctly include full detailed_markdown_content. Using raw overview directly.");
+          parsedSummary.detailed_markdown_content = overviewContent;
+      }
 
     } catch (error) {
       console.error('   ❌ Failed to create overall summary via LLM:', error.message);
-      return this.createFallbackSummary(rawAnalysisData, formattedPageAnalyses);
+      parsedSummary = this.createFallbackOverallSummary(promptRawData, formattedPageAnalyses);
     }
-  }
-
-  createFallbackPageAnalysis(pageAnalysisInput, index) {
-    const originalAnalysisText = (pageAnalysisInput && typeof pageAnalysisInput.analysis === 'string') ? pageAnalysisInput.analysis : "Raw analysis not available.";
-    const url = (pageAnalysisInput && typeof pageAnalysisInput.url === 'string') ? pageAnalysisInput.url : `Unknown URL ${index}`;
-
-    const sectionScores = this.extractSectionScores(originalAnalysisText);
-    const key_issue_items = this.extractListFallback(originalAnalysisText, ['CRITICAL FLAWS', 'issues', 'problems', 'flaws']).slice(0, 3);
-    const recommendation_items = this.extractListFallback(originalAnalysisText, ['ACTIONABLE RECOMMENDATIONS', 'recommendations', 'suggestions', 'improvements']).slice(0, 3);
-
-    return {
-      page_type: this.extractPageType(url),
-      title: `${this.extractPageType(url)} (Review Needed)`,
-      url: url,
-      overall_score: 2,
-      overall_explanation: "Formatting failed. Data based on fallback. Manual review needed.",
-      sections: [],
-      section_scores: sectionScores,
-      key_issues: key_issue_items.map(item => typeof item === 'object' && item.issue ? item : { issue: String(item.issue || item), how_to_fix: String(item.how_to_fix || "Manual review required.") }),
-      recommendations: recommendation_items.map(item => typeof item === 'object' && item.recommendation ? item : { recommendation: String(item.recommendation || item), benefit: String(item.benefit || "Manual review required.") }),
-      summary: (originalAnalysisText.substring(0, 150) + (originalAnalysisText.length > 150 ? '...' : '')),
-      original_analysis: originalAnalysisText
+    
+    const fallbackSummary = this.createFallbackOverallSummary(promptRawData, formattedPageAnalyses);
+    parsedSummary = {
+        ...fallbackSummary, 
+        ...parsedSummary,   
+        total_pages_analyzed: formattedPageAnalyses.length, 
+        overall_score: typeof parsedSummary.overall_score === 'number' && parsedSummary.overall_score >=1 && parsedSummary.overall_score <=10 ? parsedSummary.overall_score : fallbackSummary.overall_score,
+        detailed_markdown_content: parsedSummary.detailed_markdown_content || overviewContent 
     };
-  }
+    // Ensure these specific fields are arrays of strings, as per the overallSummary prompt
+    parsedSummary.most_critical_issues = (Array.isArray(parsedSummary.most_critical_issues) ? parsedSummary.most_critical_issues.map(String) : fallbackSummary.most_critical_issues).slice(0,5);
+    parsedSummary.top_recommendations = (Array.isArray(parsedSummary.top_recommendations) ? parsedSummary.top_recommendations.map(String) : fallbackSummary.top_recommendations).slice(0,5);
+    parsedSummary.key_strengths = (Array.isArray(parsedSummary.key_strengths) ? parsedSummary.key_strengths.map(String) : fallbackSummary.key_strengths).slice(0,3);
 
-  createFallbackSummary(rawAnalysisData, pageAnalyses) {
+    return parsedSummary;
+  }
+  
+  createFallbackOverallSummary(rawAnalysisData, pageAnalyses) {
     let avgScore = 3;
     const validScores = pageAnalyses.filter(p => p && typeof p.overall_score === 'number').map(p => p.overall_score);
     if (validScores.length > 0) {
       avgScore = Math.round(validScores.reduce((sum, score) => sum + score, 0) / validScores.length);
     }
+    const overviewText = (rawAnalysisData && typeof rawAnalysisData.overview === 'string') ? rawAnalysisData.overview : "Comprehensive overview markdown not available.";
     return {
-      executive_summary: (rawAnalysisData.overview && typeof rawAnalysisData.overview === 'string' ? rawAnalysisData.overview.substring(0,500) : 'Overall website analysis requires review.'),
+      executive_summary: (rawAnalysisData.overview && typeof rawAnalysisData.overview === 'string' ? this.extractSummaryFallback(rawAnalysisData.overview, 500) : 'Overall website analysis requires review.'),
       overall_score: avgScore,
       total_pages_analyzed: pageAnalyses.length,
-      most_critical_issues: ['Review individual page analyses for critical issues.'],
-      top_recommendations: ['Implement fixes based on manual review.'],
-      key_strengths: ['General site functionality noted; detailed strengths require review.'],
-      performance_summary: (rawAnalysisData.technicalSummary && typeof rawAnalysisData.technicalSummary === 'string' ? rawAnalysisData.technicalSummary.substring(0,200) : 'Technical performance summary requires manual review.')
+      most_critical_issues: ['Review "detailed_markdown_content" for critical issues.'],
+      top_recommendations: ['Implement fixes based on manual review of "detailed_markdown_content".'],
+      key_strengths: ['Review "detailed_markdown_content" for strengths.'],
+      performance_summary: (rawAnalysisData.technicalSummary && typeof rawAnalysisData.technicalSummary === 'string' ? this.extractSummaryFallback(rawAnalysisData.technicalSummary, 200) : 'Technical performance summary requires manual review.'),
+      detailed_markdown_content: overviewText
     };
   }
 }

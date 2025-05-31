@@ -11,7 +11,7 @@ Extract key information from the following raw page analysis and structure it ac
 PAGE ANALYSIS TO FORMAT:
 URL: ${pageAnalysis.url}
 Raw Analysis Content:
-${pageAnalysis.analysis}
+${"```markdown\n" + pageAnalysis.analysis + "\n```"}
 
 You MUST return ONLY a single, valid JSON object. NO additional text, NO explanations, NO markdown formatting like \`\`\`json.
 The entire response must be the JSON object itself.
@@ -122,45 +122,39 @@ IMPORTANT RULES FOR JSON OUTPUT:
     overallSummary: (rawAnalysisData, pageAnalyses) => `
 You are an expert at creating concise, structured executive summaries in PERFECT, VALID JSON.
 Based on the provided full analysis data and individual page summaries, generate an overall summary.
+The "detailed_markdown_content" field MUST contain the ENTIRE RAW MARKDOWN of the "Overall LLM Analysis Content" provided below, verbatim. Newlines within this markdown MUST be escaped as \\n.
 
-FULL ANALYSIS DATA (for context):
-Overview Section from LLM: ${JSON.stringify(rawAnalysisData.overview || 'No overview provided by LLM.', null, 2)}
-Technical Summary from LLM: ${JSON.stringify(rawAnalysisData.technicalSummary || 'No technical summary provided by LLM.', null, 2)}
-Number of Pages Analyzed: ${pageAnalyses.length}
-
-INDIVIDUAL PAGE SUMMARIES (for context):
-${pageAnalyses.map(page => `- ${page.url}: Score ${page.overall_score}/10. Summary: ${page.summary || 'No summary available.'}`).join('\n')}
+Overall LLM Analysis Content (raw markdown to be included in detailed_markdown_content):
+${"```markdown\n" + rawAnalysisData.overview + "\n```"}
 
 You MUST return ONLY a single, valid JSON object. NO additional text, NO explanations, NO markdown formatting like \`\`\`json.
 The entire response must be the JSON object itself.
 
 THE EXACT JSON STRUCTURE REQUIRED:
 {
-  "executive_summary": "Craft a 2-3 paragraph executive summary. Synthesize key findings, overall website effectiveness in achieving its purpose (assume purpose is to inform, engage, and encourage action like donations/sign-ups), and the most critical areas for improvement across the entire website.",
-  "overall_score": ${"`/* (number 1-10) Calculate or infer an average overall website score based on individual page scores. Default to 6 if pages are unavailable or scores are inconsistent. */`"},
+  "executive_summary": "Craft a 2-3 paragraph executive summary. Synthesize key findings, overall website effectiveness in achieving its purpose (assume purpose is to inform, engage, and encourage action like donations/sign-ups), and the most critical areas for improvement across the entire website. This should be a concise summary derived from the 'Overall LLM Analysis Content'.",
+  "overall_score": ${"`/* (number 1-10) Extract or infer an average overall website score from the 'Overall LLM Analysis Content'. Default to 6 if not explicitly found. */`"},
   "total_pages_analyzed": ${pageAnalyses.length},
   "most_critical_issues": [
-    "Identify and list up to 5 site-wide critical issues by synthesizing common themes from individual page issues or the LLM's overview. Example: 'Inconsistent navigation across multiple key pages.'",
-    "Another site-wide critical issue."
+    "Identify and list up to 5 site-wide critical issues by summarizing them from the 'Overall LLM Analysis Content'. Example: 'Inconsistent navigation across multiple key pages.'"
   ],
   "top_recommendations": [
-    "Identify and list up to 5 high-priority, site-wide recommendations. Example: 'Standardize call-to-action button design and placement for better conversion.'",
-    "Another top site-wide recommendation."
+    "Identify and list up to 5 high-priority, site-wide recommendations by summarizing them from the 'Overall LLM Analysis Content'. Example: 'Standardize call-to-action button design.'"
   ],
   "key_strengths": [
-    "Identify and list up to 3 key strengths of the website based on positive themes from page analyses or the LLM overview. Example: 'Clear and professional visual design on most pages.'",
-    "Another key strength."
+    "Identify and list up to 3 key strengths of the website by summarizing them from the 'Overall LLM Analysis Content'. Example: 'Clear and professional visual design.'"
   ],
-  "performance_summary": "Provide a 1-2 sentence overview of the website's technical performance, drawing from the technical summary if available, or state 'Technical performance data should be reviewed for detailed insights.'."
+  "performance_summary": "Provide a 1-2 sentence overview of the website's technical performance, drawing from the 'Overall LLM Analysis Content' or the separate technical summary if applicable. If not detailed, state 'Technical performance data should be reviewed for detailed insights.'.",
+  "detailed_markdown_content": ${"`/* Verbatim copy of the 'Overall LLM Analysis Content' provided above. This entire markdown block goes here as a single string. Ensure newlines are escaped (\\\\n). */`"}
 }
 
 IMPORTANT RULES FOR JSON OUTPUT:
 - Adhere strictly to the JSON structure.
 - "overall_score" MUST be a number between 1 and 10.
-- All arrays (most_critical_issues, top_recommendations, key_strengths) MUST contain strings. These should be general site-wide themes, not the detailed object structures from individual pages.
-- Focus on SITE-WIDE themes and insights, not page-specific details unless they represent a broader pattern.
-- If specific site-wide themes are hard to extract, provide more generic but still useful statements based on common web best practices, framed as observations from the (general) analysis.
-- DO NOT use markdown (e.g., no \`\`\`, no \`*\`, no \`-\` for lists inside strings where not appropriate for the final text).
+- "most_critical_issues", "top_recommendations", "key_strengths" MUST be arrays of strings, summarized from the detailed markdown.
+- "detailed_markdown_content" MUST be a single string containing the complete raw markdown of the 'Overall LLM Analysis Content'. Ensure all newlines within this markdown are properly escaped as \\\\n for the JSON string.
+- All other summary string fields should be concise and derived from the 'Overall LLM Analysis Content'.
+- DO NOT use markdown (e.g., no \`\`\`, no \`*\`) within the summarized string fields like executive_summary, most_critical_issues items, etc.
 - The final output MUST start with \`{\` and end with \`}\` and be parseable by JSON.parse().
 `
   };

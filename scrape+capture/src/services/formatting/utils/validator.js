@@ -1,203 +1,155 @@
+/**
+ * Validates structured data for individual pages + overall summary format
+ */
 function validateStructuredData(data) {
   const errors = [];
 
-  // Check required top-level keys for NEW structure
+  // Check required top-level keys
   const requiredKeys = ["overall_summary", "page_analyses", "metadata"];
   for (const key of requiredKeys) {
     if (!data[key]) {
       errors.push(`Missing required key: ${key}`);
+      // Provide default structures for missing top-level keys
       if (key === 'overall_summary') {
         data[key] = {
-          executive_summary: 'Website analysis completed',
-          overall_score: 6,
+          executive_summary: 'Default executive summary.',
+          overall_score: 5,
           total_pages_analyzed: 0,
           most_critical_issues: [],
           top_recommendations: [],
           key_strengths: [],
-          performance_summary: 'Performance evaluated'
+          performance_summary: 'Default performance summary.',
+          detailed_markdown_content: 'No detailed markdown content provided for overview.' // Added default
         };
       } else if (key === 'page_analyses') {
         data[key] = [];
       } else if (key === 'metadata') {
         data[key] = {
           total_pages: 0,
+          analysis_provider: 'unknown',
+          analysis_model: 'unknown',
           generated_at: new Date().toISOString()
         };
       }
     }
   }
 
-  // Validate overall summary
+  // Validate overall_summary
   if (data.overall_summary) {
     const summary = data.overall_summary;
-
-    if (!summary.executive_summary) {
-      summary.executive_summary = 'Website analysis completed';
-      errors.push('Missing executive_summary in overall_summary');
+    if (!summary.executive_summary || typeof summary.executive_summary !== 'string') {
+      summary.executive_summary = 'Executive summary not provided or invalid.';
+      errors.push('overall_summary.executive_summary is missing or not a string');
     }
-
-    if (typeof summary.overall_score !== 'number' ||
-        summary.overall_score < 1 ||
-        summary.overall_score > 10) {
-      summary.overall_score = 6;
-      errors.push('Invalid overall_score (should be number between 1-10)');
+    if (typeof summary.overall_score !== 'number' || summary.overall_score < 1 || summary.overall_score > 10) {
+      summary.overall_score = 5; 
+      errors.push('overall_summary.overall_score is invalid (must be number 1-10)');
     }
-
     if (!Array.isArray(summary.most_critical_issues)) {
-      summary.most_critical_issues = [];
-      errors.push('most_critical_issues should be an array');
+      summary.most_critical_issues = []; errors.push('overall_summary.most_critical_issues must be an array');
+    } else {
+      summary.most_critical_issues.forEach((item, i) => {
+        if(typeof item !== 'string') errors.push(`overall_summary.most_critical_issues[${i}] is not a string`);
+      });
     }
-
     if (!Array.isArray(summary.top_recommendations)) {
-      summary.top_recommendations = [];
-      errors.push('top_recommendations should be an array');
+      summary.top_recommendations = []; errors.push('overall_summary.top_recommendations must be an array');
+    } else {
+      summary.top_recommendations.forEach((item, i) => {
+        if(typeof item !== 'string') errors.push(`overall_summary.top_recommendations[${i}] is not a string`);
+      });
     }
-
     if (!Array.isArray(summary.key_strengths)) {
-      summary.key_strengths = [];
-      errors.push('key_strengths should be an array');
+      summary.key_strengths = []; errors.push('overall_summary.key_strengths must be an array');
+    } else {
+      summary.key_strengths.forEach((item, i) => {
+        if(typeof item !== 'string') errors.push(`overall_summary.key_strengths[${i}] is not a string`);
+      });
     }
-
-    if (!summary.performance_summary) {
-      summary.performance_summary = 'Performance evaluated';
-      errors.push('Missing performance_summary');
+    if (!summary.performance_summary || typeof summary.performance_summary !== 'string') {
+      summary.performance_summary = 'Performance summary not provided or invalid.';
+      errors.push('overall_summary.performance_summary is missing or not a string');
+    }
+    // UPDATED: Validate detailed_markdown_content
+    if (!summary.detailed_markdown_content || typeof summary.detailed_markdown_content !== 'string') {
+      summary.detailed_markdown_content = 'Detailed markdown content for overview is missing or not a string.'; 
+      errors.push('overall_summary.detailed_markdown_content is missing or not a string');
+    } else if (summary.detailed_markdown_content.trim() === "") {
+        // Allow it to be empty if explicitly set, but warn if it was just spaces
+        // errors.push('overall_summary.detailed_markdown_content is empty after trimming.'); 
+        // Decided against this error, empty might be valid if LLM provides no overview.
     }
   }
 
-  // Validate page analyses
+  // Validate page_analyses
   if (data.page_analyses) {
     if (!Array.isArray(data.page_analyses)) {
       errors.push('page_analyses should be an array');
       data.page_analyses = [];
     } else {
-      for (let i = 0; i < data.page_analyses.length; i++) {
-        const page = data.page_analyses[i];
-
-        if (!page.page_type) {
-          page.page_type = `Page ${i + 1}`;
-          errors.push(`Page analysis ${i} missing page_type`);
+      data.page_analyses.forEach((page, i) => {
+        if (!page || typeof page !== 'object') {
+          errors.push(`Page analysis ${i} is not a valid object.`);
+          data.page_analyses[i] = { title: `Invalid Page Data ${i}`, overall_score: 1, key_issues: [], recommendations: [], summary: "", original_analysis:"", section_scores: {}, page_type:"Unknown", url: "" };
+          return; 
         }
 
-        if (!page.url) {
-          errors.push(`Page analysis ${i} missing url`);
+        if (!page.page_type || typeof page.page_type !== 'string') {
+          page.page_type = `Page ${i + 1}`; errors.push(`Page analysis ${i} missing or invalid page_type`);
+        }
+        if (!page.url || typeof page.url !== 'string') {
+          page.url = `unknown-url-${i}`; errors.push(`Page analysis ${i} missing or invalid url`);
+        }
+        if (typeof page.overall_score !== 'number' || page.overall_score < 1 || page.overall_score > 10) {
+          page.overall_score = 3; errors.push(`Page analysis ${i} (${page.url}) has invalid overall_score`);
+        }
+        if (!page.summary || typeof page.summary !== 'string') {
+          page.summary = 'Summary not available.'; errors.push(`Page analysis ${i} (${page.url}) missing or invalid summary`);
+        }
+        if (!page.original_analysis || typeof page.original_analysis !== 'string') {
+          page.original_analysis = 'Raw analysis not available.';
         }
 
-        if (typeof page.overall_score !== 'number' ||
-            page.overall_score < 1 ||
-            page.overall_score > 10) {
-          page.overall_score = 5;
-          errors.push(`Page analysis ${i} has invalid overall_score`);
-        }
-
-        // Validate section scores if present
-        if (page.section_scores) {
-          if (typeof page.section_scores !== 'object' || Array.isArray(page.section_scores)) {
-            page.section_scores = {};
-            errors.push(`Page analysis ${i} section_scores should be an object`);
-          } else {
-            // Validate individual section scores
-            const validSections = [
-              'first_impression_clarity',
-              'goal_alignment',
-              'visual_design',
-              'content_quality',
-              'usability_accessibility',
-              'conversion_optimization',
-              'technical_execution'
-            ];
-
-            for (const [sectionName, score] of Object.entries(page.section_scores)) {
-              if (!validSections.includes(sectionName)) {
-                errors.push(`Page analysis ${i} has invalid section name: ${sectionName}`);
-              }
-
-              if (typeof score !== 'number' || score < 1 || score > 10) {
-                page.section_scores[sectionName] = 5;
-                errors.push(`Page analysis ${i} has invalid section score for ${sectionName}: ${score}`);
-              }
-            }
-          }
-        }
-
-        // Validate key_issues
         if (!Array.isArray(page.key_issues)) {
-          page.key_issues = [];
-          errors.push(`Page analysis ${i} key_issues should be an array`);
+          page.key_issues = []; errors.push(`Page analysis ${i} (${page.url}) key_issues should be an array`);
         } else {
           page.key_issues.forEach((item, idx) => {
             if (typeof item !== 'object' || item === null) {
-              errors.push(`Page analysis ${i} key_issues item ${idx} should be an object`);
-              page.key_issues[idx] = { issue: String(item), how_to_fix: "No details provided." };
+              errors.push(`Page analysis ${i} (${page.url}) key_issues item ${idx} should be an object`);
+              page.key_issues[idx] = { issue: String(item), how_to_fix: "Details needed." };
             } else {
-              if (!item.issue || typeof item.issue !== 'string') {
-                errors.push(`Page analysis ${i} key_issues item ${idx} missing or invalid 'issue' string`);
-                item.issue = "Issue not specified.";
-              }
-              // how_to_fix is optional, but if present, should be a string
-              if (item.how_to_fix && typeof item.how_to_fix !== 'string') {
-                errors.push(`Page analysis ${i} key_issues item ${idx} has invalid 'how_to_fix' (should be string)`);
-                item.how_to_fix = "Fix details are not correctly formatted.";
-              }
-              if (!item.how_to_fix) { // Ensure it exists, even if empty, for consistent access
-                item.how_to_fix = "";
-              }
+              if (typeof item.issue !== 'string') item.issue = "Issue description missing.";
+              if (typeof item.how_to_fix !== 'string') item.how_to_fix = "Fix details missing.";
             }
           });
         }
-
-        // Validate recommendations
         if (!Array.isArray(page.recommendations)) {
-          page.recommendations = [];
-          errors.push(`Page analysis ${i} recommendations should be an array`);
+          page.recommendations = []; errors.push(`Page analysis ${i} (${page.url}) recommendations should be an array`);
         } else {
           page.recommendations.forEach((item, idx) => {
             if (typeof item !== 'object' || item === null) {
-              errors.push(`Page analysis ${i} recommendations item ${idx} should be an object`);
-              page.recommendations[idx] = { recommendation: String(item), benefit: "No details provided." };
+              errors.push(`Page analysis ${i} (${page.url}) recommendations item ${idx} should be an object`);
+              page.recommendations[idx] = { recommendation: String(item), benefit: "Details needed." };
             } else {
-              if (!item.recommendation || typeof item.recommendation !== 'string') {
-                errors.push(`Page analysis ${i} recommendations item ${idx} missing or invalid 'recommendation' string`);
-                item.recommendation = "Recommendation not specified.";
-              }
-              // benefit is optional, but if present, should be a string
-              if (item.benefit && typeof item.benefit !== 'string') {
-                errors.push(`Page analysis ${i} recommendations item ${idx} has invalid 'benefit' (should be string)`);
-                item.benefit = "Benefit details are not correctly formatted.";
-              }
-              if (!item.benefit) { // Ensure it exists, even if empty
-                  item.benefit = "";
-              }
+              if (typeof item.recommendation !== 'string') item.recommendation = "Recommendation description missing.";
+              if (typeof item.benefit !== 'string') item.benefit = "Benefit details missing.";
             }
           });
         }
-
-        if (!page.summary) {
-          page.summary = 'Page analysis available';
-          errors.push(`Page analysis ${i} missing summary`);
-        }
-
-        if (!page.title) {
-          page.title = page.page_type || 'Page';
-          errors.push(`Page analysis ${i} missing title`);
-        }
-      }
+      });
     }
   }
 
-  // Validate metadata
   if (data.metadata) {
     if (typeof data.metadata.total_pages !== 'number') {
       data.metadata.total_pages = (data.page_analyses || []).length;
-    }
-    if (!data.metadata.generated_at) {
-      data.metadata.generated_at = new Date().toISOString();
     }
   }
 
   return {
     valid: errors.length === 0,
     errors: errors,
-    data: data
+    data: data 
   };
 }
 
