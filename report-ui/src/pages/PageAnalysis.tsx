@@ -19,8 +19,8 @@ interface PageAnalysisDetail {
   overall_score: number;
   url: string;
   section_scores: { [key: string]: number };
-  key_issues: PageIssue[]; // Updated
-  recommendations: PageRecommendation[]; // Updated
+  key_issues: PageIssue[];
+  recommendations: PageRecommendation[];
   summary: string;
   overall_explanation?: string;
   sections?: Array<{
@@ -37,17 +37,23 @@ interface PageAnalysisDetail {
   screenshot_path?: string;
 }
 
+interface OverallSummary {
+  executive_summary: string;
+  overall_score: number;
+  site_score_explanation?: string;
+  total_pages_analyzed: number;
+  most_critical_issues: string[];
+  top_recommendations: string[];
+  key_strengths: string[];
+  performance_summary: string;
+  detailed_markdown_content: string;
+}
+
 interface ReportData {
   organization: string;
   analysis_date: string;
   timestamp?: string;
-  total_pages_analyzed: number;
-  overall_score: number;
-  executive_summary: string;
-  most_critical_issues: string[]; // Assuming these remain strings for the overview
-  top_recommendations: string[]; // Assuming these remain strings for the overview
-  key_strengths: string[];
-  performance_summary: string;
+  overall_summary: OverallSummary;
   page_analyses: PageAnalysisDetail[];
   metadata?: any;
 }
@@ -57,7 +63,25 @@ const fetchReportData = async (): Promise<ReportData> => {
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
-  return response.json();
+  const data = await response.json();
+  
+  // Ensure overall_summary exists and has proper structure
+  if (!data.overall_summary) {
+    console.warn("Fetched data is missing 'overall_summary'. Using defaults.");
+    data.overall_summary = {
+      executive_summary: "Executive summary not available.",
+      overall_score: 0,
+      site_score_explanation: "Site score explanation not available.",
+      total_pages_analyzed: data.page_analyses?.length || 0,
+      most_critical_issues: [],
+      top_recommendations: [],
+      key_strengths: [],
+      performance_summary: "Performance summary not available.",
+      detailed_markdown_content: "# Overview Not Available\n\nThe detailed overview content could not be loaded."
+    };
+  }
+  
+  return data;
 };
 
 // Helper function to extract page role analysis from detailed analysis
@@ -314,6 +338,30 @@ const renderMarkdownContent = (content: string) => {
     }
   };
 
+  // Helper function to get the display date
+  const getDisplayDate = () => {
+    if (reportData?.metadata?.generated_at) {
+      return new Date(reportData.metadata.generated_at).toLocaleDateString();
+    }
+    if (reportData?.timestamp) {
+      return new Date(reportData.timestamp).toLocaleDateString();
+    }
+    if (reportData?.analysis_date) {
+      return reportData.analysis_date;
+    }
+    return new Date().toLocaleDateString(); // Current date as final fallback
+  };
+
+  // Helper function to generate a generic page role description
+  const getGenericPageRoleDescription = () => {
+    if (!pageData || !reportData) return "Page role information not available.";
+    
+    const pageType = pageData.page_type.toLowerCase();
+    const organization = reportData.metadata?.organization_name || reportData.organization || "the organization";
+    
+    return `This page serves as a ${pageType} for ${organization}'s website, contributing to the overall user experience and supporting the organization's digital goals.`;
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -431,7 +479,7 @@ const renderMarkdownContent = (content: string) => {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500 font-semibold">Analysis Date:</span>
-                  <span className="text-slate-900 font-bold">{reportData?.analysis_date || 'May 28, 2025'}</span>
+                  <span className="text-slate-900 font-bold">{getDisplayDate()}</span>
                 </div>
               </div>
             </div>
@@ -610,10 +658,9 @@ const renderMarkdownContent = (content: string) => {
                   </div>
                   <div className="prose prose-lg max-w-none">
                     <p className="text-slate-700 leading-relaxed text-lg m-0">
-                      {pageData.detailed_analysis ?
-                        extractPageRoleAnalysis(pageData.detailed_analysis) ||
-                        `This page serves as a ${pageData.page_type.toLowerCase()} for the ${reportData?.organization} website, responsible for ${pageData.page_type === 'Homepage' ? 'making strong first impressions and guiding visitors toward key actions like donations and training enrollment' : 'supporting the organization\'s overall user experience and conversion goals'}.` :
-                        `This page serves as a ${pageData.page_type.toLowerCase()} for the ${reportData?.organization} website.`
+                      {pageData.detailed_analysis ? 
+                        extractPageRoleAnalysis(pageData.detailed_analysis) || getGenericPageRoleDescription() :
+                        getGenericPageRoleDescription()
                       }
                     </p>
                   </div>
@@ -677,19 +724,6 @@ const renderMarkdownContent = (content: string) => {
                       return analysisData.map((section: any, index: number) => (
                         activeNestedTab === `section-${index}` && (
                           <div key={index} className="space-y-6">
-                            {/* Section Title */}
-                            <div className="flex items-center gap-3 mb-6">
-                              <span className={`w-8 h-8 bg-gradient-to-br ${
-                                section.score && section.score >= 7 ? 'from-emerald-500 to-emerald-600' :
-                                section.score && section.score >= 5 ? 'from-amber-500 to-amber-600' :
-                                section.score ? 'from-red-500 to-red-600' :
-                                'from-slate-600 to-slate-700'
-                              } text-white rounded-lg flex items-center justify-center text-sm font-bold shadow-lg`}>
-                                {index + 1}
-                              </span>
-                              <h4 className="text-xl font-bold text-slate-900">{section.title}</h4>
-                            </div>
-
                             {/* Section Summary */}
                             {section.summary && (
                               <div className="mb-6">
@@ -747,6 +781,32 @@ const renderMarkdownContent = (content: string) => {
                               </div>
                             )}
 
+                            
+
+                            {/* Score Progress Bar */}
+                            {section.score && (
+                              <div className="pt-6 border-t border-slate-100">
+                                <div className="flex items-center gap-4">
+                                  <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden mr-4">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                                        section.score >= 7 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' :
+                                        section.score >= 5 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
+                                        'bg-gradient-to-r from-red-500 to-red-600'
+                                      }`}
+                                      style={{ width: `${(section.score / 10) * 100}%` }}
+                                    />
+                                  </div>
+                                  <div className={`px-3 py-1 rounded-lg text-sm font-bold border ${
+                                    section.score >= 7 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+                                    section.score >= 5 ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                                    'bg-red-50 border-red-200 text-red-800'
+                                  }`}>
+                                    {section.score}/10
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             {/* Score Explanation */}
                             {section.score_explanation && (
                               <div className="mb-6">
@@ -787,31 +847,6 @@ const renderMarkdownContent = (content: string) => {
                                 })()}
                               </div>
                             )}
-
-                            {/* Score Progress Bar */}
-                            {section.score && (
-                              <div className="pt-6 border-t border-slate-100">
-                                <div className="flex items-center gap-4">
-                                  <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden mr-4">
-                                    <div
-                                      className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                                        section.score >= 7 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' :
-                                        section.score >= 5 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
-                                        'bg-gradient-to-r from-red-500 to-red-600'
-                                      }`}
-                                      style={{ width: `${(section.score / 10) * 100}%` }}
-                                    />
-                                  </div>
-                                  <div className={`px-3 py-1 rounded-lg text-sm font-bold border ${
-                                    section.score >= 7 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-                                    section.score >= 5 ? 'bg-amber-50 border-amber-200 text-amber-800' :
-                                    'bg-red-50 border-red-200 text-red-800'
-                                  }`}>
-                                    {section.score}/10
-                                  </div>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )
                       ));
@@ -825,7 +860,7 @@ const renderMarkdownContent = (content: string) => {
             {activeTab === 'tab-issues' && (
               <div className="space-y-6">
                 {pageData.key_issues.length > 0 ? (
-                  pageData.key_issues.map((issueObj, index) => ( // Changed to issueObj
+                  pageData.key_issues.map((issueObj, index) => (
                     <div key={index} className="flex gap-6 p-8 bg-gradient-to-r from-red-50/80 to-red-50/40 border border-red-200/60 rounded-2xl hover:shadow-lg hover:shadow-red-100/50 transition-all duration-300">
                       <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-2xl flex items-center justify-center text-sm font-bold shadow-lg">
                         {index + 1}
@@ -864,7 +899,7 @@ const renderMarkdownContent = (content: string) => {
             {activeTab === 'tab-recommendations' && (
               <div className="space-y-6">
                 {pageData.recommendations.length > 0 ? (
-                  pageData.recommendations.map((recObj, index) => ( // Changed to recObj
+                  pageData.recommendations.map((recObj, index) => (
                     <div key={index} className="flex gap-6 p-8 bg-gradient-to-r from-green-50/80 to-green-50/40 border border-green-200/60 rounded-2xl hover:shadow-lg hover:shadow-green-100/50 transition-all duration-300">
                       <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl flex items-center justify-center text-sm font-bold shadow-lg">
                         {index + 1}
@@ -913,13 +948,13 @@ const renderMarkdownContent = (content: string) => {
               <div className="text-center py-10">
                  {pageData.screenshot_path ? (
                     <img 
-                        src={`/${pageData.screenshot_path}`} // Ensure path is absolute from public root
+                        src={`/${pageData.screenshot_path}`}
                         alt={`Screenshot of ${pageData.title}`} 
                         className="max-w-full h-auto rounded-2xl border-2 border-slate-200 shadow-2xl mx-auto"
                         onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            target.onerror = null; // prevent infinite loop
-                            target.src = "/assets/screenshots/placeholder.png"; // Fallback image
+                            target.onerror = null;
+                            target.src = "/assets/screenshots/placeholder.png";
                             target.alt = "Screenshot not found, placeholder displayed.";
                         }}
                     />
@@ -931,7 +966,7 @@ const renderMarkdownContent = (content: string) => {
                         </svg>
                         </div>
                         <h3 className="text-2xl font-bold text-slate-900 mb-3">Screenshot Not Available</h3>
-                        <p className="text-slate-600 text-lg">{pageData.screenshot_path || 'No screenshot path provided'}</p>
+                        <p className="text-slate-600 text-lg">No screenshot is available for this page.</p>
                     </>
                  )}
               </div>

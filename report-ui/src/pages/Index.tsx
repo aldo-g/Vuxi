@@ -208,6 +208,7 @@ const Index = () => {
   const [pageAnalysesForDisplay, setPageAnalysesForDisplay] = useState<PageAnalysisDetail[]>([]);
   const [mainExecutiveSummaryParagraph, setMainExecutiveSummaryParagraph] = useState("");
   const [parsedDetailedSections, setParsedDetailedSections] = useState<{ [key: string]: { title: string; content: string; subsections: Array<{title:string; content:string}> } }>({});
+  const [goalAchievementAssessment, setGoalAchievementAssessment] = useState<string>("");
 
   // HOOK 3 (Score Ring Animation)
   useEffect(() => {
@@ -285,6 +286,29 @@ const Index = () => {
       })();
       setMainExecutiveSummaryParagraph(mainExecSummaryP);
 
+      // Extract Goal Achievement Assessment from markdown content
+      const extractedGoalAssessment = (() => {
+        if (!dmc) return "";
+        // Look for Goal Achievement Assessment in various sections
+        const goalAssessmentMatch = dmc.match(/###?\s*Goal Achievement Assessment[:\s]*\n([\s\S]*?)(?=\n\n(?:###?|##|\*\*Performance Summary|\*\*Key Strengths|$))/i);
+        if (goalAssessmentMatch && goalAssessmentMatch[1]) {
+          return goalAssessmentMatch[1].trim();
+        }
+        
+        // Alternative pattern - look for it in Key Findings section
+        const keyFindingsMatch = dmc.match(/## KEY FINDINGS([\s\S]*?)(?=\n\n## |$)/i);
+        if (keyFindingsMatch && keyFindingsMatch[1]) {
+          const keyFindingsContent = keyFindingsMatch[1];
+          const goalInKeyFindings = keyFindingsContent.match(/Goal Achievement Assessment[:\s]*\n([\s\S]*?)(?=\n\n(?:###?|##|\*\*|$))/i);
+          if (goalInKeyFindings && goalInKeyFindings[1]) {
+            return goalInKeyFindings[1].trim();
+          }
+        }
+        
+        return "";
+      })();
+      setGoalAchievementAssessment(extractedGoalAssessment);
+
       const parsedSections = (() => {
         if (!dmc) return {};
         const sections: { [key: string]: { title: string; content: string; subsections: Array<{title:string; content:string}> } } = {};
@@ -301,9 +325,8 @@ const Index = () => {
           if (currentSubsectionTitle && currentSectionKey && sections[currentSectionKey]) {
             if (currentSectionKey === 'executive-summary' &&
                 (currentSubsectionTitle.toLowerCase().includes('key strengths') ||
-                 currentSubsectionTitle.toLowerCase().includes('critical weaknesses') ||
-                 currentSubsectionTitle.toLowerCase().includes('goal achievement assessment'))) {
-              // Skip
+                 currentSubsectionTitle.toLowerCase().includes('critical weaknesses'))) {
+              // Skip these but allow goal achievement assessment to be processed separately
             } else {
                 sections[currentSectionKey].subsections.push({
                   title: currentSubsectionTitle,
@@ -329,7 +352,9 @@ const Index = () => {
                 });
                 contentToAdd = tempContent.replace(/\n\s*\n/g, '\n\n').trim();
 
+                 // Remove Goal Achievement Assessment from executive summary content since it's handled separately
                  contentToAdd = contentToAdd.replace(/(\n\n)?\*\*Goal Achievement Assessment:\*\*[\s\S]*?(?=\n\n##|$)/i, '').trim();
+                 contentToAdd = contentToAdd.replace(/(\n\n)?###?\s*Goal Achievement Assessment[\s\S]*?(?=\n\n##|$)/i, '').trim();
             }
             sections[currentSectionKey].content = contentToAdd;
           }
@@ -347,6 +372,10 @@ const Index = () => {
             commitSubSection();
             if (currentSectionKey) {
               currentSubsectionTitle = line.substring(4).trim();
+              // Skip Goal Achievement Assessment as subsection since it's handled separately
+              if (currentSubsectionTitle.toLowerCase().includes('goal achievement assessment')) {
+                currentSubsectionTitle = null;
+              }
             }
           } else if (currentSectionKey) {
             if (currentSubsectionTitle) {
@@ -416,8 +445,6 @@ const Index = () => {
       </div>
     );
   }
-
-  const goalAchievementAssessmentText = `**Donations:** Poor (3/10) - Despite having a "Donate" button in navigation, the site lacks compelling donation appeals, impact stories, or contextual CTAs explaining why and how donations make a difference.\n\n**Training Sign-ups:** Below Average (4/10) - While training courses are well-described with strong content, the site lacks clear registration pathways, pricing information, course schedules, and compelling CTAs to drive enrollment.`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100">
@@ -539,7 +566,7 @@ const Index = () => {
                             mainContent={parsedDetailedSections[key]!.content}
                             subsections={parsedDetailedSections[key]!.subsections}
                             performanceSummary={key === 'key-findings' ? performanceSummary : undefined}
-                            goalAchievementAssessment={key === 'key-findings' ? goalAchievementAssessmentText : undefined}
+                            goalAchievementAssessment={key === 'key-findings' ? goalAchievementAssessment : undefined}
                             icon={sectionDetails[key]!.icon}
                             sectionKey={key}
                         />
