@@ -1,6 +1,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const { URLCrawler } = require('./crawler');
+const { limitUrlsPerCategory, hierarchicalSampling, simpleAggressiveFilter } = require('./utils');
 
 class URLDiscoveryService {
   constructor(options = {}) {
@@ -11,6 +12,18 @@ class URLDiscoveryService {
     this.fastMode = options.fastMode !== false;
     this.excludePatterns = options.excludePatterns || [];
     this.outputDir = options.outputDir || './data';
+    this.maxUrlsPerCategory = options.maxUrlsPerCategory || 5;
+    this.enableCategoryLimiting = options.enableCategoryLimiting !== false;
+    this.enableHierarchicalSampling = options.enableHierarchicalSampling !== false;
+    this.enableSimpleFilter = options.enableSimpleFilter !== false;
+    this.hierarchicalOptions = {
+      maxDepth: options.maxDepth || 3,
+      samplesPerCategory: options.samplesPerCategory || 2,
+      prioritizeOverviews: options.prioritizeOverviews !== false,
+      skipLegalPages: options.skipLegalPages !== false,
+      useSimpleFilter: options.useSimpleFilter !== false,
+      maxUrlsTotal: options.maxUrlsTotal || 10
+    };
   }
 
   async discover(startUrl) {
@@ -22,6 +35,7 @@ class URLDiscoveryService {
     console.log(`⏰ Timeout: ${this.timeout}ms per page`);
     console.log(`⏳ Wait time: ${this.waitTime}s`);
     console.log(`📁 Output: ${this.outputDir}`);
+    console.log(`🔥 Simple aggressive filter: ${this.enableSimpleFilter ? 'ENABLED' : 'disabled'}`);
     
     const startTime = Date.now();
     
@@ -42,10 +56,32 @@ class URLDiscoveryService {
       console.log('\n⚡ Starting CONCURRENT crawl...');
       const results = await crawler.crawl(startUrl);
       
+      let finalUrls = results.urls;
+      const urlsAfterDeduplication = finalUrls.length;
+      
+      // Apply simple aggressive filter if enabled
+      if (this.enableSimpleFilter) {
+        console.log(`\n🔥 Applying simple aggressive filter...`);
+        finalUrls = simpleAggressiveFilter(finalUrls, this.hierarchicalOptions);
+      }
+      // Otherwise apply hierarchical sampling if enabled
+      else if (this.enableHierarchicalSampling) {
+        console.log(`\n🏗️  Applying hierarchical sampling...`);
+        finalUrls = hierarchicalSampling(finalUrls, this.hierarchicalOptions);
+      }
+      
+      // Apply category limiting if enabled (and simple filter not used)
+      let urlsBeforeCategoryLimiting = finalUrls.length;
+      if (this.enableCategoryLimiting && !this.enableSimpleFilter) {
+        console.log(`\n🗂️  Applying category limiting (max ${this.maxUrlsPerCategory} per category)...`);
+        finalUrls = limitUrlsPerCategory(finalUrls, this.maxUrlsPerCategory);
+        console.log(`📉 URLs after category limiting: ${finalUrls.length} (reduced from ${urlsBeforeCategoryLimiting})`);
+      }
+      
       const outputData = {
         timestamp: new Date().toISOString(),
         startUrl: startUrl,
-        totalUrls: results.urls.length,
+        totalUrls: finalUrls.length,
         crawlStats: {
           pagesCrawled: results.stats.pagesCrawled,
           pagesSkipped: results.stats.pagesSkipped,
@@ -53,15 +89,22 @@ class URLDiscoveryService {
           duration: results.stats.duration,
           totalUrlsDiscovered: results.stats.totalUrlsDiscovered,
           duplicatesSkipped: results.stats.duplicatesSkipped,
-          duplicatesRemoved: results.stats.duplicatesRemoved
+          duplicatesRemoved: results.stats.duplicatesRemoved,
+          urlsAfterDeduplication: urlsAfterDeduplication,
+          urlsAfterFiltering: finalUrls.length
         },
-        urls: results.urls,
+        urls: finalUrls,
         excludePatterns: this.excludePatterns,
         settings: {
           fastMode: this.fastMode,
           concurrency: this.concurrency,
           timeout: this.timeout,
-          waitTime: this.waitTime
+          waitTime: this.waitTime,
+          maxUrlsPerCategory: this.maxUrlsPerCategory,
+          enableCategoryLimiting: this.enableCategoryLimiting,
+          enableHierarchicalSampling: this.enableHierarchicalSampling,
+          enableSimpleFilter: this.enableSimpleFilter,
+          hierarchicalOptions: this.hierarchicalOptions
         }
       };
       
@@ -71,26 +114,27 @@ class URLDiscoveryService {
       const simpleUrlsPath = path.join(this.outputDir, 'urls_simple.json');
       
       await fs.writeJson(urlsPath, outputData, { spaces: 2 });
-      await fs.writeJson(simpleUrlsPath, results.urls, { spaces: 2 });
+      await fs.writeJson(simpleUrlsPath, finalUrls, { spaces: 2 });
       
       const duration = (Date.now() - startTime) / 1000;
       
       console.log('\n🎉 URL Discovery completed successfully');
-      console.log(`⚡ Speed: ${(results.urls.length / duration).toFixed(1)} URLs/second`);
+      console.log(`⚡ Speed: ${(finalUrls.length / duration).toFixed(1)} URLs/second`);
       console.log(`🔀 Concurrency: ${this.concurrency}x parallel processing`);
       console.log(`⏱️  Duration: ${duration.toFixed(2)} seconds`);
-      console.log(`🔗 Total URLs discovered: ${results.urls.length}`);
+      console.log(`🔗 Total URLs discovered: ${finalUrls.length}`);
       console.log(`📋 Pages crawled: ${results.stats.pagesCrawled}`);
       console.log(`⚠️  Pages skipped: ${results.stats.pagesSkipped}`);
       console.log(`❌ Errors: ${results.stats.errors}`);
       console.log(`🔍 Duplicates skipped during crawl: ${results.stats.duplicatesSkipped}`);
       console.log(`🗑️  Duplicates removed in final processing: ${results.stats.duplicatesRemoved}`);
+      console.log(`🔥 URLs reduced by filtering: ${urlsAfterDeduplication - finalUrls.length}`);
       console.log(`📄 Full data saved to: ${urlsPath}`);
       console.log(`📝 Simple URL list saved to: ${simpleUrlsPath}`);
       
       return {
         success: true,
-        urls: results.urls,
+        urls: finalUrls,
         stats: results.stats,
         outputData,
         files: {
