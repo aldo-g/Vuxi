@@ -143,17 +143,36 @@ class Formatter {
 
   parseJSON(text, source) {
     let cleanedText = text.trim();
-    try { return JSON.parse(cleanedText); } catch (e) { /* continue */ }
+    
+    // First, try to parse as-is
+    try { 
+      const parsed = JSON.parse(cleanedText);
+      console.log(`     ✅ Successfully parsed JSON for ${source}`);
+      return parsed;
+    } catch (e) { /* continue to next attempt */ }
+    
+    // Try to extract from code block
     const codeBlockMatch = cleanedText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (codeBlockMatch && codeBlockMatch[1]) {
-      try { return JSON.parse(codeBlockMatch[1].trim()); } catch (e) { /* continue */ }
+      try { 
+        const parsed = JSON.parse(codeBlockMatch[1].trim());
+        console.log(`     ✅ Successfully parsed JSON from code block for ${source}`);
+        return parsed;
+      } catch (e) { /* continue to next attempt */ }
     }
+    
+    // Try to extract JSON object from text
     const firstBrace = cleanedText.indexOf('{');
     const lastBrace = cleanedText.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace > firstBrace) {
       const potentialJson = cleanedText.substring(firstBrace, lastBrace + 1);
-      try { return JSON.parse(potentialJson); } catch (e) { /* continue */ }
+      try { 
+        const parsed = JSON.parse(potentialJson);
+        console.log(`     ✅ Successfully extracted and parsed JSON object for ${source}`);
+        return parsed;
+      } catch (e) { /* continue to fallback */ }
     }
+    
     console.warn(`     ⚠️  JSON parse failed for ${source}, using text extraction fallback.`);
     if (source === 'overall summary') {
       return this.extractOverallSummaryFromTextFallback(cleanedText);
@@ -163,16 +182,40 @@ class Formatter {
   }
   
   extractOverallSummaryFromTextFallback(text) { 
+    console.log('     📝 Using text extraction fallback for overall summary');
+    
+    // Try to extract nested JSON first
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const nestedData = JSON.parse(jsonMatch[0]);
+        console.log('     🔍 Found nested JSON in LLM response');
+        return {
+          executive_summary: nestedData.executive_summary || this.extractSummaryFallback(text, 500) || 'Website analysis summary requires review.',
+          overall_score: nestedData.overall_score || this.extractScoreFallback(text) || 5,
+          site_score_explanation: nestedData.site_score_explanation || "Overall site score explanation requires manual review.",
+          total_pages_analyzed: nestedData.total_pages_analyzed || 0,
+          most_critical_issues: Array.isArray(nestedData.most_critical_issues) ? nestedData.most_critical_issues.map(String) : this.extractListFallback(text, ['critical_issues', 'site-wide critical issue']).map(item => typeof item === 'object' ? item.issue : String(item)).slice(0, 5),
+          top_recommendations: Array.isArray(nestedData.top_recommendations) ? nestedData.top_recommendations.map(String) : this.extractListFallback(text, ['top_recommendations', 'priority recommendation']).map(item => typeof item === 'object' ? item.recommendation : String(item)).slice(0, 5),
+          key_strengths: Array.isArray(nestedData.key_strengths) ? nestedData.key_strengths.map(String) : this.extractListFallback(text, ['key_strengths', 'website does well']).map(item => String(item)).slice(0, 3),
+          performance_summary: nestedData.performance_summary || this.extractSectionTextFallback(text, 'performance_summary') || 'Performance details require review.',
+          detailed_markdown_content: nestedData.detailed_markdown_content || text
+        };
+      } catch (e) {
+        console.warn('     ⚠️ Failed to parse nested JSON, using manual extraction');
+      }
+    }
+    
     return {
       executive_summary: this.extractSummaryFallback(text, 500) || 'Website analysis summary requires review.',
       overall_score: this.extractScoreFallback(text) || 5,
-      site_score_explanation: "Overall site score explanation requires manual review.", // Added fallback
+      site_score_explanation: "Overall site score explanation requires manual review.",
       total_pages_analyzed: 0,
       most_critical_issues: this.extractListFallback(text, ['critical_issues', 'site-wide critical issue']).map(item => typeof item === 'object' ? item.issue : String(item)).slice(0, 5),
       top_recommendations: this.extractListFallback(text, ['top_recommendations', 'priority recommendation']).map(item => typeof item === 'object' ? item.recommendation : String(item)).slice(0, 5),
       key_strengths: this.extractListFallback(text, ['key_strengths', 'website does well']).map(item => String(item)).slice(0, 3),
       performance_summary: this.extractSectionTextFallback(text, 'performance_summary') || 'Performance details require review.',
-      detailed_markdown_content: text // Include the raw text as fallback
+      detailed_markdown_content: text
     };
   }
 
@@ -339,20 +382,19 @@ class Formatter {
         messages: [{ role: 'user', content: prompt }]
       });
       const summaryText = response.content[0].text.trim();
+      console.log(`     📝 LLM response length: ${summaryText.length} characters`);
       parsedSummary = this.parseJSON(summaryText, 'overall summary');
       
       if (!parsedSummary.detailed_markdown_content || parsedSummary.detailed_markdown_content.length < overviewContent.length * 0.8) {
           console.warn("   ⚠️  LLM did not correctly include full detailed_markdown_content. Using raw overview directly.");
           parsedSummary.detailed_markdown_content = overviewContent;
       }
-      // Ensure site_score_explanation is present, if not, use a fallback.
+      
       if (typeof parsedSummary.site_score_explanation !== 'string' || parsedSummary.site_score_explanation.trim() === "") {
         console.warn("   ⚠️  LLM did not provide site_score_explanation. Using fallback.");
-        // Try to extract from detailed_markdown_content or use a generic fallback.
         const extractedExplanation = this.extractSiteScoreExplanationFromMarkdown(overviewContent);
         parsedSummary.site_score_explanation = extractedExplanation || "Overall site score evaluation highlights key strengths and areas needing improvement.";
       }
-
 
     } catch (error) {
       console.error('   ❌ Failed to create overall summary via LLM:', error.message);
@@ -366,7 +408,7 @@ class Formatter {
         ...parsedSummary,   
         total_pages_analyzed: formattedPageAnalyses.length, 
         overall_score: typeof parsedSummary.overall_score === 'number' && parsedSummary.overall_score >=1 && parsedSummary.overall_score <=10 ? parsedSummary.overall_score : fallbackSummary.overall_score,
-        site_score_explanation: parsedSummary.site_score_explanation || fallbackSummary.site_score_explanation, // Ensure it's set
+        site_score_explanation: parsedSummary.site_score_explanation || fallbackSummary.site_score_explanation,
         detailed_markdown_content: parsedSummary.detailed_markdown_content || overviewContent 
     };
 
@@ -379,16 +421,14 @@ class Formatter {
 
   extractSiteScoreExplanationFromMarkdown(markdownContent) {
     if (!markdownContent || typeof markdownContent !== 'string') return null;
-    // Attempt to find a sentence near the overall score discussion
     const scoreMatch = markdownContent.match(/Overall.*?Score:\s*\d+\/10\s*-\s*(.*)/i);
     if (scoreMatch && scoreMatch[1]) {
-      return scoreMatch[1].split('.')[0] + '.'; // Get the first sentence
+      return scoreMatch[1].split('.')[0] + '.';
     }
-    // Fallback: Look for common summary phrases if the direct score explanation isn't found
     const executiveSummaryMatch = markdownContent.match(/## Executive Summary\s*([\s\S]*?)(?=\n##|$)/i);
     if (executiveSummaryMatch && executiveSummaryMatch[1]) {
         const firstSentences = executiveSummaryMatch[1].trim().split('.').slice(0,2).join('.') + '.';
-        if (firstSentences.length > 30) return firstSentences; // Return first two sentences of exec summary
+        if (firstSentences.length > 30) return firstSentences;
     }
     return null;
   }
@@ -412,6 +452,22 @@ class Formatter {
       key_strengths: ['Review "detailed_markdown_content" for strengths.'],
       performance_summary: (rawAnalysisData.technicalSummary && typeof rawAnalysisData.technicalSummary === 'string' ? this.extractSummaryFallback(rawAnalysisData.technicalSummary, 200) : 'Technical performance summary requires manual review.'),
       detailed_markdown_content: overviewText
+    };
+  }
+
+  createFallbackPageAnalysis(pageAnalysisItem, index) {
+    return {
+      page_type: this.extractPageType(pageAnalysisItem.url),
+      title: `Fallback Page ${index + 1}`,
+      overall_score: 3,
+      overall_explanation: "Analysis could not be processed properly.",
+      sections: [],
+      section_scores: {},
+      key_issues: [],
+      recommendations: [],
+      summary: "This page analysis could not be processed due to missing or invalid data.",
+      url: pageAnalysisItem.url,
+      original_analysis: pageAnalysisItem.analysis || "No analysis data available."
     };
   }
 }

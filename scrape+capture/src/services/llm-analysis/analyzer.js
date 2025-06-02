@@ -18,6 +18,13 @@ class LLMAnalyzer {
     this.screenshotsDir = options.screenshotsDir;
     this.lighthouseDir = options.lighthouseDir;
     
+    // Organization context
+    this.orgContext = options.orgContext || {
+      org_name: 'the organization',
+      org_type: 'organization',
+      org_purpose: 'to achieve its business goals and serve its users effectively'
+    };
+    
     // Initialize LLM client
     this.initializeClient();
   }
@@ -135,6 +142,7 @@ class LLMAnalyzer {
       provider: this.provider,
       model: this.model,
       concurrency: this.concurrency,
+      orgContext: this.orgContext,
       pageAnalyses: [],
       technicalSummary: null,
       overview: null
@@ -236,11 +244,7 @@ class LLMAnalyzer {
       url: pageData.url,
       lighthouse: pageData.lighthouse,
       page_type: pageData.page_type || 'webpage',
-      context: {
-        org_name: process.env.ORG_NAME || 'the organization',
-        org_type: process.env.ORG_TYPE || 'non-profit',
-        org_purpose: process.env.ORG_PURPOSE || 'to encourage donations and sign-ups for trainings'
-      }
+      context: this.orgContext
     });
     
     // Include screenshot for page analysis
@@ -274,11 +278,7 @@ class LLMAnalyzer {
       })),
       pageAnalyses: previousAnalysis.pageAnalyses,
       technicalSummary: previousAnalysis.technicalSummary,
-      context: {
-        org_name: process.env.ORG_NAME || 'the organization',
-        org_type: process.env.ORG_TYPE || 'non-profit',
-        org_purpose: process.env.ORG_PURPOSE || 'to encourage donations and sign-ups for trainings'
-      }
+      context: this.orgContext
     };
     
     const prompt = getAnalysisPrompt('comprehensive_overview', overviewData);

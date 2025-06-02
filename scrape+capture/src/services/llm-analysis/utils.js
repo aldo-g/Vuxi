@@ -72,7 +72,7 @@ function validateStructuredData(data) {
       errors.push(`Overall score has invalid value: ${data.summary.overall_score}`);
       data.summary.overall_score = 5;
     }
-    if (!data.summary.priority_action) data.summary.priority_action = 'Review and improve the website';
+    if (!data.summary.priority_action) data.summary.priority_action = 'Review and improve the website to better achieve organizational goals';
   }
   
   // Add validation results to data

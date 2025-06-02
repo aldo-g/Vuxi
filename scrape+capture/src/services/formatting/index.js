@@ -7,6 +7,9 @@ class FormattingService {
     this.model = options.model || 'claude-3-7-sonnet-20250219';
     this.inputPath = options.inputPath || './data/analysis/analysis.json';
     this.outputPath = options.outputPath || './data/analysis/structured-analysis.json';
+    
+    // Organization context - can be overridden via options
+    this.orgContext = options.orgContext || null; // Will be extracted from analysis data if not provided
   }
 
   async format() {
@@ -28,11 +31,6 @@ class FormattingService {
         throw new Error(`Input file not found: ${this.inputPath}`);
       }
       
-      // Initialize formatter
-      const formatter = new Formatter({
-        model: this.model
-      });
-      
       // Read raw analysis data
       console.log('\n📖 Reading raw analysis data...');
       const rawAnalysisData = await fs.readJson(this.inputPath);
@@ -44,11 +42,30 @@ class FormattingService {
       
       console.log(`   ✅ Loaded analysis data (${Object.keys(rawAnalysisData).length} top-level keys)`);
       
+      // Extract organization context from analysis data if not provided
+      const orgContext = this.orgContext || rawAnalysisData.orgContext || {
+        org_name: 'the organization',
+        org_type: 'organization', 
+        org_purpose: 'to achieve its business goals and serve its users effectively'
+      };
+      
+      console.log(`🏢 Organization: ${orgContext.org_name} (${orgContext.org_type})`);
+      console.log(`🎯 Purpose: ${orgContext.org_purpose}`);
+      
+      // Initialize formatter with organization context
+      const formatter = new Formatter({
+        model: this.model,
+        orgContext: orgContext
+      });
+      
       // Format the data
       console.log('🔄 Formatting analysis data into structured format...');
       const result = await formatter.format(rawAnalysisData);
       
       if (result.status === 'success') {
+        // Add organization context to the formatted data
+        result.data.orgContext = orgContext;
+        
         // Ensure output directory exists
         await fs.ensureDir(path.dirname(this.outputPath));
         
@@ -83,6 +100,7 @@ class FormattingService {
           status: 'error',
           error: result.error,
           timestamp: new Date().toISOString(),
+          orgContext: orgContext,
           rawData: rawAnalysisData // Include raw data for fallback
         };
         
