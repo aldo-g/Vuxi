@@ -83,6 +83,10 @@ function getAnalysisPrompt(type, data) {
 
       WEBSITE PURPOSE: ${context.org_purpose}
 
+      Please format your response as a Markdown document.
+      The main sections of your report should be H2 headings (e.g., ## Section Title).
+      Sub-sections should use H3 headings (e.g., ### Subsection Title), and bullet points for lists.
+
       This is the final step of our analysis. You now have access to:
       1. All website screenshots
       2. Detailed individual page analyses
@@ -107,37 +111,61 @@ function getAnalysisPrompt(type, data) {
         SEO: ${page.lighthouseScores?.seo ? (page.lighthouseScores.seo * 100).toFixed(1) + '%' : 'N/A'}
       `).join('\n')}
 
-      Based on all this comprehensive data, provide:
+      Based on all this comprehensive data, provide the following sections using the specified Markdown heading levels:
 
-      1. **EXECUTIVE SUMMARY**
-         - Overall assessment of the website's effectiveness (Score: ?/10)
+      ## EXECUTIVE SUMMARY
+         - Provide an overall assessment of the website's effectiveness (Score: ?/10).
          - How well does it achieve ${context.org_purpose}?
-         - Key strengths and critical weaknesses
+         - Summarize key strengths and critical weaknesses.
 
-      2. **KEY FINDINGS**
-         - Top 3 strengths discovered across all analyses
-         - Top 5 critical issues that must be addressed
+      ## KEY FINDINGS
+         ### Top 3 strengths discovered across all analyses
+           - Strength 1: (Description)
+           - Strength 2: (Description)
+           - Strength 3: (Description)
+         ### Top 5 critical issues that must be addressed
+           - Issue 1 (Severity: High/Medium/Low) - (Description). How to Fix: (Details).
+           - Issue 2 (Severity: High/Medium/Low) - (Description). How to Fix: (Details).
+           - ...and so on for up to 5 issues.
 
-      3. **STRATEGIC RECOMMENDATIONS**
-         - Priority fixes (Critical/High/Medium priority)
-         - Performance optimizations 
-         - User experience enhancements
-         - Accessibility improvements
-         - Each with estimated impact and implementation effort
+      ## STRATEGIC RECOMMENDATIONS
+         ### Priority fixes (Critical/High/Medium priority)
+           - Recommendation 1 (Impact: High/Medium/Low, Effort: High/Medium/Low) - (Details).
+           - ...
+         ### Performance optimizations
+           - (Recommendation and details)
+           - ...
+         ### User experience enhancements
+           - (Recommendation and details)
+           - ...
+         ### Accessibility improvements
+           - (Recommendation and details)
+           - ...
+           (Each recommendation should include estimated impact and implementation effort where possible)
 
-      4. **OVERALL THEME ASSESSMENT**
-         - Consistency of brand identity across pages
-         - How well the visual design supports the mission
-         - Areas where the design either helps or hinders conversions
+      ## OVERALL THEME ASSESSMENT
+         ### Consistency of brand identity across pages
+           - (Your assessment)
+         ### How well the visual design supports the mission
+           - (Your assessment)
+         ### Areas where the design either helps or hinders conversions
+           - (Your assessment)
 
-      5. **IMPLEMENTATION ROADMAP**
-         - Quick wins (1-2 weeks)
-         - Medium-term improvements (1-2 months)
-         - Long-term strategic changes (3-6 months)
+      ## IMPLEMENTATION ROADMAP
+         ### Quick wins (1-2 weeks)
+           - (Actionable item 1)
+           - (Actionable item 2)
+           - ...
+         ### Medium-term improvements (1-2 months)
+           - (Actionable item 1)
+           - ...
+         ### Long-term strategic changes (3-6 months)
+           - (Actionable item 1)
+           - ...
 
-      Format this as a comprehensive executive report that synthesizes all previous analyses into actionable insights.
-      
-      ${getExampleSection()}`;
+      Synthesize all previous analyses into actionable insights within this Markdown structure.
+      Ensure your language is professional and consultancy-grade.
+      `;
 
     case 'page':
       const pageSections = [
@@ -249,8 +277,8 @@ function formatLighthouseMetrics(lighthouse) {
 
 module.exports = {
   getAnalysisPrompt,
-  getScoringDefinitions,
-  getExampleSection,
-  createAnalysisPrompt,
-  formatLighthouseMetrics
+  getScoringDefinitions, // Exporting this as it's used internally by createAnalysisPrompt
+  getExampleSection, // Exporting this for the same reason
+  createAnalysisPrompt, // Exporting this if it's intended to be reusable
+  formatLighthouseMetrics // Exporting this as it's a utility function
 };

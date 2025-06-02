@@ -8,6 +8,11 @@ class Formatter {
   constructor(options = {}) {
     this.model = options.model || process.env.ANTHROPIC_MODEL || 'claude-3-7-sonnet-20250219';
     this.concurrency = options.concurrency || 4;
+    this.orgContext = options.orgContext || { // Added orgContext initialization
+      org_name: 'the organization',
+      org_type: 'organization',
+      org_purpose: 'to achieve its business goals and serve its users effectively'
+    };
 
     this.client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
@@ -47,7 +52,7 @@ class Formatter {
     const items = [];
     if (!text || typeof text !== 'string') return items;
     const lines = text.split('\n');
-    let inRelevantBlock = !keywords.length; 
+    let inRelevantBlock = !keywords.length;
     const keywordRegex = new RegExp(`(?:${keywords.join('|')}):`, 'i');
 
     for (const line of lines) {
@@ -72,11 +77,11 @@ class Formatter {
                     } else if (keywords.some(k => k.toLowerCase().includes('recommendation'))) {
                          items.push({ recommendation: itemText, benefit: "Details not parsed." });
                     } else {
-                         items.push(itemText); 
+                         items.push(itemText);
                     }
                 }
             } else if (trimmedLine.match(/^(##|SUMMARY:|PAGE ROLE ANALYSIS:)/i) && keywords.length) {
-                 inRelevantBlock = false; 
+                 inRelevantBlock = false;
             }
         }
     }
@@ -89,7 +94,7 @@ class Formatter {
     if (scoreMatch && scoreMatch[1]) return parseInt(scoreMatch[1], 10);
     const genericScoreMatch = text.match(/Score:\s*(\d+)\/10/i);
     if (genericScoreMatch && genericScoreMatch[1]) return parseInt(genericScoreMatch[1],10);
-    return 3; 
+    return 3;
   }
 
   extractSummaryFallback(text, maxLength = 250) {
@@ -101,7 +106,7 @@ class Formatter {
     const firstMeaningfulParagraph = text.split('\n\n').find(p => p.trim().length > 50 && !p.trim().startsWith("##"));
     return firstMeaningfulParagraph ? firstMeaningfulParagraph.trim().substring(0, maxLength) + (firstMeaningfulParagraph.length > maxLength ? "..." : "") : "Summary requires manual review.";
   }
-  
+
   extractOverallExplanationFallback(text) {
       if (!text || typeof text !== 'string') return "Explanation not available.";
       const explanationMatch = text.match(/(?:overall_explanation|overall explanation)[:\s]*"([^"]*)"/i);
@@ -126,14 +131,14 @@ class Formatter {
       return lastPart.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' Page';
     } catch (e) {
       const pathSegment = url.substring(url.lastIndexOf('/') + 1);
-      const simpleName = pathSegment.split('.')[0]; 
+      const simpleName = pathSegment.split('.')[0];
       return simpleName.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Page';
     }
   }
 
   extractSectionTextFallback(text, sectionKey) {
     if (!text || typeof text !== 'string') return null;
-    const regex = new RegExp(`"${sectionKey}"\\s*:\\s*"([^"]*)"`, 'i'); 
+    const regex = new RegExp(`"${sectionKey}"\\s*:\\s*"([^"]*)"`, 'i');
     const match = text.match(regex);
     if (match && match[1]) return match[1];
     const sectionRegex = new RegExp(`(?:${sectionKey.replace("_", " ")}|${sectionKey}):\\s*([\\s\\S]*?)(?=\\n\\n[A-Z\\s]+:|$)`, 'i');
@@ -143,36 +148,33 @@ class Formatter {
 
   parseJSON(text, source) {
     let cleanedText = text.trim();
-    
-    // First, try to parse as-is
-    try { 
+
+    try {
       const parsed = JSON.parse(cleanedText);
       console.log(`     ✅ Successfully parsed JSON for ${source}`);
       return parsed;
     } catch (e) { /* continue to next attempt */ }
-    
-    // Try to extract from code block
+
     const codeBlockMatch = cleanedText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (codeBlockMatch && codeBlockMatch[1]) {
-      try { 
+      try {
         const parsed = JSON.parse(codeBlockMatch[1].trim());
         console.log(`     ✅ Successfully parsed JSON from code block for ${source}`);
         return parsed;
       } catch (e) { /* continue to next attempt */ }
     }
-    
-    // Try to extract JSON object from text
+
     const firstBrace = cleanedText.indexOf('{');
     const lastBrace = cleanedText.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace > firstBrace) {
       const potentialJson = cleanedText.substring(firstBrace, lastBrace + 1);
-      try { 
+      try {
         const parsed = JSON.parse(potentialJson);
         console.log(`     ✅ Successfully extracted and parsed JSON object for ${source}`);
         return parsed;
       } catch (e) { /* continue to fallback */ }
     }
-    
+
     console.warn(`     ⚠️  JSON parse failed for ${source}, using text extraction fallback.`);
     if (source === 'overall summary') {
       return this.extractOverallSummaryFromTextFallback(cleanedText);
@@ -180,11 +182,10 @@ class Formatter {
       return this.extractPageDataFromTextFallback(cleanedText, source);
     }
   }
-  
-  extractOverallSummaryFromTextFallback(text) { 
+
+  extractOverallSummaryFromTextFallback(text) {
     console.log('     📝 Using text extraction fallback for overall summary');
-    
-    // Try to extract nested JSON first
+
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
@@ -199,13 +200,13 @@ class Formatter {
           top_recommendations: Array.isArray(nestedData.top_recommendations) ? nestedData.top_recommendations.map(String) : this.extractListFallback(text, ['top_recommendations', 'priority recommendation']).map(item => typeof item === 'object' ? item.recommendation : String(item)).slice(0, 5),
           key_strengths: Array.isArray(nestedData.key_strengths) ? nestedData.key_strengths.map(String) : this.extractListFallback(text, ['key_strengths', 'website does well']).map(item => String(item)).slice(0, 3),
           performance_summary: nestedData.performance_summary || this.extractSectionTextFallback(text, 'performance_summary') || 'Performance details require review.',
-          detailed_markdown_content: nestedData.detailed_markdown_content || text
+          detailed_markdown_content: nestedData.detailed_markdown_content || text // THIS IS THE KEY LINE FOR THE BUG
         };
       } catch (e) {
-        console.warn('     ⚠️ Failed to parse nested JSON, using manual extraction');
+        console.warn('     ⚠️ Failed to parse nested JSON, using manual extraction for overall summary fallback');
       }
     }
-    
+
     return {
       executive_summary: this.extractSummaryFallback(text, 500) || 'Website analysis summary requires review.',
       overall_score: this.extractScoreFallback(text) || 5,
@@ -227,7 +228,7 @@ class Formatter {
       title: this.extractPageType(url) || "Untitled Page (Fallback)",
       overall_score: this.extractScoreFallback(analysisText) || 3,
       overall_explanation: this.extractOverallExplanationFallback(analysisText) || "Detailed explanation requires manual review.",
-      sections: [], 
+      sections: [],
       section_scores: this.extractSectionScores(analysisText),
       key_issues: key_issue_objects.map(item =>
         typeof item === 'object' && item.issue ? item : { issue: String(item.issue || item), how_to_fix: String(item.how_to_fix || "Fix details not parsed.") }
@@ -238,7 +239,7 @@ class Formatter {
       summary: this.extractSummaryFallback(analysisText, 150) || 'Page analysis summary requires manual review.'
     };
   }
-  
+
   async format(rawAnalysisData) {
     try {
       if (!process.env.ANTHROPIC_API_KEY) {
@@ -261,7 +262,7 @@ class Formatter {
         }
       };
       console.log('🔍 Validating structured data...');
-      const validationResult = validateStructuredData(structuredData);
+      const validationResult = validateStructuredData(structuredData); // Ensure validator can handle this.orgContext
 
       if (validationResult.valid) {
         console.log('   ✅ Structured data validated successfully.');
@@ -271,7 +272,7 @@ class Formatter {
         return {
           status: 'error',
           error: 'Structured data validation failed: ' + validationResult.errors.join('; '),
-          data: validationResult.data 
+          data: validationResult.data
         };
       }
     } catch (error) {
@@ -298,7 +299,7 @@ class Formatter {
       const promises = batch.map((pageAnalysisItem, batchIndex) =>
         this.formatIndividualPage(pageAnalysisItem, i + batchIndex)
       );
-      const batchSettledResults = await Promise.all(promises); 
+      const batchSettledResults = await Promise.all(promises);
       allResults.push(...batchSettledResults);
       const batchDuration = (Date.now() - batchStartTime) / 1000;
       console.log(`   ⚡ Batch ${batchNum} completed in ${batchDuration.toFixed(2)}s`);
@@ -312,23 +313,23 @@ class Formatter {
       return this.createFallbackPageAnalysis(pageAnalysisItem || {url: `Unknown URL ${index}`, analysis: ""}, index);
     }
     console.log(`     📄 [${index}] Formatting: ${pageAnalysisItem.url}`);
-    const prompt = getFormattingPrompts().individualPage(pageAnalysisItem);
+    const prompt = getFormattingPrompts(this.orgContext).individualPage(pageAnalysisItem); // Pass orgContext
     let parsed;
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 4000, 
+        max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }]
       });
       const formattedText = response.content[0].text.trim();
       parsed = this.parseJSON(formattedText, pageAnalysisItem.url);
     } catch (error) {
       console.error(`     ❌ LLM call or initial parsing failed for ${pageAnalysisItem.url}:`, error.message);
-      parsed = this.extractPageDataFromTextFallback(pageAnalysisItem.analysis, pageAnalysisItem.url); 
+      parsed = this.extractPageDataFromTextFallback(pageAnalysisItem.analysis, pageAnalysisItem.url);
     }
 
-    const sectionScores = this.extractSectionScores(pageAnalysisItem.analysis); 
-    
+    const sectionScores = this.extractSectionScores(pageAnalysisItem.analysis);
+
     const finalParsed = {
         page_type: parsed.page_type || this.extractPageType(pageAnalysisItem.url),
         title: parsed.title || this.extractPageType(pageAnalysisItem.url) || `Page ${index + 1}`,
@@ -346,25 +347,25 @@ class Formatter {
     finalParsed.key_issues = (Array.isArray(parsed.key_issues) ? parsed.key_issues : []).map(issue_item => {
         if (typeof issue_item === 'string') return { issue: issue_item, how_to_fix: "Fix details require review." };
         if (typeof issue_item === 'object' && issue_item !== null) {
-            return { 
-                issue: String(issue_item.issue || "Issue text missing from parsed object."), 
-                how_to_fix: String(issue_item.how_to_fix || "Fix details not provided in parsed object.") 
+            return {
+                issue: String(issue_item.issue || "Issue text missing from parsed object."),
+                how_to_fix: String(issue_item.how_to_fix || "Fix details not provided in parsed object.")
             };
         }
         return { issue: "Invalid issue format in parsed data.", how_to_fix: "Review needed."};
-    }).slice(0,8); 
+    }).slice(0,8);
 
     finalParsed.recommendations = (Array.isArray(parsed.recommendations) ? parsed.recommendations : []).map(rec_item => {
         if (typeof rec_item === 'string') return { recommendation: rec_item, benefit: "Benefit details require review." };
         if (typeof rec_item === 'object' && rec_item !== null) {
-            return { 
-                recommendation: String(rec_item.recommendation || "Recommendation text missing from parsed object."), 
-                benefit: String(rec_item.benefit || "Benefit details not provided in parsed object.") 
+            return {
+                recommendation: String(rec_item.recommendation || "Recommendation text missing from parsed object."),
+                benefit: String(rec_item.benefit || "Benefit details not provided in parsed object.")
             };
         }
         return { recommendation: "Invalid recommendation format in parsed data.", benefit: "Review needed."};
     }).slice(0,8);
-    
+
     return finalParsed;
   }
 
@@ -373,7 +374,7 @@ class Formatter {
     const overviewContent = (rawAnalysisData && typeof rawAnalysisData.overview === 'string') ? rawAnalysisData.overview : "Comprehensive overview not available.";
     const promptRawData = { ...rawAnalysisData, overview: overviewContent };
 
-    const prompt = getFormattingPrompts().overallSummary(promptRawData, formattedPageAnalyses);
+    const prompt = getFormattingPrompts(this.orgContext).overallSummary(promptRawData, formattedPageAnalyses); // Pass orgContext
     let parsedSummary;
     try {
       const response = await this.client.messages.create({
@@ -382,16 +383,18 @@ class Formatter {
         messages: [{ role: 'user', content: prompt }]
       });
       const summaryText = response.content[0].text.trim();
-      console.log(`     📝 LLM response length: ${summaryText.length} characters`);
+      console.log(`     📝 LLM response length for overall summary: ${summaryText.length} characters`);
       parsedSummary = this.parseJSON(summaryText, 'overall summary');
-      
-      if (!parsedSummary.detailed_markdown_content || parsedSummary.detailed_markdown_content.length < overviewContent.length * 0.8) {
-          console.warn("   ⚠️  LLM did not correctly include full detailed_markdown_content. Using raw overview directly.");
-          parsedSummary.detailed_markdown_content = overviewContent;
-      }
-      
+
+      // --- UPDATED FIX APPLICATION ---
+      // Ensure detailed_markdown_content is the raw overviewContent from the analysis stage.
+      // The LLM's job for this prompt is to populate the *other* summary fields by reading overviewContent.
+      parsedSummary.detailed_markdown_content = overviewContent;
+      console.log("   ✅ Ensured 'overall_summary.detailed_markdown_content' is set to the direct raw markdown overview.");
+      // --- END OF UPDATED FIX ---
+
       if (typeof parsedSummary.site_score_explanation !== 'string' || parsedSummary.site_score_explanation.trim() === "") {
-        console.warn("   ⚠️  LLM did not provide site_score_explanation. Using fallback.");
+        console.warn("   ⚠️  LLM did not provide site_score_explanation. Attempting to extract or using fallback.");
         const extractedExplanation = this.extractSiteScoreExplanationFromMarkdown(overviewContent);
         parsedSummary.site_score_explanation = extractedExplanation || "Overall site score evaluation highlights key strengths and areas needing improvement.";
       }
@@ -399,25 +402,30 @@ class Formatter {
     } catch (error) {
       console.error('   ❌ Failed to create overall summary via LLM:', error.message);
       parsedSummary = this.createFallbackOverallSummary(promptRawData, formattedPageAnalyses);
+      // Fallback already sets detailed_markdown_content to overviewContent
     }
-    
+
     const fallbackSummary = this.createFallbackOverallSummary(promptRawData, formattedPageAnalyses);
-    // Merge, prioritizing fields from LLM if valid, else from fallback
     parsedSummary = {
-        ...fallbackSummary, 
-        ...parsedSummary,   
-        total_pages_analyzed: formattedPageAnalyses.length, 
-        overall_score: typeof parsedSummary.overall_score === 'number' && parsedSummary.overall_score >=1 && parsedSummary.overall_score <=10 ? parsedSummary.overall_score : fallbackSummary.overall_score,
+        ...fallbackSummary,
+        ...parsedSummary,
+        total_pages_analyzed: formattedPageAnalyses.length,
+        // Ensure detailed_markdown_content remains the raw overviewContent after merging
+        detailed_markdown_content: overviewContent,
+        // Ensure overall_score is valid
+        overall_score: (typeof parsedSummary.overall_score === 'number' && parsedSummary.overall_score >=1 && parsedSummary.overall_score <=10)
+                       ? parsedSummary.overall_score
+                       : fallbackSummary.overall_score,
         site_score_explanation: parsedSummary.site_score_explanation || fallbackSummary.site_score_explanation,
-        detailed_markdown_content: parsedSummary.detailed_markdown_content || overviewContent 
     };
 
-    parsedSummary.most_critical_issues = (Array.isArray(parsedSummary.most_critical_issues) ? parsedSummary.most_critical_issues.map(String) : fallbackSummary.most_critical_issues).slice(0,5);
-    parsedSummary.top_recommendations = (Array.isArray(parsedSummary.top_recommendations) ? parsedSummary.top_recommendations.map(String) : fallbackSummary.top_recommendations).slice(0,5);
-    parsedSummary.key_strengths = (Array.isArray(parsedSummary.key_strengths) ? parsedSummary.key_strengths.map(String) : fallbackSummary.key_strengths).slice(0,3);
+    parsedSummary.most_critical_issues = (Array.isArray(parsedSummary.most_critical_issues) ? parsedSummary.most_critical_issues.map(String) : fallbackSummary.most_critical_issues || []).slice(0,5);
+    parsedSummary.top_recommendations = (Array.isArray(parsedSummary.top_recommendations) ? parsedSummary.top_recommendations.map(String) : fallbackSummary.top_recommendations || []).slice(0,5);
+    parsedSummary.key_strengths = (Array.isArray(parsedSummary.key_strengths) ? parsedSummary.key_strengths.map(String) : fallbackSummary.key_strengths || []).slice(0,3);
 
     return parsedSummary;
   }
+
 
   extractSiteScoreExplanationFromMarkdown(markdownContent) {
     if (!markdownContent || typeof markdownContent !== 'string') return null;
@@ -432,7 +440,7 @@ class Formatter {
     }
     return null;
   }
-  
+
   createFallbackOverallSummary(rawAnalysisData, pageAnalyses) {
     let avgScore = 3;
     const validScores = pageAnalyses.filter(p => p && typeof p.overall_score === 'number').map(p => p.overall_score);
@@ -451,7 +459,7 @@ class Formatter {
       top_recommendations: ['Implement fixes based on manual review of "detailed_markdown_content".'],
       key_strengths: ['Review "detailed_markdown_content" for strengths.'],
       performance_summary: (rawAnalysisData.technicalSummary && typeof rawAnalysisData.technicalSummary === 'string' ? this.extractSummaryFallback(rawAnalysisData.technicalSummary, 200) : 'Technical performance summary requires manual review.'),
-      detailed_markdown_content: overviewText
+      detailed_markdown_content: overviewText // Correctly uses the raw overview
     };
   }
 
