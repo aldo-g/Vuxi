@@ -1,23 +1,24 @@
 // scrape+capture/src/batch_analyzer.js
 
+// Load environment variables FIRST
+require('dotenv').config();
+
 // Import necessary modules
-const fs = require('fs-extra'); // fs-extra for promise-based fs and ensureDir
+const fs = require('fs-extra');
 const path = require('path');
-const { spawnSync } = require('child_process'); // Using spawnSync for simplicity in waiting for completion
+const { spawnSync } = require('child_process');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 
 // --- Configuration ---
-const DEFAULT_PRESETS_FILE = path.join(__dirname, '..', 'config', 'analysis_presets.json'); // Adjusted path
-const DEFAULT_BASE_OUTPUT_DIR = path.resolve(process.cwd(), "all_analysis_runs"); // Output relative to where script is run
-const NODE_SERVICES_BASE_PATH = path.join(__dirname, 'services'); // Relative to this script's location
+const DEFAULT_PRESETS_FILE = path.join(__dirname, '..', 'config', 'analysis_presets.json');
+const DEFAULT_BASE_OUTPUT_DIR = path.resolve(process.cwd(), "all_analysis_runs");
+const NODE_SERVICES_BASE_PATH = path.join(__dirname, 'services');
 
 // --- Helper Functions ---
 
 /**
  * Sanitizes a string to be safe for directory or file names.
- * @param {string} name - The string to sanitize.
- * @returns {string} The sanitized string.
  */
 function sanitizeForPath(name) {
     if (!name || typeof name !== 'string') return 'invalid_name';
@@ -26,10 +27,6 @@ function sanitizeForPath(name) {
 
 /**
  * Runs a Node.js service command and handles errors.
- * @param {string[]} commandParts - Array of command and arguments.
- * @param {string} serviceName - Name of the service for logging.
- * @param {string} presetKey - Key of the current preset for logging.
- * @returns {boolean} True if successful, false otherwise.
  */
 function runNodeService(commandParts, serviceName, presetKey) {
     console.log(`\nINFO [${presetKey}]: Starting ${serviceName}...`);
@@ -39,8 +36,8 @@ function runNodeService(commandParts, serviceName, presetKey) {
 
     try {
         const result = spawnSync(command, args, {
-            stdio: 'inherit', // Inherit stdio to see output directly, or use 'pipe' to capture
-            shell: false, // Safer; ensure paths with spaces are handled if any part of command is constructed from user input
+            stdio: 'inherit',
+            shell: false,
             encoding: 'utf-8'
         });
 
@@ -49,7 +46,7 @@ function runNodeService(commandParts, serviceName, presetKey) {
             if (result.stderr) {
                 console.error(`STDERR [${presetKey} - ${serviceName}]:\n${result.stderr}`);
             }
-            if (result.stdout) { // Log stdout too on error for more context
+            if (result.stdout) {
                 console.error(`STDOUT [${presetKey} - ${serviceName}]:\n${result.stdout}`);
             }
             return false;
@@ -171,12 +168,12 @@ async function main() {
         const formattedDataFile = path.join(llmAndFormattingOutputDir, "structured-analysis.json");
 
         let currentStepNumber = 1;
-        const totalSteps = 5; // URL Discovery, Screenshots, Lighthouse, LLM+Format, Report
+        const totalSteps = 5;
 
         // --- 1. URL Discovery ---
         if (!argv.skipToStep || argv.skipToStep === "urlDiscovery") {
             console.log(`\n--- [${presetKey}] Step ${currentStepNumber}/${totalSteps}: URL Discovery ---`);
-            const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "url-discovery", "run.js"); // Assuming run.js
+            const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "url-discovery", "run.js");
             const cmd = [
                 "node", scriptPath,
                 "--targetUrl", targetUrl,
@@ -237,18 +234,17 @@ async function main() {
             const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "llm-analysis", "run.js");
             const cmd = [
                 "node", scriptPath,
-                "--screenshotsDir", path.join(screenshotsOutputDir, "desktop"),
-                "--lighthouseDir", path.join(lighthouseOutputDir, "trimmed"),
+                "--screenshotsDir", path.join(screenshotsOutputDir, "desktop"), // Pass the full path to desktop folder
+                "--lighthouseDir", path.join(lighthouseOutputDir, "trimmed"),   // Pass the full path to trimmed folder
                 "--outputDir", llmAndFormattingOutputDir,
                 "--orgName", orgName,
                 "--orgType", orgType,
                 "--orgPurpose", orgPurpose,
-                "--model", analysisOptions.llmModel || "claude-3-haiku-20240307", // Example: use Haiku for speed/cost
-                "--concurrency", String(analysisOptions.llmConcurrency || 2) // Lower concurrency for LLM
+                "--model", analysisOptions.llmModel || "claude-3-haiku-20240307",
+                "--concurrency", String(analysisOptions.llmConcurrency || 2)
             ];
             if (!runNodeService(cmd, "LLM Analysis", presetKey)) continue;
         }
-        // No currentStepNumber++ here, formatting is part of this conceptual step.
 
         // --- 4b. Formatting ---
         if (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse", "llm", "formatting"].includes(argv.skipToStep)) {
@@ -282,8 +278,8 @@ async function main() {
             const cmd = [
                 "node", scriptPath,
                 "--analysisFilePath", formattedDataFile,
-                "--outputDir", currentRunBaseDir, // Report UI and report-data.json go to the root
-                "--screenshotsDir", screenshotsOutputDir // Source for screenshots to copy
+                "--outputDir", currentRunBaseDir,
+                "--screenshotsDir", screenshotsOutputDir
             ];
             if (!runNodeService(cmd, "HTML Report Generation", presetKey)) continue;
         }
@@ -295,11 +291,12 @@ async function main() {
     console.log("Batch processing finished for all specified presets.");
 }
 
-// Ensure ANTHROPIC_API_KEY is set (or loaded via .env in service scripts)
+// Check ANTHROPIC_API_KEY after loading .env
 if (!process.env.ANTHROPIC_API_KEY) {
     console.warn("WARNING: ANTHROPIC_API_KEY environment variable is not set. LLM-dependent services might fail.");
-    // For a production script, you might want to exit if it's absolutely required here.
-    // For now, we'll let the individual services handle their .env loading or fail.
+    console.warn("Please ensure you have a .env file in the project root with: ANTHROPIC_API_KEY=your-api-key");
+} else {
+    console.log(`INFO: ANTHROPIC_API_KEY loaded successfully (${process.env.ANTHROPIC_API_KEY.substring(0, 8)}...)`);
 }
 
 main().catch(error => {

@@ -6,3 +6,4 @@ report-ui/public/data/
 .compile-context/
 report-ui/public/
 data/
+.env

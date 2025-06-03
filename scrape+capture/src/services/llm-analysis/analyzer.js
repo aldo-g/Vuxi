@@ -14,7 +14,7 @@ class LLMAnalyzer {
   constructor(options = {}) {
     this.provider = options.provider || 'anthropic';
     this.model = options.model || process.env.ANTHROPIC_MODEL || 'claude-3-7-sonnet-20250219';
-    this.concurrency = options.concurrency || 3; // Add concurrency for page analyses
+    this.concurrency = options.concurrency || 3;
     this.screenshotsDir = options.screenshotsDir;
     this.lighthouseDir = options.lighthouseDir;
     
@@ -29,44 +29,53 @@ class LLMAnalyzer {
     this.initializeClient();
   }
   
-    initializeClient() {
-        if (this.provider === 'anthropic') {
-        // Check for API key in environment
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-            throw new Error('ANTHROPIC_API_KEY environment variable is required. Please set it in your .env file.');
-        }
-        
-        console.log(`API Key loaded from environment: ${apiKey.substring(0, 8)}...`);
-        
-        this.client = new Anthropic({
-            apiKey: apiKey,
-        });
-        
-        if (!this.client) {
-            throw new Error('Failed to initialize Anthropic client');
-        }
-        } else if (this.provider === 'openai') {
-        if (!OpenAI) {
-            OpenAI = require('openai').OpenAI;
-        }
-        this.client = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
-        });
-        } else {
-        throw new Error(`Unsupported provider: ${this.provider}`);
-        }
+  initializeClient() {
+    if (this.provider === 'anthropic') {
+      // Check for API key in environment
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY environment variable is required. Please set it in your .env file.');
+      }
+      
+      console.log(`API Key loaded from environment: ${apiKey.substring(0, 8)}...`);
+      
+      this.client = new Anthropic({
+        apiKey: apiKey,
+      });
+      
+      if (!this.client) {
+        throw new Error('Failed to initialize Anthropic client');
+      }
+    } else if (this.provider === 'openai') {
+      if (!OpenAI) {
+        OpenAI = require('openai').OpenAI;
+      }
+      this.client = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+    } else {
+      throw new Error(`Unsupported provider: ${this.provider}`);
     }
+  }
   
   async loadScreenshots() {
     try {
-      const desktopDir = path.join(this.screenshotsDir, 'desktop');
-      const files = await fs.readdir(desktopDir);
+      // Use screenshotsDir directly - it should already point to the desktop folder
+      console.log(`📸 Loading screenshots from: ${this.screenshotsDir}`);
+      
+      // Check if the path exists
+      if (!await fs.pathExists(this.screenshotsDir)) {
+        console.error(`Screenshots directory does not exist: ${this.screenshotsDir}`);
+        return [];
+      }
+      
+      const files = await fs.readdir(this.screenshotsDir);
       const screenshots = [];
       
       for (const file of files) {
         if (file.endsWith('.png')) {
-          const filePath = path.join(desktopDir, file);
+          const filePath = path.join(this.screenshotsDir, file);
+          console.log(`📸 Processing screenshot: ${file}`);
           const imageData = await prepareImageForLLM(filePath);
           
           screenshots.push({
@@ -90,13 +99,22 @@ class LLMAnalyzer {
   
   async loadLighthouseData() {
     try {
-      const trimmedDir = path.join(this.lighthouseDir, 'trimmed');
-      const files = await fs.readdir(trimmedDir);
+      // Use lighthouseDir directly - it should already point to the trimmed folder
+      console.log(`🚦 Loading lighthouse data from: ${this.lighthouseDir}`);
+      
+      // Check if the path exists
+      if (!await fs.pathExists(this.lighthouseDir)) {
+        console.error(`Lighthouse directory does not exist: ${this.lighthouseDir}`);
+        return [];
+      }
+      
+      const files = await fs.readdir(this.lighthouseDir);
       const lighthouseData = [];
       
       for (const file of files) {
         if (file.endsWith('_trimmed.json')) {
-          const filePath = path.join(trimmedDir, file);
+          const filePath = path.join(this.lighthouseDir, file);
+          console.log(`🚦 Processing lighthouse report: ${file}`);
           const data = await fs.readJson(filePath);
           
           lighthouseData.push({
