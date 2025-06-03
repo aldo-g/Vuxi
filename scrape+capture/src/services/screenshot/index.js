@@ -10,7 +10,7 @@ class ScreenshotService {
       height: options.viewport?.height || 900
     };
     this.timeout = options.timeout || 30000;
-    this.concurrent = options.concurrent || 4; // Increased from 3 to 4
+    this.concurrent = options.concurrent || 4;
   }
 
   async captureAll(urls) {
@@ -21,13 +21,14 @@ class ScreenshotService {
     console.log(`🔀 Concurrency: ${this.concurrent} screenshots at once`);
     
     const startTime = Date.now();
+    let screenshotCapture = null;
     
     try {
       // Ensure output directory exists
       await fs.ensureDir(this.outputDir);
       
-      // Initialize capture service (but don't init browser yet)
-      const screenshotCapture = new ScreenshotCapture(this.outputDir, {
+      // Initialize capture service
+      screenshotCapture = new ScreenshotCapture(this.outputDir, {
         width: this.viewport.width,
         height: this.viewport.height,
         timeout: this.timeout
@@ -55,9 +56,6 @@ class ScreenshotService {
         console.log(`  ⚡ Batch completed in ${batchDuration.toFixed(2)}s`);
         console.log(`✅ Completed ${completed}/${urls.length} URLs`);
       }
-      
-      // Close browser
-      await screenshotCapture.close();
       
       // Calculate statistics
       const successful = allResults.filter(r => r.success);
@@ -116,6 +114,16 @@ class ScreenshotService {
         failed: [],
         stats: {}
       };
+    } finally {
+      // CRITICAL: Always close the browser
+      if (screenshotCapture) {
+        try {
+          await screenshotCapture.close();
+          console.log('🔒 Screenshot service cleanup completed');
+        } catch (error) {
+          console.error('❌ Error during screenshot service cleanup:', error);
+        }
+      }
     }
   }
 

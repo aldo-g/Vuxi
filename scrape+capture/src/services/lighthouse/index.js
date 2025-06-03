@@ -5,8 +5,9 @@ const { LighthouseAuditor } = require('./auditor');
 class LighthouseService {
   constructor(options = {}) {
     this.outputDir = options.outputDir || './data/lighthouse';
-    this.retries = options.retries || 1; // Keep reduced retries
-    this.concurrent = 1; // Back to sequential for stability
+    this.retries = options.retries || 1;
+    this.concurrent = 1; // Keep sequential for stability
+    this.timeout = options.timeout || 60000; // 60 second timeout per audit
   }
 
   async auditAll(urls) {
@@ -14,7 +15,7 @@ class LighthouseService {
     console.log(`📋 URLs to audit: ${urls.length}`);
     console.log(`📁 Output: ${this.outputDir}`);
     console.log(`🔄 Retries: ${this.retries}`);
-    console.log(`⚡ Mode: Sequential (optimized for reliability)`);
+    console.log(`⏰ Timeout: ${this.timeout}ms per audit`);
     
     const startTime = Date.now();
     
@@ -25,13 +26,14 @@ class LighthouseService {
       // Initialize single auditor for reuse
       const auditor = new LighthouseAuditor({
         outputDir: this.outputDir,
-        retries: this.retries
+        retries: this.retries,
+        timeout: this.timeout
       });
       
-      // Process URLs sequentially but with optimizations
+      // Process URLs sequentially
       const allResults = [];
       
-      console.log('\n🚦 Running optimized sequential Lighthouse audits...');
+      console.log('\n🚦 Running sequential Lighthouse audits...');
       
       for (let i = 0; i < urls.length; i++) {
         const url = urls[i];
@@ -86,8 +88,9 @@ class LighthouseService {
         successful_audits: successful.length,
         failed_audits: failed.length,
         settings: {
-          mode: 'sequential-optimized',
-          retries: this.retries
+          mode: 'sequential',
+          retries: this.retries,
+          timeout: this.timeout
         },
         results: allResults.map(r => ({
           url: r.url,
@@ -103,8 +106,6 @@ class LighthouseService {
       
       // Summary
       console.log('\n🎉 Lighthouse audits completed');
-      console.log(`⚡ Speed: ${(successful.length / duration).toFixed(1)} audits/second`);
-      console.log(`🚀 Optimizations: Fast browser launch, reduced audits, minimal retries`);
       console.log(`⏱️  Duration: ${duration.toFixed(2)} seconds`);
       console.log(`✅ Successful: ${successful.length}/${urls.length}`);
       console.log(`❌ Failed: ${failed.length}/${urls.length}`);

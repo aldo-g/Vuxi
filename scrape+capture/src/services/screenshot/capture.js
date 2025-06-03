@@ -33,8 +33,8 @@ class ScreenshotCapture {
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
           '--disable-renderer-backgrounding',
-          '--memory-pressure-off', // Help with concurrent operations
-          '--max_old_space_size=4096' // Increase memory limit
+          '--memory-pressure-off',
+          '--max_old_space_size=4096'
         ]
       });
     }
@@ -43,8 +43,14 @@ class ScreenshotCapture {
   async close() {
     if (this.browser) {
       console.log('🛑 Closing browser...');
-      await this.browser.close();
-      this.browser = null;
+      try {
+        await this.browser.close();
+        this.browser = null;
+        console.log('✅ Browser closed successfully');
+      } catch (error) {
+        console.error('⚠️ Error closing browser:', error.message);
+        this.browser = null;
+      }
     }
   }
   
@@ -62,7 +68,6 @@ class ScreenshotCapture {
       context = await this.browser.newContext({
         viewport: this.viewport,
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        // Optimize for concurrent operations
         reducedMotion: 'reduce',
         colorScheme: 'light'
       });
@@ -84,8 +89,8 @@ class ScreenshotCapture {
       console.log(`  ✨ Applying enhancements...`);
       await this.enhancer.enhance(page);
       
-      // Reduced wait time for concurrent operations
-      await page.waitForTimeout(1500); // Reduced from 2000ms
+      // Wait for content to settle
+      await page.waitForTimeout(1500);
       
       // Generate filename and path
       const filename = createFilename(url, index);
