@@ -32,4 +32,6 @@ package-lock.json
 # OS files
 .DS_Store
 Thumbs.db
-EOF
+
+
+all_analysis_runs/
