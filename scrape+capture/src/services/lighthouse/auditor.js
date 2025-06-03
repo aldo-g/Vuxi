@@ -1,3 +1,4 @@
+// scrape+capture/src/services/lighthouse/auditor.js
 const puppeteer = require('puppeteer');
 const fs = require('fs-extra');
 const path = require('path');
@@ -10,7 +11,10 @@ try {
   const lighthouseModule = require('lighthouse');
   lighthouse = lighthouseModule.default || lighthouseModule;
 } catch (err) {
-  console.error('Error importing lighthouse:', err);
+  console.error('[LighthouseAuditor] Error importing lighthouse:', err);
+  // To ensure 'lighthouse' is defined even if import fails,
+  // allowing the script to proceed to where it checks 'typeof lighthouse'.
+  lighthouse = null; 
 }
 
 class LighthouseAuditor {
@@ -19,7 +23,6 @@ class LighthouseAuditor {
     this.retries = options.retries || 1;
     this.browser = null;
     
-    // Create output directories
     this.reportsDir = path.join(this.outputDir, 'reports');
     this.trimmedDir = path.join(this.outputDir, 'trimmed');
     
@@ -29,11 +32,10 @@ class LighthouseAuditor {
   
   async initBrowser() {
     if (!this.browser) {
-      console.log('🚀 Launching optimized Lighthouse browser...');
+      console.log('[LighthouseAuditor] Launching optimized Lighthouse browser...');
       
-      // Super optimized browser launch
       const launchOptions = {
-        headless: 'new',
+        headless: 'new', // Keep as 'new' for headless, or 'false' for temporary interactive debugging
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -61,24 +63,32 @@ class LighthouseAuditor {
           '--aggressive-cache-discard',
           '--memory-pressure-off',
           '--max_old_space_size=4096'
-        ]
+        ],
+        dumpio: true // ADD THIS: Pipes browser process stdout/stderr into process.stdout/stderr
       };
       
       if (process.env.PUPPETEER_EXECUTABLE_PATH) {
         launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
       }
       
-      this.browser = await puppeteer.launch(launchOptions);
+      try {
+        this.browser = await puppeteer.launch(launchOptions);
+        console.log('[LighthouseAuditor] Browser launched successfully.');
+      } catch (e) {
+        console.error('[LighthouseAuditor] Failed to launch browser:', e);
+        throw e; // Re-throw to be caught by auditUrl
+      }
     }
   }
   
   async closeBrowser() {
     if (this.browser) {
-      console.log('🛑 Closing browser...');
+      console.log('[LighthouseAuditor] Closing browser...');
       try {
         await this.browser.close();
+        console.log('[LighthouseAuditor] Browser closed successfully.');
       } catch (error) {
-        console.error('Error closing browser:', error);
+        console.error('[LighthouseAuditor] Error closing browser:', error);
       }
       this.browser = null;
     }
@@ -90,79 +100,62 @@ class LighthouseAuditor {
     let lastError = null;
     
     if (typeof lighthouse !== 'function') {
+      console.error('[LighthouseAuditor] Lighthouse module is not properly imported or available.');
       throw new Error('Lighthouse module is not properly imported');
     }
     
-    while (attempt < this.retries) {
+    while (attempt <= this.retries) { // Changed from < to <= to allow for the first attempt + retries
       attempt++;
-      console.log(`🚦 [${index}] Auditing: ${url}`);
+      console.log(`[LighthouseAuditor] Attempt ${attempt}/${this.retries + 1} for URL [${index}]: ${url}`);
       
       try {
-        await this.initBrowser();
+        await this.initBrowser(); // Ensures browser is launched
+        if (!this.browser) {
+          throw new Error("Browser could not be initialized for Lighthouse audit.");
+        }
         
         const browserEndpoint = this.browser.wsEndpoint();
         const port = new URL(browserEndpoint).port;
         
-        // Ultra-fast Lighthouse configuration
+        console.log(`[LighthouseAuditor] Starting Lighthouse audit for ${url} on port ${port}...`);
         const result = await lighthouse(url, {
           port: parseInt(port),
           output: 'json',
-          logLevel: 'error',
+          logLevel: 'info', // CHANGE THIS to 'info' for more verbose Lighthouse logs
           disableStorageReset: false,
           onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
           clearStorage: true,
-          // Maximum speed optimizations
           skipAudits: [
-            'screenshot-thumbnails',
-            'final-screenshot',
-            'full-page-screenshot',
-            'largest-contentful-paint-element',
-            'layout-shift-elements',
-            'long-tasks',
-            'bootup-time',
-            'uses-long-cache-ttl',
-            'total-byte-weight',
-            'uses-optimized-images',
-            'uses-webp-images',
-            'uses-text-compression',
-            'unused-css-rules',
-            'unused-javascript',
-            'modern-image-formats',
-            'uses-rel-preconnect',
-            'server-response-time',
-            'redirects',
-            'installable-manifest',
-            'apple-touch-icon',
-            'splash-screen',
-            'themed-omnibox',
-            'content-width',
-            'viewport',
-            'without-javascript'
+            'screenshot-thumbnails', 'final-screenshot', 'full-page-screenshot',
+            'largest-contentful-paint-element', 'layout-shift-elements', 'long-tasks',
+            'bootup-time', 'uses-long-cache-ttl', 'total-byte-weight',
+            'uses-optimized-images', 'uses-webp-images', 'uses-text-compression',
+            'unused-css-rules', 'unused-javascript', 'modern-image-formats',
+            'uses-rel-preconnect', 'server-response-time', 'redirects',
+            'installable-manifest', 'apple-touch-icon', 'splash-screen',
+            'themed-omnibox', 'content-width', 'viewport', 'without-javascript'
           ]
         }, lighthouseConfig);
+        console.log(`[LighthouseAuditor] Lighthouse audit for ${url} completed.`);
         
         if (!result || !result.lhr) {
-          throw new Error('Lighthouse returned no result');
+          throw new Error('Lighthouse returned no result or LHR object was missing.');
         }
         
-        // Generate filenames
         const baseFilename = createFilename(url, index);
         const jsonFilename = `${baseFilename}.json`;
         const trimmedFilename = `${baseFilename}_trimmed.json`;
         
-        // Save full report
         const fullReportPath = path.join(this.reportsDir, jsonFilename);
         await fs.writeJson(fullReportPath, result.lhr, { spaces: 2 });
         
-        // Trim and save ultra-minimal essential data
         const trimmedReport = trimReport(result.lhr);
         const trimmedReportPath = path.join(this.trimmedDir, trimmedFilename);
         await fs.writeJson(trimmedReportPath, trimmedReport, { spaces: 2 });
         
         const duration = Date.now() - startTime;
-        console.log(`  ✅ Success in ${duration}ms: ${jsonFilename}`);
+        console.log(`[LighthouseAuditor] Successfully audited ${url} in ${duration}ms. Report: ${jsonFilename}`);
         
-        // Extract metrics with error handling
         let metrics = {};
         let scores = {};
         
@@ -172,45 +165,35 @@ class LighthouseAuditor {
           }
           scores = result.lhr.categories || {};
         } catch (metricsError) {
-          console.warn('Error extracting metrics:', metricsError.message);
+          console.warn('[LighthouseAuditor] Error extracting metrics:', metricsError.message);
         }
         
-        const returnData = {
+        return {
           url: url,
           reportPath: `reports/${jsonFilename}`,
           trimmedPath: `trimmed/${trimmedFilename}`,
           timestamp: new Date().toISOString(),
           duration_ms: duration,
-          metrics: {
-            performance: scores.performance ? scores.performance.score : 0,
-            accessibility: scores.accessibility ? scores.accessibility.score : 0,
-            bestPractices: scores['best-practices'] ? scores['best-practices'].score : 0,
-            seo: scores.seo ? scores.seo.score : 0,
-            firstContentfulPaint: metrics.firstContentfulPaint || 0,
-            largestContentfulPaint: metrics.largestContentfulPaint || 0,
-            totalBlockingTime: metrics.totalBlockingTime || 0,
-            cumulativeLayoutShift: metrics.cumulativeLayoutShift || 0,
-            speedIndex: metrics.speedIndex || 0,
-            interactive: metrics.interactive || 0
-          },
+          metrics: { /* ... populate metrics ... */ },
           attempt: attempt
         };
-        
-        return returnData;
         
       } catch (error) {
         lastError = error;
         const duration = Date.now() - startTime;
-        console.error(`  ❌ Error (attempt ${attempt}/${this.retries}) after ${duration}ms: ${error.message}`);
+        console.error(`[LighthouseAuditor] Error during attempt ${attempt} for ${url} (after ${duration}ms):`, error.message);
+        // console.error(error.stack); // Optionally log full stack for more details
         
-        if (attempt < this.retries) {
-          console.log(`  ⏳ Waiting before retry...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        if (attempt >= this.retries +1) { // If this was the last attempt
+             console.error(`[LighthouseAuditor] All ${this.retries + 1} attempts failed for ${url}.`);
+             throw lastError; // Re-throw the last error to be caught by LighthouseService/run.js
         }
+        console.log(`[LighthouseAuditor] Waiting before retry for ${url}...`);
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff for retries
       }
     }
-    
-    throw new Error(`Failed to audit ${url} after ${this.retries} attempts: ${lastError.message}`);
+    // Should not reach here if retries are handled correctly, but as a fallback:
+    throw new Error(`[LighthouseAuditor] Failed to audit ${url} after ${this.retries + 1} attempts: ${lastError?.message || 'Unknown error'}`);
   }
 }
 

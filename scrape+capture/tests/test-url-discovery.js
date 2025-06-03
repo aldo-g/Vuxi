@@ -17,7 +17,7 @@ async function testURLDiscoveryService() {
   
   try {
     // Test with Edinburgh Peace Institute
-    const result = await service.discover('https://pre-sustainability.com');
+    const result = await service.discover('https://www.edinburghpeaceinstitute.org');
     
     if (result.success) {
       console.log('✅ URL Discovery test PASSED');

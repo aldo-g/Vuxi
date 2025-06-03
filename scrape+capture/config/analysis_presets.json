@@ -1,0 +1,44 @@
+{
+    "epi": {
+      "URL": "https://edinburghpeaceinstitute.org",
+      "ORG_NAME": "Edinburgh Peace Institute",
+      "ORG_TYPE": "non-profit",
+      "ORG_PURPOSE": "to encourage donations and sign-ups for trainings",
+      "ANALYSIS_OPTIONS": {
+        "maxPages": 10,
+        "fastMode": true,
+        "enableSimpleFilter": false,
+        "enableHierarchicalSampling": true,
+        "maxUrlsTotal": 10 
+      }
+    },
+    "presustainability": {
+      "URL": "https://www.presustainability.com",
+      "ORG_NAME": "Presustainability",
+      "ORG_TYPE": "Environmental Life Cycle Assessment Consultancy Which offers SaaS solution called SimaPro",
+      "ORG_PURPOSE": "To Promote and offer consulting services, and build professional credibility",
+      "ANALYSIS_OPTIONS": {
+        "maxPages": 10,
+        "timeout": 10000,
+        "fastMode": true,
+        "enableSimpleFilter": true, 
+        "enableHierarchicalSampling": true,
+        "maxUrlsTotal": 15 
+      }
+    },
+    "nopublicpurpose": {
+      "URL": "https://www.nopublicpurpose.com",
+      "ORG_NAME": "No Public Purpose",
+      "ORG_TYPE": "Amsterdam Based Music Collective",
+      "ORG_PURPOSE": "To Promote there events and org",
+      "ANALYSIS_OPTIONS": {
+        "maxPages": 10,
+        "timeout": 10000,
+        "fastMode": true,
+        "enableSimpleFilter": false,
+        "enableHierarchicalSampling": true,
+        "maxUrlsTotal": 10
+      }
+    }
+  }
+  
