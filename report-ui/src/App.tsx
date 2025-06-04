@@ -5,11 +5,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Import your page components
-import VuxiLanding from "./pages/VuxiLanding"; // New: Vuxi Landing Page
-import ReportList from "./pages/ReportList";   // Existing: Will be at /reports
-import Index from "./pages/Index";             // Existing: Report Detail Overview
-import PageAnalysis from "./pages/PageAnalysis"; // Existing: For individual page analysis view
-import NotFound from "./pages/NotFound";         // Existing: For handling 404 errors
+import VuxiLanding from "./pages/VuxiLanding";     // New: Vuxi Landing Page
+import ReportList from "./pages/ReportList";       // Existing: Will be at /reports
+import Index from "./pages/Index";                 // Existing: Report Detail Overview
+import PageAnalysis from "./pages/PageAnalysis";   // Existing: For individual page analysis view
+import ConductAnalysis from "./pages/ConductAnalysis"; // New: Page to conduct new analysis
+import NotFound from "./pages/NotFound";             // Existing: For handling 404 errors
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,9 @@ const App = () => (
 
           {/* Route to display the detailed analysis of a specific page within a specific report run */}
           <Route path="/report/:reportId/page/:pageId" element={<PageAnalysis />} />
+
+          {/* Route for the new Conduct Analysis page */}
+          <Route path="/conduct-analysis" element={<ConductAnalysis />} />
 
           {/* Catch-all route for 404 Not Found pages */}
           <Route path="*" element={<NotFound />} />
