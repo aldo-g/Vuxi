@@ -21,7 +21,7 @@
         "maxPages": 10,
         "timeout": 10000,
         "fastMode": true,
-        "enableSimpleFilter": true, 
+        "enableSimpleFilter": false, 
         "enableHierarchicalSampling": true,
         "maxUrlsTotal": 15 
       }

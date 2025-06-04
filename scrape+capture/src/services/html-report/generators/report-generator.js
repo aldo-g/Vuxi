@@ -76,7 +76,7 @@ class ReportGenerator {
       metadata: analysisData.metadata,
 
       // Convenience fields for easier access in React root components
-      organization: analysisData.metadata?.organization_name || "Presustainability",
+      organization: analysisData.orgContext?.org_name || analysisData.metadata?.organization_name || "Organization Name Not Provided",
       analysis_date: new Date(analysisData.timestamp || analysisData.metadata?.generated_at || Date.now()).toLocaleDateString(),
       total_pages_analyzed: cleanedOverallSummary.total_pages_analyzed,
       overall_score: cleanedOverallSummary.overall_score,
