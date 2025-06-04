@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, FileText, Target as TargetIcon, CheckCircle2, AlertTriangleIcon, Info, Home, ImageOff } from "lucide-react";
+import { ExternalLink, FileText, Target as TargetIcon, CheckCircle2, AlertTriangleIcon, Info, Home, ImageOff, MessageSquareHeart } from "lucide-react";
 
 // Interfaces
 interface PageIssue {
@@ -355,7 +355,7 @@ const PageAnalysis = () => {
           <h1 className="text-3xl font-bold text-slate-900 mb-4">Error Loading Report Data</h1>
           <p className="text-slate-600 mb-8 text-lg">Could not load data for report ID: {reportId}.</p>
           {reportError && <pre className="text-xs text-red-700 bg-red-50 p-4 rounded-md text-left mt-4">{reportError.message}</pre>}
-          <Link to="/" className="mt-8 inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          <Link to="/reports" className="mt-8 inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
             <Home size={18}/> Back to Report List
           </Link>
         </div>
@@ -389,11 +389,11 @@ const PageAnalysis = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="mb-10">
           <Link
-            to={`/report/${reportId}`}
+            to={`/report/${reportId}`} // This link correctly points to the report overview
             className="inline-flex items-center gap-3 text-slate-600 hover:text-blue-600 transition-all duration-300 font-medium group"
           >
             <Home className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform duration-300" />
-            Back to: {reportData?.metadata?.organization_name || `Report ${reportId}`}
+            Back to Report: {reportData?.metadata?.organization_name || `ID ${reportId}`}
           </Link>
         </div>
 
@@ -701,10 +701,10 @@ const PageAnalysis = () => {
                         className="max-w-full h-auto rounded-xl border-2 border-slate-200 shadow-2xl mx-auto"
                         onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            target.onerror = null;
-                            target.style.display = 'none';
-                            const fallback = document.getElementById(`screenshot-fallback-${pageData.id}`);
-                            if(fallback) fallback.style.display = 'block';
+                            target.onerror = null; // Prevent infinite loop if fallback also fails
+                            target.style.display = 'none'; // Hide broken image
+                            const fallbackDiv = document.getElementById(`screenshot-fallback-${pageData.id}`);
+                            if (fallbackDiv) fallbackDiv.style.display = 'block'; // Show fallback
                         }}
                     />
                  ) : null }

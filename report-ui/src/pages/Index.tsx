@@ -430,7 +430,7 @@ const Index = () => {
             Could not load the analysis data for this report. Please ensure "report-data.json" is available at `/all_analysis_runs/${reportId}/report-data.json`.
           </p>
           {error && <pre className="text-xs text-red-700 bg-red-50 p-4 rounded-md text-left mt-4">{error.message}</pre>}
-          <Link to="/" className="mt-8 inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          <Link to="/reports" className="mt-8 inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
             <Home size={18} />
             Back to Report List
           </Link>
@@ -444,7 +444,7 @@ const Index = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-10">
             <Link
-                to="/"
+                to="/reports"
                 className="inline-flex items-center gap-3 text-slate-600 hover:text-blue-600 transition-all duration-300 font-medium group"
             >
                 <Home className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform duration-300" />
