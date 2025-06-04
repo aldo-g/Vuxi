@@ -9,7 +9,7 @@
         "timeout": 10000,
         "fastMode": true,
         "enableHierarchicalSampling": true,
-        "maxUrlsTotal": 15 
+        "maxUrlsTotal": 10 
       }
     },
     "epi": {
