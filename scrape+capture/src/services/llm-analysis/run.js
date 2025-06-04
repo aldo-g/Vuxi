@@ -51,7 +51,7 @@ async function main() {
             type: 'string',
             description: 'LLM model to use.',
             // Default to a faster/cheaper model for batch processing, can be overridden by ANALYSIS_OPTIONS
-            default: process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307',
+            default: process.env.ANTHROPIC_MODEL || 'claude-3-7-sonnet-20250219',
         })
         .option('concurrency', {
             type: 'number',

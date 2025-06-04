@@ -40,7 +40,7 @@ async function main() {
         .option('model', {
             type: 'string',
             description: 'LLM model to use for formatting (if applicable).',
-            default: process.env.ANTHROPIC_MODEL_FORMATTING || 'claude-3-haiku-20240307', // Or a specific model for formatting
+            default: process.env.ANTHROPIC_MODEL_FORMATTING || 'claude-3-7-sonnet-20250219', // Or a specific model for formatting
         })
         // Add other options your FormattingService might accept
         .help()

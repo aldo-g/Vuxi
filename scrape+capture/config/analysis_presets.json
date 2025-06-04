@@ -15,7 +15,7 @@
     "epi": {
       "URL": "https://edinburghpeaceinstitute.org",
       "ORG_NAME": "Edinburgh Peace Institute",
-      "ORG_TYPE": "non-profit",
+      "ORG_TYPE": "peace and conflict resolution non-profit",
       "ORG_PURPOSE": "to encourage donations and sign-ups for trainings",
       "ANALYSIS_OPTIONS": {
         "maxPages": 10,
@@ -36,6 +36,32 @@
         "enableHierarchicalSampling": true,
         "maxUrlsTotal": 10
       }
-    }
+    },
+    "CGMT": {
+          "URL": "https://www.camgrant.org.uk",
+          "ORG_NAME": "Cameron Grant Memorial Trust",
+          "ORG_TYPE": "Mental health non-profit",
+          "ORG_PURPOSE": "To actively promote the charity, including encouraging engagement and donations, and to encourage people to speak up about mental health",
+          "ANALYSIS_OPTIONS": {
+            "maxPages": 10,
+            "timeout": 10000,
+            "fastMode": true,
+            "enableHierarchicalSampling": true,
+            "maxUrlsTotal": 10
+          }
+        },
+      "Amsterdam": {
+          "URL": "https://www.ams-institute.org",
+          "ORG_NAME": "AMS Institute",
+          "ORG_TYPE": "start up accelerater",
+          "ORG_PURPOSE": "accelerate the development of science-based solutions to make cities resilient, regenerative and just",
+          "ANALYSIS_OPTIONS": {
+            "maxPages": 10,
+            "timeout": 10000,
+            "fastMode": true,
+            "enableHierarchicalSampling": true,
+            "maxUrlsTotal": 10
+          }
+        }
   }
   
