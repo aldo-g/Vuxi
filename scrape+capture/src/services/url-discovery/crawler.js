@@ -14,11 +14,15 @@ class URLCrawler {
     this.discoveredUrls = new Set();
     this.urlsToVisit = [];
     this.deduplicationKeys = new Set();
+    this.actualBaseUrl = null; // Store the final URL after redirects
     this.stats = {
       pagesCrawled: 0,
       pagesSkipped: 0,
       errors: 0,
       duplicatesSkipped: 0,
+      redirectDetected: false,
+      originalUrl: null,
+      finalUrl: null,
       startTime: Date.now()
     };
   }
@@ -35,10 +39,13 @@ class URLCrawler {
       console.log(`    🔍 Raw links found: ${links.length}`);
       
       const validLinks = [];
+      // Use the actual base URL (after redirects) for domain checking
+      const domainCheckUrl = this.actualBaseUrl || baseUrl;
+      
       for (const link of links) {
         if (!isValidUrl(link)) continue;
         if (!link.startsWith('http://') && !link.startsWith('https://')) continue;
-        if (!isSameDomain(baseUrl, link)) continue;
+        if (!isSameDomain(domainCheckUrl, link)) continue;
         
         const normalizedUrl = normalizeUrl(link);
         if (shouldExcludeUrl(normalizedUrl, this.excludePatterns)) continue;
@@ -94,6 +101,28 @@ class URLCrawler {
         console.log(`  ⚠️  [${pageIndex}] Warning: HTTP ${response ? response.status() : 'unknown'} for ${url}`);
         this.stats.pagesSkipped++;
         return [];
+      }
+      
+      // Check for redirects on the first page
+      if (pageIndex === 1) {
+        const finalUrl = page.url();
+        if (finalUrl !== url) {
+          console.log(`  🔄 [${pageIndex}] Redirect detected:`);
+          console.log(`      Original: ${url}`);
+          console.log(`      Final: ${finalUrl}`);
+          
+          this.actualBaseUrl = finalUrl;
+          this.stats.redirectDetected = true;
+          this.stats.originalUrl = url;
+          this.stats.finalUrl = finalUrl;
+          
+          // Add the final URL to our discovered URLs if it's not already there
+          const normalizedFinalUrl = normalizeUrl(finalUrl);
+          if (!this.discoveredUrls.has(normalizedFinalUrl)) {
+            this.discoveredUrls.add(normalizedFinalUrl);
+            this.deduplicationKeys.add(createDeduplicationKey(normalizedFinalUrl));
+          }
+        }
       }
       
       // Small wait for dynamic content
@@ -164,6 +193,9 @@ class URLCrawler {
       this.discoveredUrls.add(normalizedStartUrl);
       this.deduplicationKeys.add(createDeduplicationKey(normalizedStartUrl));
       
+      // Store original URL for stats
+      this.stats.originalUrl = normalizedStartUrl;
+      
       console.log(`🚀 Starting concurrent crawl (${this.concurrency} parallel) from: ${normalizedStartUrl}`);
       
       let processedCount = 0;
@@ -199,6 +231,11 @@ class URLCrawler {
         
         console.log(`  ⚡ Batch completed in ${batchDuration.toFixed(2)}s`);
         console.log(`  📊 Queue: ${this.urlsToVisit.length} | Discovered: ${this.discoveredUrls.size} | Visited: ${this.visitedUrls.size} | Duplicates: ${this.stats.duplicatesSkipped}`);
+        
+        // Show redirect info if detected
+        if (this.stats.redirectDetected && processedCount === currentBatch.length) {
+          console.log(`  🔄 Using redirected domain: ${this.actualBaseUrl}`);
+        }
       }
       
       const finalUrls = deduplicateUrls(Array.from(this.discoveredUrls));
@@ -207,6 +244,11 @@ class URLCrawler {
       this.stats.finalUrlCount = finalUrls.length;
       this.stats.totalUrlsDiscovered = this.discoveredUrls.size;
       this.stats.duplicatesRemoved = this.discoveredUrls.size - finalUrls.length;
+      
+      // Set final URL in stats if no redirect was detected
+      if (!this.stats.finalUrl) {
+        this.stats.finalUrl = this.stats.originalUrl;
+      }
       
       return {
         urls: finalUrls,

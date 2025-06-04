@@ -1,24 +1,24 @@
 // scrape+capture/src/batch_analyzer.js
 
-// Load environment variables FIRST
-require('dotenv').config();
-
 // Import necessary modules
-const fs = require('fs-extra');
+const fs = require('fs-extra'); // fs-extra for promise-based fs and ensureDir
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawnSync } = require('child_process'); // Using spawnSync for simplicity in waiting for completion
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 
 // --- Configuration ---
-const DEFAULT_PRESETS_FILE = path.join(__dirname, '..', 'config', 'analysis_presets.json');
-const DEFAULT_BASE_OUTPUT_DIR = path.resolve(process.cwd(), "all_analysis_runs");
-const NODE_SERVICES_BASE_PATH = path.join(__dirname, 'services');
+const DEFAULT_PRESETS_FILE = path.join(__dirname, '..', 'config', 'analysis_presets.json'); // Adjusted path
+const DEFAULT_BASE_OUTPUT_DIR = path.resolve(process.cwd(), "all_analysis_runs"); // Output relative to where script is run
+const NODE_SERVICES_BASE_PATH = path.join(__dirname, 'services'); // Relative to this script's location
+const MANIFEST_FILE_NAME = 'all_analysis_runs_manifest.json';
 
 // --- Helper Functions ---
 
 /**
  * Sanitizes a string to be safe for directory or file names.
+ * @param {string} name - The string to sanitize.
+ * @returns {string} The sanitized string.
  */
 function sanitizeForPath(name) {
     if (!name || typeof name !== 'string') return 'invalid_name';
@@ -27,6 +27,10 @@ function sanitizeForPath(name) {
 
 /**
  * Runs a Node.js service command and handles errors.
+ * @param {string[]} commandParts - Array of command and arguments.
+ * @param {string} serviceName - Name of the service for logging.
+ * @param {string} presetKey - Key of the current preset for logging.
+ * @returns {boolean} True if successful, false otherwise.
  */
 function runNodeService(commandParts, serviceName, presetKey) {
     console.log(`\nINFO [${presetKey}]: Starting ${serviceName}...`);
@@ -36,8 +40,8 @@ function runNodeService(commandParts, serviceName, presetKey) {
 
     try {
         const result = spawnSync(command, args, {
-            stdio: 'inherit',
-            shell: false,
+            stdio: 'inherit', // Inherit stdio to see output directly, or use 'pipe' to capture
+            shell: false, // Safer; ensure paths with spaces are handled if any part of command is constructed from user input
             encoding: 'utf-8'
         });
 
@@ -46,7 +50,7 @@ function runNodeService(commandParts, serviceName, presetKey) {
             if (result.stderr) {
                 console.error(`STDERR [${presetKey} - ${serviceName}]:\n${result.stderr}`);
             }
-            if (result.stdout) {
+            if (result.stdout) { // Log stdout too on error for more context
                 console.error(`STDOUT [${presetKey} - ${serviceName}]:\n${result.stdout}`);
             }
             return false;
@@ -61,6 +65,100 @@ function runNodeService(commandParts, serviceName, presetKey) {
         }
         return false;
     }
+}
+
+/**
+ * Loads existing manifest or creates a new one
+ * @param {string} baseOutputDir - Base output directory
+ * @returns {Array} Existing manifest entries
+ */
+async function loadManifest(baseOutputDir) {
+    const manifestPath = path.join(baseOutputDir, MANIFEST_FILE_NAME);
+    
+    try {
+        if (await fs.pathExists(manifestPath)) {
+            const manifest = await fs.readJson(manifestPath);
+            return Array.isArray(manifest) ? manifest : [];
+        }
+    } catch (error) {
+        console.warn(`Warning: Could not load existing manifest: ${error.message}`);
+    }
+    
+    return [];
+}
+
+/**
+ * Saves the manifest file
+ * @param {string} baseOutputDir - Base output directory
+ * @param {Array} manifestEntries - Array of manifest entries
+ */
+async function saveManifest(baseOutputDir, manifestEntries) {
+    const manifestPath = path.join(baseOutputDir, MANIFEST_FILE_NAME);
+    
+    try {
+        // Sort by date (newest first)
+        const sortedEntries = manifestEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        await fs.writeJson(manifestPath, sortedEntries, { spaces: 2 });
+        console.log(`📄 Manifest updated: ${manifestPath}`);
+    } catch (error) {
+        console.error(`Error saving manifest: ${error.message}`);
+    }
+}
+
+/**
+ * Creates a manifest entry for a completed analysis run
+ * @param {string} presetKey - Preset key
+ * @param {Object} config - Preset configuration
+ * @param {string} runDirName - Run directory name
+ * @param {string} currentRunBaseDir - Full path to run directory
+ * @returns {Object} Manifest entry
+ */
+function createManifestEntry(presetKey, config, runDirName, currentRunBaseDir) {
+    const timestamp = new Date().toISOString();
+    const displayDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    
+    return {
+        id: runDirName,
+        name: `${config.ORG_NAME || presetKey} Analysis (${displayDate})`,
+        date: timestamp,
+        description: `Analysis report for ${config.ORG_NAME || presetKey} generated on ${displayDate}.`,
+        preset: presetKey,
+        organizationName: config.ORG_NAME || presetKey,
+        organizationType: config.ORG_TYPE || 'organization',
+        organizationPurpose: config.ORG_PURPOSE || 'to achieve its business goals',
+        targetUrl: config.URL,
+        runDirectory: path.basename(currentRunBaseDir),
+        analysisOptions: config.ANALYSIS_OPTIONS || {},
+        status: 'completed'
+    };
+}
+
+/**
+ * Removes incomplete runs from manifest (runs that don't have index.html)
+ * @param {string} baseOutputDir - Base output directory
+ * @param {Array} manifestEntries - Current manifest entries
+ * @returns {Array} Cleaned manifest entries
+ */
+async function cleanupManifest(baseOutputDir, manifestEntries) {
+    const cleanedEntries = [];
+    
+    for (const entry of manifestEntries) {
+        const runDir = path.join(baseOutputDir, entry.runDirectory || entry.id);
+        const indexHtmlPath = path.join(runDir, 'index.html');
+        
+        if (await fs.pathExists(indexHtmlPath)) {
+            cleanedEntries.push(entry);
+        } else {
+            console.log(`📝 Removing incomplete run from manifest: ${entry.id}`);
+        }
+    }
+    
+    return cleanedEntries;
 }
 
 /**
@@ -121,6 +219,13 @@ async function main() {
     await fs.ensureDir(baseOutputDir);
     console.log(`INFO: Base output directory: ${baseOutputDir}`);
 
+    // Load existing manifest
+    let manifestEntries = await loadManifest(baseOutputDir);
+    console.log(`📄 Loaded existing manifest with ${manifestEntries.length} entries`);
+
+    // Track successful runs for this batch
+    const successfulRuns = [];
+
     for (const [presetKey, config] of Object.entries(presetsToRun)) {
         console.log(`\n==================== PROCESSING PRESET: ${presetKey} ====================`);
 
@@ -168,12 +273,13 @@ async function main() {
         const formattedDataFile = path.join(llmAndFormattingOutputDir, "structured-analysis.json");
 
         let currentStepNumber = 1;
-        const totalSteps = 5;
+        const totalSteps = 5; // URL Discovery, Screenshots, Lighthouse, LLM+Format, Report
+        let runFailed = false;
 
         // --- 1. URL Discovery ---
         if (!argv.skipToStep || argv.skipToStep === "urlDiscovery") {
             console.log(`\n--- [${presetKey}] Step ${currentStepNumber}/${totalSteps}: URL Discovery ---`);
-            const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "url-discovery", "run.js");
+            const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "url-discovery", "run.js"); // Assuming run.js
             const cmd = [
                 "node", scriptPath,
                 "--targetUrl", targetUrl,
@@ -181,17 +287,22 @@ async function main() {
                 "--maxPages", String(analysisOptions.maxPages || 50),
                 "--timeout", String(analysisOptions.timeout || 8000),
                 "--fastMode", String(analysisOptions.fastMode !== undefined ? analysisOptions.fastMode : true).toLowerCase(),
+                "--enableSimpleFilter", String(analysisOptions.enableSimpleFilter !== undefined ? analysisOptions.enableSimpleFilter : false).toLowerCase(),
                 "--maxUrlsTotal", String(analysisOptions.maxUrlsTotal || 10)
             ];
-            if (!runNodeService(cmd, "URL Discovery", presetKey)) continue;
+            if (!runNodeService(cmd, "URL Discovery", presetKey)) {
+                runFailed = true;
+                break;
+            }
         }
         currentStepNumber++;
 
         // --- 2. Screenshot Capture ---
-        if (!argv.skipToStep || ["urlDiscovery", "screenshots"].includes(argv.skipToStep)) {
+        if (!runFailed && (!argv.skipToStep || ["urlDiscovery", "screenshots"].includes(argv.skipToStep))) {
              if (argv.skipToStep === "screenshots" && !await fs.pathExists(discoveredUrlsSimpleFile)) {
                 console.error(`ERROR [${presetKey}]: Skipping to screenshots but '${discoveredUrlsSimpleFile}' not found. Run URL discovery first.`);
-                continue;
+                runFailed = true;
+                break;
             }
             console.log(`\n--- [${presetKey}] Step ${currentStepNumber}/${totalSteps}: Screenshot Capture ---`);
             const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "screenshot", "run.js");
@@ -202,15 +313,19 @@ async function main() {
                 "--viewportWidth", String(analysisOptions.viewportWidth || 1440),
                 "--viewportHeight", String(analysisOptions.viewportHeight || 900)
             ];
-            if (!runNodeService(cmd, "Screenshot Capture", presetKey)) continue;
+            if (!runNodeService(cmd, "Screenshot Capture", presetKey)) {
+                runFailed = true;
+                break;
+            }
         }
         currentStepNumber++;
 
         // --- 3. Lighthouse Audits ---
-        if (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse"].includes(argv.skipToStep)) {
+        if (!runFailed && (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse"].includes(argv.skipToStep))) {
             if (argv.skipToStep === "lighthouse" && !await fs.pathExists(discoveredUrlsSimpleFile)) {
                 console.error(`ERROR [${presetKey}]: Skipping to Lighthouse but '${discoveredUrlsSimpleFile}' not found.`);
-                continue;
+                runFailed = true;
+                break;
             }
             console.log(`\n--- [${presetKey}] Step ${currentStepNumber}/${totalSteps}: Lighthouse Audits ---`);
             const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "lighthouse", "run.js");
@@ -219,37 +334,46 @@ async function main() {
                 "--urlsFile", discoveredUrlsSimpleFile,
                 "--outputDir", lighthouseOutputDir
             ];
-            if (!runNodeService(cmd, "Lighthouse Audits", presetKey)) continue;
+            if (!runNodeService(cmd, "Lighthouse Audits", presetKey)) {
+                runFailed = true;
+                break;
+            }
         }
         currentStepNumber++;
 
         // --- 4a. LLM Analysis ---
-        if (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse", "llm"].includes(argv.skipToStep)) {
+        if (!runFailed && (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse", "llm"].includes(argv.skipToStep))) {
              if (argv.skipToStep === "llm" && (!await fs.pathExists(path.join(screenshotsOutputDir, "desktop")) || !await fs.pathExists(path.join(lighthouseOutputDir, "trimmed")))) {
                 console.error(`ERROR [${presetKey}]: Skipping to LLM analysis but screenshot/lighthouse data not found.`);
-                continue;
+                runFailed = true;
+                break;
             }
             console.log(`\n--- [${presetKey}] Step ${currentStepNumber}/${totalSteps}: LLM Analysis ---`);
             const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "llm-analysis", "run.js");
             const cmd = [
                 "node", scriptPath,
-                "--screenshotsDir", path.join(screenshotsOutputDir, "desktop"), // Pass the full path to desktop folder
-                "--lighthouseDir", path.join(lighthouseOutputDir, "trimmed"),   // Pass the full path to trimmed folder
+                "--screenshotsDir", path.join(screenshotsOutputDir, "desktop"),
+                "--lighthouseDir", path.join(lighthouseOutputDir, "trimmed"),
                 "--outputDir", llmAndFormattingOutputDir,
                 "--orgName", orgName,
                 "--orgType", orgType,
                 "--orgPurpose", orgPurpose,
-                "--model", analysisOptions.llmModel || "claude-3-haiku-20240307",
-                "--concurrency", String(analysisOptions.llmConcurrency || 2)
+                "--model", analysisOptions.llmModel || "claude-3-haiku-20240307", // Example: use Haiku for speed/cost
+                "--concurrency", String(analysisOptions.llmConcurrency || 2) // Lower concurrency for LLM
             ];
-            if (!runNodeService(cmd, "LLM Analysis", presetKey)) continue;
+            if (!runNodeService(cmd, "LLM Analysis", presetKey)) {
+                runFailed = true;
+                break;
+            }
         }
+        // No currentStepNumber++ here, formatting is part of this conceptual step.
 
         // --- 4b. Formatting ---
-        if (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse", "llm", "formatting"].includes(argv.skipToStep)) {
+        if (!runFailed && (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse", "llm", "formatting"].includes(argv.skipToStep))) {
             if (argv.skipToStep === "formatting" && !await fs.pathExists(rawLlmAnalysisFile)) {
                 console.error(`ERROR [${presetKey}]: Skipping to Formatting but '${rawLlmAnalysisFile}' not found.`);
-                continue;
+                runFailed = true;
+                break;
             }
             console.log(`\n--- [${presetKey}] Step ${currentStepNumber}/${totalSteps} (cont.): Formatting ---`);
             const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "formatting", "run.js");
@@ -262,40 +386,80 @@ async function main() {
                 "--orgPurpose", orgPurpose,
                 "--model", analysisOptions.formattingModel || "claude-3-haiku-20240307"
             ];
-            if (!runNodeService(cmd, "Formatting", presetKey)) continue;
+            if (!runNodeService(cmd, "Formatting", presetKey)) {
+                runFailed = true;
+                break;
+            }
         }
         currentStepNumber++;
 
         // --- 5. HTML Report Generation ---
-        if (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse", "llm", "formatting", "report"].includes(argv.skipToStep)) {
+        if (!runFailed && (!argv.skipToStep || ["urlDiscovery", "screenshots", "lighthouse", "llm", "formatting", "report"].includes(argv.skipToStep))) {
             if (argv.skipToStep === "report" && !await fs.pathExists(formattedDataFile)) {
                 console.error(`ERROR [${presetKey}]: Skipping to Report Generation but '${formattedDataFile}' not found.`);
-                continue;
+                runFailed = true;
+                break;
             }
             console.log(`\n--- [${presetKey}] Step ${currentStepNumber}/${totalSteps}: HTML Report Generation ---`);
             const scriptPath = path.join(NODE_SERVICES_BASE_PATH, "html-report", "run.js");
             const cmd = [
                 "node", scriptPath,
                 "--analysisFilePath", formattedDataFile,
-                "--outputDir", currentRunBaseDir,
-                "--screenshotsDir", screenshotsOutputDir
+                "--outputDir", currentRunBaseDir, // Report UI and report-data.json go to the root
+                "--screenshotsDir", screenshotsOutputDir // Source for screenshots to copy
             ];
-            if (!runNodeService(cmd, "HTML Report Generation", presetKey)) continue;
+            if (!runNodeService(cmd, "HTML Report Generation", presetKey)) {
+                runFailed = true;
+                break;
+            }
         }
 
-        console.log(`\nSUCCESS [${presetKey}]: Full analysis pipeline completed. Report at: ${path.join(currentRunBaseDir, 'index.html')}`);
+        if (!runFailed) {
+            console.log(`\nSUCCESS [${presetKey}]: Full analysis pipeline completed. Report at: ${path.join(currentRunBaseDir, 'index.html')}`);
+            
+            // Create manifest entry for this successful run
+            const manifestEntry = createManifestEntry(presetKey, config, runDirName, currentRunBaseDir);
+            successfulRuns.push(manifestEntry);
+            
+            console.log(`📄 Added to manifest: ${manifestEntry.name}`);
+        } else {
+            console.error(`\nFAILED [${presetKey}]: Pipeline failed, removing incomplete directory.`);
+            
+            // Clean up failed run directory
+            try {
+                await fs.remove(currentRunBaseDir);
+            } catch (cleanupError) {
+                console.error(`Warning: Could not clean up failed run directory: ${cleanupError.message}`);
+            }
+        }
+        
         console.log(`==================== FINISHED PRESET: ${presetKey} ====================\n`);
+    }
+
+    // Update manifest with all successful runs
+    if (successfulRuns.length > 0) {
+        // Add new runs to existing manifest
+        manifestEntries.push(...successfulRuns);
+        
+        // Clean up manifest (remove entries for runs that no longer exist)
+        manifestEntries = await cleanupManifest(baseOutputDir, manifestEntries);
+        
+        // Save updated manifest
+        await saveManifest(baseOutputDir, manifestEntries);
+        
+        console.log(`\n📄 Manifest updated with ${successfulRuns.length} new successful runs`);
+        console.log(`📁 Total runs in manifest: ${manifestEntries.length}`);
+        console.log(`📄 Manifest location: ${path.join(baseOutputDir, MANIFEST_FILE_NAME)}`);
     }
 
     console.log("Batch processing finished for all specified presets.");
 }
 
-// Check ANTHROPIC_API_KEY after loading .env
+// Ensure ANTHROPIC_API_KEY is set (or loaded via .env in service scripts)
 if (!process.env.ANTHROPIC_API_KEY) {
     console.warn("WARNING: ANTHROPIC_API_KEY environment variable is not set. LLM-dependent services might fail.");
-    console.warn("Please ensure you have a .env file in the project root with: ANTHROPIC_API_KEY=your-api-key");
-} else {
-    console.log(`INFO: ANTHROPIC_API_KEY loaded successfully (${process.env.ANTHROPIC_API_KEY.substring(0, 8)}...)`);
+    // For a production script, you might want to exit if it's absolutely required here.
+    // For now, we'll let the individual services handle their .env loading or fail.
 }
 
 main().catch(error => {
