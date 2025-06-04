@@ -1,0 +1,42 @@
+{
+  "timestamp": "2025-06-04T23:37:25.958Z",
+  "startUrl": "https://www.edinburghpeaceinstitute.org",
+  "totalFinalUrls": 5,
+  "crawlStats": {
+    "pagesCrawled": 5,
+    "pagesSkipped": 0,
+    "errors": 0,
+    "durationSeconds": 5.236,
+    "totalUrlsDiscoveredByCrawler": 5,
+    "duplicatesSkippedByCrawler": 96,
+    "duplicatesRemovedByCrawler": 0,
+    "urlsAfterInitialCrawlAndDeduplication": 5,
+    "urlsAfterAllFiltering": 5,
+    "hardLimitEnforced": false
+  },
+  "urls": [
+    "https://edinburghpeaceinstitute.org/",
+    "https://edinburghpeaceinstitute.org/training",
+    "https://edinburghpeaceinstitute.org/research",
+    "https://edinburghpeaceinstitute.org/projects",
+    "https://edinburghpeaceinstitute.org/contact-us"
+  ],
+  "excludePatternsUsed": [],
+  "settings": {
+    "maxPagesSetForCrawl": 50,
+    "fastMode": true,
+    "concurrency": 3,
+    "timeout": 8000,
+    "waitTime": 0.5,
+    "enableHierarchicalSamplingConfig": true,
+    "enableCategoryLimitingConfig": true,
+    "maxUrlsPerCategorySet": 5,
+    "hierarchicalOptionsUsed": {
+      "maxDepth": 3,
+      "samplesPerCategory": 2,
+      "prioritizeOverviews": true,
+      "skipLegalPages": true,
+      "maxUrlsTotal": 10
+    }
+  }
+}
