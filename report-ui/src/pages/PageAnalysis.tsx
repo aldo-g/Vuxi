@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ExternalLink, ChevronRight, Zap, Lightbulb, ListChecks, Palette, FileText, ShieldCheck, MessageSquareHeart, Target as TargetIcon, CheckCircle2, AlertTriangleIcon, Info, Home, ImageOff, AlertCircle } from "lucide-react"; // Added Home, ImageOff
+import { ExternalLink, ChevronRight, Zap, Lightbulb, ListChecks, Palette, FileText, ShieldCheck, MessageSquareHeart, Target as TargetIcon, CheckCircle2, AlertTriangleIcon, Info, Home, ImageOff } from "lucide-react"; // Added Home, ImageOff
 
 // Interfaces (ensure these match your actual data structure in report-data.json)
 interface PageIssue {
