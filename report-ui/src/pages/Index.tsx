@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ExternalLink, ChevronRight, Zap, Lightbulb, ListChecks, MapIcon, Palette, Trophy, Route, FileText, TrendingUp, ShieldCheck, MessageSquareHeart, Target as TargetIcon, CheckCircle2, AlertTriangleIcon, Info, Home, AlertCircle } from "lucide-react";
-import { ExecutiveSummary } from "@/components/ExecutiveSummary"; // Assuming this component exists
+import { ExecutiveSummary } from "@/components/ExecutiveSummary";
 
 // Interfaces (ensure these match your actual data structure in report-data.json)
 interface PageIssue {
@@ -78,8 +78,6 @@ const fetchReportData = async (reportId: string | undefined): Promise<ReportData
   if (!reportId) {
     throw new Error("Report ID is undefined. Cannot fetch report data.");
   }
-  // Path assumes all_analysis_runs is in the public folder
-  // And each report run (identified by reportId) has its own report-data.json
   const dataPath = `/all_analysis_runs/${reportId}/report-data.json`;
   const response = await fetch(dataPath);
 
@@ -91,7 +89,6 @@ const fetchReportData = async (reportId: string | undefined): Promise<ReportData
 
   try {
     const data = await response.json();
-    // Data sanitization/defaulting (important for robustness)
     if (!data.overall_summary) {
       console.warn(`Fetched data for report ${reportId} is missing 'overall_summary'. Using defaults.`);
       data.overall_summary = {
@@ -210,21 +207,19 @@ const MarkdownSectionRenderer: React.FC<{
 );
 
 
-const Index = () => { // Index component now represents the Report Detail Page
+const Index = () => { 
   const { reportId } = useParams<{ reportId: string }>();
-
   const [activeDetailedTab, setActiveDetailedTab] = useState("key-findings");
 
   const { data: reportData, isLoading, error, isError } = useQuery<ReportData, Error>({
-    queryKey: ["reportData", reportId], // Include reportId to make query unique per report
+    queryKey: ["reportData", reportId], 
     queryFn: () => fetchReportData(reportId),
-    enabled: !!reportId, // Only fetch if reportId is present
-    staleTime: Infinity, // Data is static per report run
+    enabled: !!reportId, 
+    staleTime: Infinity, 
     refetchOnWindowFocus: false,
     retry: 1,
   });
 
-  // State for derived data from reportData
   const [organizationName, setOrganizationName] = useState("Analysis Report");
   const [analysisDateToDisplay, setAnalysisDateToDisplay] = useState(new Date().toLocaleDateString());
   const [conciseExecutiveSummary, setConciseExecutiveSummary] = useState("Executive summary not available.");
@@ -242,12 +237,12 @@ const Index = () => { // Index component now represents the Report Detail Page
   useEffect(() => {
     if (reportData && reportData.overall_summary) {
       const {
-        organization: orgFromData, // This field might not exist; metadata is better
+        organization: orgFromData, 
         overall_summary,
         page_analyses = [],
         metadata,
         timestamp,
-        analysis_date // Fallback date
+        analysis_date 
       } = reportData;
 
       setOrganizationName(metadata?.organization_name || orgFromData || `Report ID: ${reportId}`);
@@ -262,37 +257,18 @@ const Index = () => { // Index component now represents the Report Detail Page
         detailed_markdown_content: dmc = "# Overview Not Available\n\nThe detailed overview content could not be loaded."
       } = overall_summary;
 
+      // This will be used by the ExecutiveSummary card component directly
+      setMainExecutiveSummaryParagraph(es || "Executive summary not available."); 
+      // Set conciseExecutiveSummary if you still need a shorter version elsewhere, or set it to the full es
       setConciseExecutiveSummary(es || "Executive summary not available.");
+
+
       setOverallScore(typeof os === 'number' ? os : 0);
       setSiteScoreExplanation(sse || "Overall site score explanation not available.");
       setTotalPagesAnalyzed(typeof tpaValue === 'number' ? tpaValue : (metadata?.total_pages ?? page_analyses.length));
       setPerformanceSummary(ps);
       setDetailedMarkdownContentState(dmc);
       setPageAnalysesForDisplay(page_analyses);
-
-      // Logic to parse mainExecutiveSummaryParagraph and parsedDetailedSections from dmc
-      const mainExecSummaryP = (() => {
-        if (!dmc) return es || "";
-        const execSummaryMatch = dmc.match(/^## EXECUTIVE SUMMARY\s*([\s\S]*?)(?=\n\n(?:## KEY FINDINGS|## STRATEGIC RECOMMENDATIONS|### Goal Achievement Assessment|$))/i);
-        if (execSummaryMatch && execSummaryMatch[1]) {
-            const summaryBlock = execSummaryMatch[1].trim();
-            const paragraphs = summaryBlock.split(/\n\s*\n+/);
-            let extracted = "";
-            let paragraphCount = 0;
-            for (const p of paragraphs) {
-                const trimmedP = p.trim();
-                 if (trimmedP && !trimmedP.startsWith("**Overall Effectiveness Score:") && !trimmedP.startsWith("###") && trimmedP.length > 30 && paragraphCount < 2) {
-                    extracted += (extracted ? "\n\n" : "") + trimmedP;
-                    paragraphCount++;
-                }
-                if(paragraphCount >=1 && !trimmedP.startsWith("-")) break;
-                 if(paragraphCount >=2) break;
-            }
-            return extracted || es || "";
-        }
-        return es || "";
-      })();
-      setMainExecutiveSummaryParagraph(mainExecSummaryP);
 
       const extractedGoalAssessment = (() => {
         if (!dmc) return "";
@@ -321,6 +297,7 @@ const Index = () => { // Index component now represents the Report Detail Page
 
         const commitSubSection = () => {
           if (currentSubsectionTitle && currentSectionKey && sections[currentSectionKey]) {
+            // Ensure not to add 'Key Strengths' or 'Critical Weaknesses' as subsections of 'Executive Summary'
             if (!(currentSectionKey === 'executive-summary' && (currentSubsectionTitle.toLowerCase().includes('key strengths') || currentSubsectionTitle.toLowerCase().includes('critical weaknesses')))) {
                 sections[currentSectionKey].subsections.push({ title: currentSubsectionTitle, content: subSectionContentAccumulator.join('\n').trim() });
             }
@@ -330,20 +307,24 @@ const Index = () => { // Index component now represents the Report Detail Page
         };
 
         const commitMainSection = () => {
-          commitSubSection();
+          commitSubSection(); // Commit any pending subsection first
           if (currentSectionKey && sections[currentSectionKey]) {
             let contentToAdd = mainSectionContentAccumulator.join('\n').trim();
-            if (currentSectionKey === 'executive-summary' && mainExecSummaryP) {
-                const mainParaLines = mainExecSummaryP.split('\n');
+            // For executive summary, ensure we don't duplicate the main paragraph if it's part of the overall content
+            if (currentSectionKey === 'executive-summary' && mainExecutiveSummaryParagraph) {
+                const mainParaLines = mainExecutiveSummaryParagraph.split('\n');
                 let tempContent = contentToAdd;
                 mainParaLines.forEach(line => {
                     const trimmedLine = line.trim();
+                     // Regex to remove the exact line, trying to avoid removing parts of other lines
                     const regex = new RegExp(`(^|\\n)${trimmedLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')}(\\n|$)`, 'gi');
-                    tempContent = tempContent.replace(regex, (match, p1, p2) => (p1 && p2) ? p1 : '');
+                    tempContent = tempContent.replace(regex, (match, p1, p2) => (p1 && p2) ? p1 : ''); 
                 });
-                contentToAdd = tempContent.replace(/\n\s*\n/g, '\n\n').trim();
-                contentToAdd = contentToAdd.replace(/(\n\n)?\*\*Goal Achievement Assessment:\*\*[\s\S]*?(?=\n\n##|$)/i, '').trim();
-                contentToAdd = contentToAdd.replace(/(\n\n)?###?\s*Goal Achievement Assessment[\s\S]*?(?=\n\n##|$)/i, '').trim();
+                 contentToAdd = tempContent.replace(/\n\s*\n/g, '\n\n').trim(); // Clean up extra newlines
+                 // Also remove specific subheadings from the main content of executive summary if they were parsed separately
+                 contentToAdd = contentToAdd.replace(/(\n\n)?\*\*Goal Achievement Assessment:\*\*[\s\S]*?(?=\n\n##|$)/i, '').trim();
+                 contentToAdd = contentToAdd.replace(/(\n\n)?###?\s*Goal Achievement Assessment[\s\S]*?(?=\n\n##|$)/i, '').trim();
+
             }
             sections[currentSectionKey].content = contentToAdd;
           }
@@ -351,30 +332,36 @@ const Index = () => { // Index component now represents the Report Detail Page
         };
 
         for (const line of lines) {
-          if (line.startsWith('## ')) {
-            commitMainSection();
+          if (line.startsWith('## ')) { // Main section (H2)
+            commitMainSection(); // Commit previous section before starting a new one
             currentSectionTitle = line.substring(3).trim();
             currentSectionKey = normalizeKey(currentSectionTitle);
-            if (!currentSectionKey) continue;
+            if (!currentSectionKey) continue; // Skip if key is invalid (e.g., empty title)
             sections[currentSectionKey] = { title: currentSectionTitle, content: '', subsections: [] };
-          } else if (line.startsWith('### ')) {
-            commitSubSection();
-            if (currentSectionKey) {
+          } else if (line.startsWith('### ')) { // Subsection (H3)
+            commitSubSection(); // Commit previous subsection
+            if (currentSectionKey) { // Only if we are inside a main section
               currentSubsectionTitle = line.substring(4).trim();
-              if (currentSubsectionTitle.toLowerCase().includes('goal achievement assessment')) currentSubsectionTitle = null;
+               // Don't treat "Goal Achievement Assessment" under "Key Findings" as a new subsection for accordion
+              if (currentSectionKey === 'key-findings' && currentSubsectionTitle.toLowerCase().includes('goal achievement assessment')) {
+                  currentSubsectionTitle = null; // It's part of key findings main content
+              }
             }
-          } else if (currentSectionKey) {
-            if (currentSubsectionTitle) subSectionContentAccumulator.push(line);
-            else mainSectionContentAccumulator.push(line);
+          } else if (currentSectionKey) { // Content lines
+            if (currentSubsectionTitle) {
+              subSectionContentAccumulator.push(line);
+            } else {
+              mainSectionContentAccumulator.push(line);
+            }
           }
         }
-        commitMainSection();
+        commitMainSection(); // Commit the last section
         return sections;
       })();
       setParsedDetailedSections(parsedSectionsResult);
 
     }
-  }, [reportData, reportId]); // Add reportId to dependency list
+  }, [reportData, reportId]); 
 
  useEffect(() => {
     if (overallScore > 0) {
@@ -395,7 +382,7 @@ const Index = () => { // Index component now represents the Report Detail Page
   }, [overallScore]);
 
   const sectionDetails: { [key: string]: { icon: React.ElementType; title: string } } = {
-    'executive-summary': { icon: FileText, title: "Executive Summary"}, // Added for completeness, though handled by ExecutiveSummary component
+    // "executive-summary" is intentionally removed from here as it won't be a tab
     'key-findings': { icon: Lightbulb, title: "Key Findings" },
     'strategic-recommendations': { icon: ListChecks, title: "Strategic Recommendations" },
     'overall-theme-assessment': { icon: Palette, title: "Overall Theme Assessment" },
@@ -403,18 +390,21 @@ const Index = () => { // Index component now represents the Report Detail Page
   };
 
  useEffect(() => {
-    const availableParsedKeys = Object.keys(parsedDetailedSections).filter(key => sectionDetails[key]);
+    // Filter out 'executive-summary' before determining the default tab
+    const availableParsedKeys = Object.keys(parsedDetailedSections).filter(key => key !== 'executive-summary' && sectionDetails[key]);
+    
     if (availableParsedKeys.length > 0) {
-      if (!availableParsedKeys.includes(activeDetailedTab)) {
+      if (!availableParsedKeys.includes(activeDetailedTab) || activeDetailedTab === 'executive-summary') {
         setActiveDetailedTab(availableParsedKeys[0]);
       }
     } else if (detailedMarkdownContentState && Object.keys(parsedDetailedSections).length === 0) {
-      const firstKeyFromDetails = Object.keys(sectionDetails)[0];
-       if (firstKeyFromDetails && activeDetailedTab !== firstKeyFromDetails && !sectionDetails[activeDetailedTab]) {
+      // Fallback if no sections are parsed but DMW content exists
+      const firstKeyFromDetails = Object.keys(sectionDetails).find(key => key !== 'executive-summary');
+       if (firstKeyFromDetails && activeDetailedTab !== firstKeyFromDetails && sectionDetails[activeDetailedTab] === undefined) { // ensure activeTab is not already valid non-exec
            setActiveDetailedTab(firstKeyFromDetails);
       }
     }
-  }, [parsedDetailedSections, activeDetailedTab, detailedMarkdownContentState]);
+  }, [parsedDetailedSections, activeDetailedTab, detailedMarkdownContentState, sectionDetails]);
 
 
   if (isLoading) {
@@ -476,7 +466,14 @@ const Index = () => { // Index component now represents the Report Detail Page
 
         <section className="grid lg:grid-cols-3 gap-8 mb-16">
           <div className="lg:col-span-2">
-             <ExecutiveSummary summary={{ executive_summary: mainExecutiveSummaryParagraph || conciseExecutiveSummary, overall_score: overallScore, total_pages_analyzed: totalPagesAnalyzed }} />
+             {/* ExecutiveSummary card now directly uses mainExecutiveSummaryParagraph */}
+             <ExecutiveSummary 
+                summary={{ 
+                  executive_summary: mainExecutiveSummaryParagraph, 
+                  overall_score: overallScore, 
+                  total_pages_analyzed: totalPagesAnalyzed 
+                }} 
+              />
           </div>
           <div className="lg:col-span-1">
             <Card className="bg-white rounded-2xl border border-slate-200/70 p-6 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-300 h-full">
@@ -536,12 +533,16 @@ const Index = () => { // Index component now represents the Report Detail Page
         </section>
         
         <section className="mt-10">
-           {Object.keys(parsedDetailedSections).length > 0 ? (
+           {/* Ensure we only render tabs if there are sections other than executive summary */}
+           {Object.keys(parsedDetailedSections).filter(key => key !== 'executive-summary' && sectionDetails[key]).length > 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xl overflow-hidden">
               <Tabs value={activeDetailedTab} onValueChange={setActiveDetailedTab} className="w-full">
                  <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50/90 to-white/90 backdrop-blur-sm px-4 sm:px-6 py-3">
                   <TabsList className="grid w-full grid-cols-2 sm:flex sm:w-auto bg-transparent p-0 h-auto gap-1 sm:gap-2 justify-start overflow-x-auto scrollbar-hide">
                      {Object.keys(sectionDetails).map((key) => {
+                        // Skip 'executive-summary' tab
+                        if (key === 'executive-summary') return null;
+
                         const sectionInfo = sectionDetails[key];
                         const Icon = sectionInfo?.icon;
                         return parsedDetailedSections[key] ? (
@@ -565,8 +566,11 @@ const Index = () => { // Index component now represents the Report Detail Page
                 </div>
 
                 <div className="p-6 sm:p-8">
-                  {Object.keys(parsedDetailedSections).map((key) => (
-                    parsedDetailedSections[key] && sectionDetails[key] && (
+                  {Object.keys(parsedDetailedSections).map((key) => {
+                    // Skip 'executive-summary' tab content
+                    if (key === 'executive-summary') return null;
+
+                    return parsedDetailedSections[key] && sectionDetails[key] && (
                       <TabsContent key={key} value={key} className="mt-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none">
                         <MarkdownSectionRenderer
                             title={parsedDetailedSections[key]!.title}
@@ -579,12 +583,13 @@ const Index = () => { // Index component now represents the Report Detail Page
                         />
                       </TabsContent>
                     )
-                  ))}
+                  })}
                 </div>
               </Tabs>
             </div>
           ) : (
-            <Card className="text-center p-10 border-slate-200/80 bg-white shadow-lg">
+             Object.keys(parsedDetailedSections).length === 0 && // Only show this if NO sections were parsed at all
+             <Card className="text-center p-10 border-slate-200/80 bg-white shadow-lg">
                 <FileText className="w-16 h-16 text-slate-400 mx-auto mb-6"/>
                 <p className="text-slate-600 text-xl font-medium mb-2">Detailed Overview Not Available</p>
                 <p className="text-sm text-slate-500">
