@@ -1,18 +1,5 @@
 {
-    "epi": {
-      "URL": "https://edinburghpeaceinstitute.org",
-      "ORG_NAME": "Edinburgh Peace Institute",
-      "ORG_TYPE": "non-profit",
-      "ORG_PURPOSE": "to encourage donations and sign-ups for trainings",
-      "ANALYSIS_OPTIONS": {
-        "maxPages": 10,
-        "fastMode": true,
-        "enableSimpleFilter": false,
-        "enableHierarchicalSampling": true,
-        "maxUrlsTotal": 10 
-      }
-    },
-    "presustainability": {
+  "presustainability": {
       "URL": "https://www.presustainability.com",
       "ORG_NAME": "Presustainability",
       "ORG_TYPE": "Environmental Life Cycle Assessment Consultancy Which offers SaaS solution called SimaPro",
@@ -21,9 +8,20 @@
         "maxPages": 10,
         "timeout": 10000,
         "fastMode": true,
-        "enableSimpleFilter": false, 
         "enableHierarchicalSampling": true,
         "maxUrlsTotal": 15 
+      }
+    },
+    "epi": {
+      "URL": "https://edinburghpeaceinstitute.org",
+      "ORG_NAME": "Edinburgh Peace Institute",
+      "ORG_TYPE": "non-profit",
+      "ORG_PURPOSE": "to encourage donations and sign-ups for trainings",
+      "ANALYSIS_OPTIONS": {
+        "maxPages": 10,
+        "fastMode": true,
+        "enableHierarchicalSampling": true,
+        "maxUrlsTotal": 10 
       }
     },
     "nopublicpurpose": {
@@ -35,7 +33,6 @@
         "maxPages": 10,
         "timeout": 10000,
         "fastMode": true,
-        "enableSimpleFilter": false,
         "enableHierarchicalSampling": true,
         "maxUrlsTotal": 10
       }

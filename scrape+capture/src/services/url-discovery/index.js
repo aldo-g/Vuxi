@@ -16,18 +16,15 @@ class URLDiscoveryService {
     this.maxUrlsPerCategory = options.maxUrlsPerCategory || 5;
     this.enableCategoryLimiting = options.enableCategoryLimiting !== undefined ? options.enableCategoryLimiting : true; // Default to true
     
-    // Hierarchical and Simple Filter options
+    // Hierarchical sampling options
     this.enableHierarchicalSampling = options.enableHierarchicalSampling !== undefined ? options.enableHierarchicalSampling : true; // Default to true
-    this.enableSimpleFilter = options.enableSimpleFilter !== undefined ? options.enableSimpleFilter : false; // Default to FALSE now, let batch analyzer control it
-                                                                                                            // Or, if true, the new logic will gate it by URL count.
 
     this.hierarchicalOptions = {
       maxDepth: options.hierarchicalOptions?.maxDepth || options.maxDepth || 3, // Use specific or general maxDepth
       samplesPerCategory: options.hierarchicalOptions?.samplesPerCategory || options.samplesPerCategory || 2,
       prioritizeOverviews: options.hierarchicalOptions?.prioritizeOverviews !== undefined ? options.hierarchicalOptions.prioritizeOverviews : true,
       skipLegalPages: options.hierarchicalOptions?.skipLegalPages !== undefined ? options.hierarchicalOptions.skipLegalPages : true,
-      // useSimpleFilter is effectively handled by the new logic below
-      maxUrlsTotal: options.hierarchicalOptions?.maxUrlsTotal || options.maxUrlsTotal || 10 // Max URLs for simple filter
+      maxUrlsTotal: options.hierarchicalOptions?.maxUrlsTotal || options.maxUrlsTotal || 10 // Max URLs total
     };
   }
 
@@ -39,9 +36,8 @@ class URLDiscoveryService {
     console.log(`🔀 Concurrency: ${this.concurrency} pages at once`);
     console.log(`⏰ Timeout: ${this.timeout}ms per page`);
     console.log(`⏳ Wait time: ${this.waitTime}s`);
-    console.log(`📁 Output to be saved in: ${this.outputDir}`); // This path is set by the calling script (e.g., batch_analyzer.js)
-    console.log(`🔥 Simple aggressive filter initially set to: ${this.enableSimpleFilter ? 'ENABLED (conditional)' : 'DISABLED'}`);
-    console.log(`📊 Max URLs for simple filter: ${this.hierarchicalOptions.maxUrlsTotal}`);
+    console.log(`📁 Output to be saved in: ${this.outputDir}`);
+    console.log(`📊 Max URLs total (hard limit): ${this.hierarchicalOptions.maxUrlsTotal}`);
     
     const startTime = Date.now();
     
@@ -66,58 +62,56 @@ class URLDiscoveryService {
       const urlsAfterInitialCrawlAndDeduplication = finalUrls.length;
       console.log(`\n🔗 URLs after initial crawl & deduplication: ${urlsAfterInitialCrawlAndDeduplication}`);
 
-      // *** MODIFIED LOGIC FOR APPLYING SIMPLE AGGRESSIVE FILTER ***
-      let simpleFilterApplied = false;
-      if (this.enableSimpleFilter && urlsAfterInitialCrawlAndDeduplication > (this.hierarchicalOptions.maxUrlsTotal || 10) ) {
-        console.log(`\n🔥 Applying simple aggressive filter (discovered ${urlsAfterInitialCrawlAndDeduplication} > ${this.hierarchicalOptions.maxUrlsTotal} threshold)...`);
-        finalUrls = simpleAggressiveFilter(finalUrls, this.hierarchicalOptions);
-        simpleFilterApplied = true;
-      } else if (this.enableSimpleFilter) {
-        console.log(`\nℹ️  Simple aggressive filter was enabled but NOT applied (discovered ${urlsAfterInitialCrawlAndDeduplication} <= ${this.hierarchicalOptions.maxUrlsTotal} threshold).`);
-      }
-      // *** END OF MODIFIED LOGIC ***
-
-      // If simple filter was NOT applied AND hierarchical sampling is enabled, apply hierarchical sampling.
-      if (!simpleFilterApplied && this.enableHierarchicalSampling) {
+      // Apply hierarchical sampling if enabled
+      if (this.enableHierarchicalSampling) {
         console.log(`\n🏗️  Applying hierarchical sampling...`);
-        // Pass hierarchicalOptions, but ensure useSimpleFilter within it is false to avoid re-triggering simple filter logic
-        const hierarchicalOptsForSampling = { ...this.hierarchicalOptions, useSimpleFilter: false };
-        finalUrls = hierarchicalSampling(finalUrls, hierarchicalOptsForSampling);
+        finalUrls = hierarchicalSampling(finalUrls, this.hierarchicalOptions);
+        console.log(`📊 URLs after hierarchical sampling: ${finalUrls.length}`);
       }
       
-      // Apply category limiting if enabled (and simple filter was not the one that ran)
-      let urlsBeforeCategoryLimiting = finalUrls.length;
-      if (this.enableCategoryLimiting && !simpleFilterApplied) { // Only limit categories if simple filter didn't already drastically reduce
+      // Apply category limiting if enabled
+      if (this.enableCategoryLimiting) {
+        const urlsBeforeCategoryLimiting = finalUrls.length;
         console.log(`\n🗂️  Applying category limiting (max ${this.maxUrlsPerCategory} per category)...`);
         finalUrls = limitUrlsPerCategory(finalUrls, this.maxUrlsPerCategory);
         console.log(`📉 URLs after category limiting: ${finalUrls.length} (reduced from ${urlsBeforeCategoryLimiting})`);
+      }
+
+      // FINAL HARD LIMIT ENFORCEMENT - Always applied
+      const maxUrlsTotal = this.hierarchicalOptions.maxUrlsTotal || 10;
+      if (finalUrls.length > maxUrlsTotal) {
+        console.log(`\n🚨 Final hard limit enforcement: ${finalUrls.length} > ${maxUrlsTotal} URLs`);
+        console.log(`🔥 Applying final aggressive filter to reduce to ${maxUrlsTotal} URLs...`);
+        finalUrls = simpleAggressiveFilter(finalUrls, { maxUrlsTotal });
+        console.log(`📉 URLs reduced to final count: ${finalUrls.length}`);
+      } else {
+        console.log(`\n✅ Final URL count (${finalUrls.length}) is within limit (${maxUrlsTotal})`);
       }
       
       const outputData = {
         timestamp: new Date().toISOString(),
         startUrl: startUrl,
-        totalFinalUrls: finalUrls.length, // Renamed for clarity
+        totalFinalUrls: finalUrls.length,
         crawlStats: {
           pagesCrawled: results.stats.pagesCrawled,
           pagesSkipped: results.stats.pagesSkipped,
           errors: results.stats.errors,
-          durationSeconds: results.stats.duration, // Assuming crawler.stats.duration is in seconds
+          durationSeconds: results.stats.duration,
           totalUrlsDiscoveredByCrawler: results.stats.totalUrlsDiscovered,
           duplicatesSkippedByCrawler: results.stats.duplicatesSkipped,
           duplicatesRemovedByCrawler: results.stats.duplicatesRemoved,
           urlsAfterInitialCrawlAndDeduplication: urlsAfterInitialCrawlAndDeduplication,
-          simpleFilterApplied: simpleFilterApplied,
-          urlsAfterAllFiltering: finalUrls.length // Renamed for clarity
+          urlsAfterAllFiltering: finalUrls.length,
+          hardLimitEnforced: finalUrls.length < urlsAfterInitialCrawlAndDeduplication
         },
-        urls: finalUrls, // The final list of URLs
-        excludePatternsUsed: this.excludePatterns.map(p => p.toString()), // Store regex as strings
+        urls: finalUrls,
+        excludePatternsUsed: this.excludePatterns.map(p => p.toString()),
         settings: {
           maxPagesSetForCrawl: this.maxPages,
           fastMode: this.fastMode,
           concurrency: this.concurrency,
           timeout: this.timeout,
           waitTime: this.waitTime,
-          enableSimpleFilterConfig: this.enableSimpleFilter,
           enableHierarchicalSamplingConfig: this.enableHierarchicalSampling,
           enableCategoryLimitingConfig: this.enableCategoryLimiting,
           maxUrlsPerCategorySet: this.maxUrlsPerCategory,
@@ -125,15 +119,13 @@ class URLDiscoveryService {
         }
       };
       
-      // This service is called with a specific outputDir by batch_analyzer.js
-      // So, this.outputDir is already unique for the run.
       await fs.ensureDir(this.outputDir); 
       
       const urlsPath = path.join(this.outputDir, 'urls.json');
       const simpleUrlsPath = path.join(this.outputDir, 'urls_simple.json');
       
       await fs.writeJson(urlsPath, outputData, { spaces: 2 });
-      await fs.writeJson(simpleUrlsPath, finalUrls, { spaces: 2 }); // Save the final list
+      await fs.writeJson(simpleUrlsPath, finalUrls, { spaces: 2 });
       
       const overallDurationSeconds = (Date.now() - startTime) / 1000;
       
@@ -148,8 +140,8 @@ class URLDiscoveryService {
       
       return {
         success: true,
-        urls: finalUrls, // Return the final list
-        stats: outputData.crawlStats, // Return the comprehensive stats
+        urls: finalUrls,
+        stats: outputData.crawlStats,
         outputData,
         files: {
           urls: urlsPath,

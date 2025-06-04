@@ -140,7 +140,7 @@ function isSameDomain(url1, url2) {
  * @returns {boolean} True if URL should be excluded
  */
 function shouldExcludeUrl(url, excludePatterns = []) {
-  // Enhanced exclusions for reducing similar content
+  // Enhanced exclusions for reducing similar content - but keep important pages
   const defaultExclusions = [
     // File types
     /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|7z|tar|gz)$/i,
@@ -203,11 +203,11 @@ function shouldExcludeUrl(url, excludePatterns = []) {
     /\/it\//i,
     /\?lang=/i,
     
-    // Legal/footer pages (often boilerplate content)
+    // Legal/footer pages (but keep contact pages!)
     /\/(legal|privacy|cookies|terms|disclaimer|gdpr)$/i,
     
-    // Newsletter/contact forms (often just forms)
-    /\/(newsletter|contact-us|subscribe)$/i,
+    // Newsletter/subscribe forms (but keep contact pages!)
+    /\/(newsletter|subscribe)$/i,
   ];
   
   // Check against default exclusions
@@ -243,117 +243,85 @@ function getUrlDepth(url) {
 }
 
 /**
- * Simple, aggressive URL filtering - cuts list to essential pages only
+ * General URL filtering - intelligently reduces URLs to specified limit
  * @param {string[]} urls - Array of URLs
  * @param {Object} options - Filtering options
- * @returns {string[]} Dramatically reduced URL list
+ * @returns {string[]} Filtered URL list
  */
 function simpleAggressiveFilter(urls, options = {}) {
   const {
-    maxUrlsTotal = 10,        // Hard limit on total URLs
-    samplesPerCategory = 1,   // Only 1 sample per category
-    keepOnlyMainAbout = true, // Only keep main about page
-    removeDuplicatePaths = true // Remove duplicate content paths
+    maxUrlsTotal = 10
   } = options;
   
-  console.log(`🔥 Applying simple aggressive filter (max ${maxUrlsTotal} URLs)...`);
+  console.log(`🔥 Applying general URL filter (target: ${maxUrlsTotal} URLs)...`);
   
-  const essential = [];
-  const overviews = [];
-  const samples = {
-    industries: [],
-    'customer-cases': [],
-    articles: [],
-    solutions: [],
-    about: []
-  };
+  if (urls.length <= maxUrlsTotal) {
+    console.log(`📊 No filtering needed - ${urls.length} URLs ≤ ${maxUrlsTotal} limit`);
+    return urls;
+  }
   
-  // Remove duplicate paths first
-  const filteredUrls = removeDuplicatePaths ? urls.filter(url => {
-    // Remove longer version if shorter exists
-    if (url.includes('/solutions/tailored-support')) {
-      return !urls.some(otherUrl => otherUrl.endsWith('/tailored-support') && !otherUrl.includes('/solutions/'));
-    }
-    return true;
-  }) : urls;
-  
-  for (const url of filteredUrls) {
+  // Score URLs by importance
+  const scoredUrls = urls.map(url => {
+    let score = 0;
+    
     try {
       const urlObj = new URL(url);
       const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
-      const path = urlObj.pathname;
+      const depth = pathParts.length;
+      const path = urlObj.pathname.toLowerCase();
       
-      // Root page - essential
-      if (pathParts.length === 0) {
-        essential.push(url);
-        continue;
+      // Homepage gets highest priority
+      if (depth === 0) {
+        score += 100;
       }
       
-      // Special case: unique content
-      if (path.includes('the-end-of-the-pef')) {
-        essential.push(url);
-        continue;
+      // Important pages get high priority
+      if (path.includes('about') || path.includes('contact') || path.includes('service') || 
+          path.includes('product') || path.includes('training') || path.includes('research') ||
+          path.includes('project')) {
+        score += 50;
       }
       
-      const category = pathParts[0];
-      
-      // Category overview pages (keep all main category pages)
-      if (pathParts.length === 1) {
-        if (['industries', 'customer-cases', 'articles', 'solutions'].includes(category)) {
-          overviews.push(url);
-        } else if (category === 'tailored-support') {
-          overviews.push(url);
-        }
-        continue;
+      // Overview/category pages (1-2 levels deep) get medium-high priority
+      if (depth >= 1 && depth <= 2) {
+        score += 30;
       }
       
-      // Handle about pages - only keep main one
-      if (category === 'about') {
-        if (keepOnlyMainAbout && pathParts[1] === 'about-pre') {
-          samples.about.push(url);
-        }
-        continue;
+      // Shorter paths are generally more important
+      score += Math.max(0, 10 - depth);
+      
+      // Shorter URLs are often more general/important
+      score += Math.max(0, 10 - Math.floor(url.length / 20));
+      
+      // Penalize very deep or complex URLs
+      if (depth > 4) {
+        score -= 20;
       }
       
-      // Sample individual content (2+ levels deep)
-      if (pathParts.length >= 2) {
-        if (category === 'industries' && samples.industries.length < samplesPerCategory) {
-          samples.industries.push(url);
-        } else if (category === 'customer-cases' && samples['customer-cases'].length < samplesPerCategory) {
-          samples['customer-cases'].push(url);
-        } else if (category === 'articles' && samples.articles.length < samplesPerCategory) {
-          samples.articles.push(url);
-        } else if (category === 'solutions' && samples.solutions.length < samplesPerCategory) {
-          samples.solutions.push(url);
-        }
+      // Penalize URLs with many query parameters
+      const paramCount = urlObj.searchParams.size;
+      if (paramCount > 2) {
+        score -= paramCount * 5;
       }
       
     } catch (error) {
-      // If parsing fails, add to essential
-      essential.push(url);
+      // If URL parsing fails, give it a neutral score
+      score = 25;
     }
-  }
+    
+    return { url, score };
+  });
   
-  // Combine all results
-  const result = [
-    ...essential,
-    ...overviews,
-    ...samples.industries,
-    ...samples['customer-cases'],
-    ...samples.articles,
-    ...samples.solutions,
-    ...samples.about
-  ];
+  // Sort by score (highest first) and take the top URLs
+  const sortedUrls = scoredUrls
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxUrlsTotal)
+    .map(item => item.url);
   
-  // Apply hard limit
-  const finalResult = result.slice(0, maxUrlsTotal);
+  console.log(`📉 URLs filtered from ${urls.length} to ${sortedUrls.length}`);
+  console.log(`   Kept highest-scoring URLs based on importance and depth`);
   
-  console.log(`📉 URLs reduced from ${urls.length} to ${finalResult.length}`);
-  console.log(`   Essential: ${essential.length}`);
-  console.log(`   Overviews: ${overviews.length}`);
-  console.log(`   Samples: ${Object.values(samples).flat().length}`);
-  
-  return finalResult;
+  return sortedUrls;
 }
 
 /**
@@ -367,13 +335,8 @@ function hierarchicalSampling(urls, options = {}) {
     maxDepth = 3,           // Maximum path depth to include
     samplesPerCategory = 2, // Max individual items per category
     prioritizeOverviews = true, // Prefer category pages over individual items
-    skipLegalPages = true,   // Skip legal/footer pages
-    useSimpleFilter = false  // Use simple aggressive filter instead
+    skipLegalPages = true   // Skip legal/footer pages
   } = options;
-  
-  if (useSimpleFilter) {
-    return simpleAggressiveFilter(urls, options);
-  }
   
   const categorized = new Map();
   const overview = [];
@@ -389,8 +352,8 @@ function hierarchicalSampling(urls, options = {}) {
       // Skip very deep URLs
       if (depth > maxDepth) continue;
       
-      // Skip legal pages if enabled
-      if (skipLegalPages && /\/(legal|privacy|cookies|terms|disclaimer|newsletter|contact-us)$/i.test(url)) {
+      // Skip legal pages if enabled (but keep contact pages)
+      if (skipLegalPages && /\/(legal|privacy|cookies|terms|disclaimer|newsletter|subscribe)$/i.test(url)) {
         continue;
       }
       

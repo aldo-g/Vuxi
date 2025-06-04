@@ -23,8 +23,7 @@ async function main() {
         .option('waitTime', { type: 'number', description: 'Wait time on page after load in seconds.' })
         .option('concurrency', { type: 'number', description: 'Number of pages to process simultaneously.' })
         .option('fastMode', { type: 'boolean', description: 'Enable all optimizations for speed.' })
-        .option('enableSimpleFilter', { type: 'boolean', description: 'Enable simple aggressive URL filtering.'})
-        .option('maxUrlsTotal', { type: 'number', description: 'Hard limit on total URLs if simple filter is used.'})
+        .option('maxUrlsTotal', { type: 'number', description: 'Hard limit on total URLs (default 10).'})
         .help()
         .argv;
 
@@ -39,7 +38,6 @@ async function main() {
         waitTime: argv.waitTime !== undefined ? argv.waitTime : 0.5,
         concurrency: argv.concurrency !== undefined ? argv.concurrency : 3,
         fastMode: argv.fastMode !== undefined ? argv.fastMode : true,
-        enableSimpleFilter: argv.enableSimpleFilter !== undefined ? argv.enableSimpleFilter : false,
         hierarchicalOptions: {
             maxUrlsTotal: argv.maxUrlsTotal !== undefined ? argv.maxUrlsTotal : 10,
         }

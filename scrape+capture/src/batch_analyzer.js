@@ -181,7 +181,6 @@ async function main() {
                 "--maxPages", String(analysisOptions.maxPages || 50),
                 "--timeout", String(analysisOptions.timeout || 8000),
                 "--fastMode", String(analysisOptions.fastMode !== undefined ? analysisOptions.fastMode : true).toLowerCase(),
-                "--enableSimpleFilter", String(analysisOptions.enableSimpleFilter !== undefined ? analysisOptions.enableSimpleFilter : false).toLowerCase(),
                 "--maxUrlsTotal", String(analysisOptions.maxUrlsTotal || 10)
             ];
             if (!runNodeService(cmd, "URL Discovery", presetKey)) continue;
