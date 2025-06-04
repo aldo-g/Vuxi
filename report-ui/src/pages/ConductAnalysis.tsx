@@ -1,84 +1,170 @@
+// src/pages/ConductAnalysis.tsx
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Removed useLocation for now, can be added back if needed for pre-filling
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, PlayCircle } from 'lucide-react';
+import { ArrowLeft, PlayCircle, Loader2, AlertTriangle } from 'lucide-react'; // Added Loader2 and AlertTriangle
 
-// Mock screenshot data structure for navigation state
-interface MockScreenshotInfo {
-  id: string;
-  url: string; 
-  path: string; 
-  altText: string;
+// Interface for analysis parameters to be passed to review page
+interface AnalysisParams {
+  targetUrl: string;
+  orgName: string;
+  orgType: string;
+  orgPurpose: string;
+  // Add other relevant options from your API if needed
+  maxUrls?: number;
+  viewportWidth?: number;
+  viewportHeight?: number;
 }
+
+// Interface for screenshot data expected by ReviewScreenshots page
+interface ScreenshotInfo {
+  url: string;
+  filename: string;
+  path: string; // Path relative to the job's screenshot directory e.g. "desktop/000_example.com.png"
+  timestamp: string;
+}
+
+interface JobResult {
+  urls: string[];
+  screenshots: ScreenshotInfo[];
+  stats: any; // Define more specifically if needed
+  tempDir: string; // Path on the backend, not directly used by frontend usually
+}
+
+
+const API_BASE_URL = 'http://localhost:3001/api'; // Assuming your Express API runs on port 3001
 
 const ConductAnalysis = () => {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [targetUrl, setTargetUrl] = useState('');
   const [orgName, setOrgName] = useState('');
   const [orgType, setOrgType] = useState('');
   const [orgPurpose, setOrgPurpose] = useState('');
-  // Add more states for other parameters if needed
+  const [maxUrls, setMaxUrls] = useState(10); // Default value
 
-  // Pre-fill form if coming back from review page
+  const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [progressMessage, setProgressMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pollingIntervalId, setPollingIntervalId] = useState<NodeJS.Timeout | null>(null);
+
+  // Cleanup polling on component unmount
   useEffect(() => {
-    if (location.state?.previousParams) {
-      const { previousParams } = location.state;
-      setTargetUrl(previousParams.targetUrl || '');
-      setOrgName(previousParams.orgName || '');
-      setOrgType(previousParams.orgType || '');
-      setOrgPurpose(previousParams.orgPurpose || '');
+    return () => {
+      if (pollingIntervalId) {
+        clearInterval(pollingIntervalId);
+      }
+    };
+  }, [pollingIntervalId]);
+
+  const startPollingJobStatus = (currentJobId: string) => {
+    if (pollingIntervalId) {
+      clearInterval(pollingIntervalId);
     }
-  }, [location.state]);
+
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/capture/${currentJobId}`);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Failed to fetch job status.' }));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        const jobStatus = await response.json();
+        setProgressMessage(jobStatus.progress?.message || jobStatus.status);
+
+        if (jobStatus.status === 'completed') {
+          clearInterval(intervalId);
+          setPollingIntervalId(null);
+          setIsLoading(false);
+          setJobId(null);
+          console.log('Capture job completed:', jobStatus.result);
+
+          const analysisParams: AnalysisParams = { targetUrl, orgName, orgType, orgPurpose, maxUrls };
+          
+          // The job result from the API already contains the screenshot data in the desired format.
+          const jobResultData = jobStatus.result as JobResult;
+
+          navigate('/review-screenshots', {
+            state: {
+              analysisParams,
+              screenshots: jobResultData.screenshots,
+              jobId: currentJobId // Pass jobId for fetching images
+            }
+          });
+        } else if (jobStatus.status === 'failed') {
+          clearInterval(intervalId);
+          setPollingIntervalId(null);
+          setIsLoading(false);
+          setJobId(null);
+          setErrorMessage(jobStatus.error || 'Capture job failed.');
+          setProgressMessage('Job failed.');
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+        clearInterval(intervalId);
+        setPollingIntervalId(null);
+        setIsLoading(false);
+        setErrorMessage((error as Error).message || 'Error polling job status.');
+        setProgressMessage('Error checking job status.');
+      }
+    }, 3000); // Poll every 3 seconds
+    setPollingIntervalId(intervalId);
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    
-    const analysisParams = {
+    setIsLoading(true);
+    setErrorMessage(null);
+    setProgressMessage('Starting analysis job...');
+
+    const analysisParamsForApi: AnalysisParams = {
       targetUrl,
-      orgName,
+      orgName, // Though not directly used by capture API, good to have consistent params
       orgType,
       orgPurpose,
+      maxUrls: Number(maxUrls),
+      viewportWidth: 1440, // Example default
+      viewportHeight: 900  // Example default
     };
 
-    console.log('Starting analysis with parameters:', analysisParams);
+    try {
+      const response = await fetch(`${API_BASE_URL}/capture`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: analysisParamsForApi.targetUrl,
+          options: { // Pass options expected by your API
+            maxUrls: analysisParamsForApi.maxUrls,
+            viewportWidth: analysisParamsForApi.viewportWidth,
+            viewportHeight: analysisParamsForApi.viewportHeight,
+            // Add other options if your API supports them (e.g. timeout, concurrency)
+          }
+        }),
+      });
 
-    // --- Simulate Backend Processing ---
-    // 1. URL Discovery (Conceptual - replace with actual API call)
-    // const discoveredUrls = await fakeUrlDiscovery(targetUrl); 
-    // For now, we'll generate some mock discovered URLs based on the target.
-    const mockDiscoveredUrls = Array.from({ length: 10 }, (_, i) => `${targetUrl.replace(/\/$/, '')}/page${i + 1}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to start job.' }));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
 
-    // 2. Screenshot Capture (Conceptual - replace with actual API call)
-    // const capturedScreenshots = await fakeScreenshotCapture(mockDiscoveredUrls);
-    // We'll create mock screenshot data to pass to the review page.
-    // In a real app, the backend would return actual paths relative to where they are served.
-    // For the frontend, if screenshots are served from the 'public/all_analysis_runs/[runId]/assets/screenshots/'
-    // the paths would be like 'assets/screenshots/000_domain_page.png'.
-    // Since we don't have a runId or actual files yet, we use placeholders.
-    const mockScreenshots: MockScreenshotInfo[] = mockDiscoveredUrls.map((url, i) => ({
-        id: `screenshot-${i + 1}-${Date.now()}`,
-        url: url,
-        // This path is a placeholder. The ReviewScreenshots component will construct full URLs
-        // assuming a base path if these are relative, or use absolute URLs if provided.
-        // For now, ReviewScreenshots uses its own placeholder image service if these are not real.
-        path: `https://via.placeholder.com/400x300.png?text=Actual+${new URL(url).pathname.replace('/', '') || 'home'}`,
-        altText: `Screenshot of ${url}`,
-    }));
-    // --- End Simulate Backend Processing ---
+      const data = await response.json();
+      setJobId(data.jobId);
+      setProgressMessage(data.message || 'Job submitted. Awaiting progress...');
+      startPollingJobStatus(data.jobId);
 
-    // Navigate to the review screenshots page with the parameters and mock screenshot data
-    navigate('/review-screenshots', { 
-      state: { 
-        analysisParams,
-        screenshots: mockScreenshots // Pass the (mock) captured screenshot data
-      } 
-    });
+    } catch (error) {
+      console.error('Failed to start analysis job:', error);
+      setIsLoading(false);
+      setErrorMessage((error as Error).message || 'Failed to start analysis job.');
+      setProgressMessage('');
+    }
   };
 
   return (
@@ -123,6 +209,7 @@ const ConductAnalysis = () => {
                   onChange={(e) => setTargetUrl(e.target.value)}
                   placeholder="https://example.com"
                   required
+                  disabled={isLoading}
                   className="w-full border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 />
               </div>
@@ -138,6 +225,7 @@ const ConductAnalysis = () => {
                   onChange={(e) => setOrgName(e.target.value)}
                   placeholder="e.g., Acme Corp"
                   required
+                  disabled={isLoading}
                   className="w-full border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 />
               </div>
@@ -153,6 +241,7 @@ const ConductAnalysis = () => {
                   onChange={(e) => setOrgType(e.target.value)}
                   placeholder="e.g., E-commerce, Non-profit, SaaS"
                   required
+                  disabled={isLoading}
                   className="w-full border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 />
               </div>
@@ -168,17 +257,52 @@ const ConductAnalysis = () => {
                   rows={3}
                   placeholder="e.g., To sell products online and increase brand awareness."
                   required
+                  disabled={isLoading}
                   className="w-full border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 />
                  <p className="mt-1.5 text-xs text-slate-500">
                   Describe the main goal of the website (e.g., convert visitors, generate leads, provide information).
                 </p>
               </div>
-             <CardFooter className="p-0 pt-6">
-                <Button type="submit" className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-base">
-                  <PlayCircle size={20} className="mr-2" />
-                  Crawl & Capture Screenshots
+               <div>
+                <Label htmlFor="maxUrls" className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Maximum URLs to Discover (for screenshots)
+                </Label>
+                <Input
+                  id="maxUrls"
+                  type="number"
+                  value={maxUrls}
+                  onChange={(e) => setMaxUrls(Math.max(1, parseInt(e.target.value, 10) || 1))} // Ensure it's at least 1
+                  min="1"
+                  max="50" // Reasonable upper limit for this UI
+                  disabled={isLoading}
+                  className="w-full border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                />
+                 <p className="mt-1.5 text-xs text-slate-500">
+                  The capture service will discover and screenshot up to this many URLs. Default: 10.
+                </p>
+              </div>
+             <CardFooter className="p-0 pt-6 flex flex-col items-start">
+                <Button 
+                    type="submit" 
+                    className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-base"
+                    disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 size={20} className="mr-2 animate-spin" />
+                  ) : (
+                    <PlayCircle size={20} className="mr-2" />
+                  )}
+                  {isLoading ? 'Processing...' : 'Crawl & Capture Screenshots'}
                 </Button>
+                {isLoading && progressMessage && (
+                  <p className="mt-4 text-sm text-indigo-600 animate-pulse">{progressMessage}</p>
+                )}
+                {errorMessage && (
+                  <div className="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm flex items-center gap-2">
+                    <AlertTriangle size={18} /> {errorMessage}
+                  </div>
+                )}
              </CardFooter>
             </form>
           </CardContent>
