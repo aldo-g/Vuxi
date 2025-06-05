@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-06-04T16:10:02.107Z",
+  "startUrl": "https://www.nopublicpurpose.com",
+  "totalFinalUrls": 1,
+  "crawlStats": {
+    "pagesCrawled": 1,
+    "pagesSkipped": 0,
+    "errors": 0,
+    "durationSeconds": 2.244,
+    "totalUrlsDiscoveredByCrawler": 1,
+    "duplicatesSkippedByCrawler": 0,
+    "duplicatesRemovedByCrawler": 0,
+    "urlsAfterInitialCrawlAndDeduplication": 1,
+    "urlsAfterAllFiltering": 1,
+    "hardLimitEnforced": false
+  },
+  "urls": [
+    "https://nopublicpurpose.com/"
+  ],
+  "excludePatternsUsed": [],
+  "settings": {
+    "maxPagesSetForCrawl": 10,
+    "fastMode": true,
+    "concurrency": 3,
+    "timeout": 10000,
+    "waitTime": 0.5,
+    "enableHierarchicalSamplingConfig": true,
+    "enableCategoryLimitingConfig": true,
+    "maxUrlsPerCategorySet": 5,
+    "hierarchicalOptionsUsed": {
+      "maxDepth": 3,
+      "samplesPerCategory": 2,
+      "prioritizeOverviews": true,
+      "skipLegalPages": true,
+      "maxUrlsTotal": 10
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "finalUrl": "https://www.camgrant.org.uk/camerons-coasters-and-cards-in-the-emergency-services/",
+  "requestedUrl": "https://camgrant.org.uk/camerons-coasters-and-cards-in-the-emergency-services",
+  "lighthouseVersion": "10.4.0",
+  "fetchTime": "2025-06-04T16:16:17.181Z",
+  "scores": {
+    "performance": {
+      "score": 0.64,
+      "title": "Performance"
+    },
+    "accessibility": {
+      "score": 0.63,
+      "title": "Accessibility"
+    },
+    "best-practices": {
+      "score": 0.67,
+      "title": "Best Practices"
+    },
+    "seo": {
+      "score": 0.67,
+      "title": "SEO"
+    }
+  },
+  "metrics": {
+    "firstContentfulPaint": 2307,
+    "largestContentfulPaint": 3644,
+    "interactive": 2307,
+    "speedIndex": 2808,
+    "totalBlockingTime": 0,
+    "cumulativeLayoutShift": 0.08776979299369991
+  },
+  "coreWebVitals": {
+    "lcp": {
+      "value": 3644,
+      "score": 0.22
+    },
+    "fid": {
+      "value": 0,
+      "score": 1
+    },
+    "cls": {
+      "value": 0.08776979299369991,
+      "score": 0.92
+    }
+  },
+  "issues": {
+    "performance": [],
+    "accessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "score": 0
+      },
+      {
+        "id": "image-alt",
+        "title": "Image elements do not have `[alt]` attributes",
+        "score": 0
+      }
+    ],
+    "seo": [
+      {
+        "id": "meta-description",
+        "title": "Document does not have a meta description",
+        "score": 0
+      }
+    ],
+    "bestPractices": [
+      {
+        "id": "errors-in-console",
+        "title": "Browser errors were logged to the console",
+        "score": 0
+      }
+    ]
+  }
+}

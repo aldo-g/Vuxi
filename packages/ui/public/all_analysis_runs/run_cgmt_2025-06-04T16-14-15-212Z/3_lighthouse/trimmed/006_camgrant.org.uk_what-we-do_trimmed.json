@@ -1,0 +1,70 @@
+{
+  "finalUrl": "https://www.camgrant.org.uk/what-we-do/",
+  "requestedUrl": "https://camgrant.org.uk/what-we-do",
+  "lighthouseVersion": "10.4.0",
+  "fetchTime": "2025-06-04T16:16:46.321Z",
+  "scores": {
+    "performance": {
+      "score": 0.65,
+      "title": "Performance"
+    },
+    "accessibility": {
+      "score": 0.72,
+      "title": "Accessibility"
+    },
+    "best-practices": {
+      "score": 0.83,
+      "title": "Best Practices"
+    },
+    "seo": {
+      "score": 0.92,
+      "title": "SEO"
+    }
+  },
+  "metrics": {
+    "firstContentfulPaint": 2222,
+    "largestContentfulPaint": 3469,
+    "interactive": 4799,
+    "speedIndex": 3331,
+    "totalBlockingTime": 11,
+    "cumulativeLayoutShift": 0.004034538698131002
+  },
+  "coreWebVitals": {
+    "lcp": {
+      "value": 3469,
+      "score": 0.24
+    },
+    "fid": {
+      "value": 11,
+      "score": 1
+    },
+    "cls": {
+      "value": 0.004034538698131002,
+      "score": 1
+    }
+  },
+  "issues": {
+    "performance": [],
+    "accessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "score": 0
+      }
+    ],
+    "seo": [
+      {
+        "id": "meta-description",
+        "title": "Document does not have a meta description",
+        "score": 0
+      }
+    ],
+    "bestPractices": [
+      {
+        "id": "errors-in-console",
+        "title": "Browser errors were logged to the console",
+        "score": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,177 @@
+{
+  "timestamp": "2025-06-04T15:51:51.557Z",
+  "duration_seconds": 40.267,
+  "total_urls": 10,
+  "successful_captures": 10,
+  "failed_captures": 0,
+  "results": [
+    {
+      "url": "https://presustainability.com/",
+      "success": true,
+      "data": {
+        "url": "https://presustainability.com/",
+        "filename": "000_presustainability.com_index.png",
+        "path": "desktop/000_presustainability.com_index.png",
+        "timestamp": "2025-06-04T15:51:22.100Z",
+        "duration_ms": 10809,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/",
+        "filename": "001_pre-sustainability.com_index.png",
+        "path": "desktop/001_pre-sustainability.com_index.png",
+        "timestamp": "2025-06-04T15:51:21.961Z",
+        "duration_ms": 10668,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/solutions/training",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/solutions/training",
+        "filename": "002_pre-sustainability.com_solutions_training.png",
+        "path": "desktop/002_pre-sustainability.com_solutions_training.png",
+        "timestamp": "2025-06-04T15:51:22.766Z",
+        "duration_ms": 11472,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/about/about-pre",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/about/about-pre",
+        "filename": "003_pre-sustainability.com_about_about-pre.png",
+        "path": "desktop/003_pre-sustainability.com_about_about-pre.png",
+        "timestamp": "2025-06-04T15:51:22.336Z",
+        "duration_ms": 11043,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/about/our-story",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/about/our-story",
+        "filename": "004_pre-sustainability.com_about_our-story.png",
+        "path": "desktop/004_pre-sustainability.com_about_our-story.png",
+        "timestamp": "2025-06-04T15:51:34.103Z",
+        "duration_ms": 11334,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/about/mission-values",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/about/mission-values",
+        "filename": "005_pre-sustainability.com_about_mission-values.png",
+        "path": "desktop/005_pre-sustainability.com_about_mission-values.png",
+        "timestamp": "2025-06-04T15:51:33.569Z",
+        "duration_ms": 10800,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/about/our-team",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/about/our-team",
+        "filename": "006_pre-sustainability.com_about_our-team.png",
+        "path": "desktop/006_pre-sustainability.com_about_our-team.png",
+        "timestamp": "2025-06-04T15:51:39.579Z",
+        "duration_ms": 16810,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/about/network",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/about/network",
+        "filename": "007_pre-sustainability.com_about_network.png",
+        "path": "desktop/007_pre-sustainability.com_about_network.png",
+        "timestamp": "2025-06-04T15:51:33.112Z",
+        "duration_ms": 10343,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/customer-cases/lca-of-frozen-food-products-versus-their-alternatives",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/customer-cases/lca-of-frozen-food-products-versus-their-alternatives",
+        "filename": "008_pre-sustainability.com_customer-cases_lca-of-frozen-food-products-versus-.png",
+        "path": "desktop/008_pre-sustainability.com_customer-cases_lca-of-frozen-food-products-versus-.png",
+        "timestamp": "2025-06-04T15:51:51.554Z",
+        "duration_ms": 11972,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    },
+    {
+      "url": "https://pre-sustainability.com/solutions/consulting/sustainable-products",
+      "success": true,
+      "data": {
+        "url": "https://pre-sustainability.com/solutions/consulting/sustainable-products",
+        "filename": "009_pre-sustainability.com_solutions_consulting_sustainable-products.png",
+        "path": "desktop/009_pre-sustainability.com_solutions_consulting_sustainable-products.png",
+        "timestamp": "2025-06-04T15:51:50.283Z",
+        "duration_ms": 10701,
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "error": null
+    }
+  ],
+  "configuration": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "timeout": 30000,
+    "concurrent": 4
+  }
+}

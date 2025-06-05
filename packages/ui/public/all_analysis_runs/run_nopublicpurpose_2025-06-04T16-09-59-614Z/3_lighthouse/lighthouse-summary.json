@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-06-04T16:10:26.279Z",
+  "duration_seconds": 14.471,
+  "total_urls": 1,
+  "successful_audits": 1,
+  "failed_audits": 0,
+  "settings": {
+    "mode": "sequential",
+    "retries": 1,
+    "timeout": 60000
+  },
+  "results": [
+    {
+      "url": "https://nopublicpurpose.com/",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/000_nopublicpurpose.com_index.json",
+      "trimmedPath": "trimmed/000_nopublicpurpose.com_index_trimmed.json"
+    }
+  ]
+}

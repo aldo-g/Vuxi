@@ -1,0 +1,63 @@
+{
+  "finalUrl": "https://www.ams-institute.org/",
+  "requestedUrl": "https://ams-institute.org/",
+  "lighthouseVersion": "10.4.0",
+  "fetchTime": "2025-06-04T16:26:36.779Z",
+  "scores": {
+    "performance": {
+      "score": 0.75,
+      "title": "Performance"
+    },
+    "accessibility": {
+      "score": 0.78,
+      "title": "Accessibility"
+    },
+    "best-practices": {
+      "score": 1,
+      "title": "Best Practices"
+    },
+    "seo": {
+      "score": 1,
+      "title": "SEO"
+    }
+  },
+  "metrics": {
+    "firstContentfulPaint": 1253,
+    "largestContentfulPaint": 3333,
+    "interactive": 1628,
+    "speedIndex": 2020,
+    "totalBlockingTime": 0,
+    "cumulativeLayoutShift": 0.00005123729731974451
+  },
+  "coreWebVitals": {
+    "lcp": {
+      "value": 3333,
+      "score": 0.27
+    },
+    "fid": {
+      "value": 0,
+      "score": 1
+    },
+    "cls": {
+      "value": 0.00005123729731974451,
+      "score": 1
+    }
+  },
+  "issues": {
+    "performance": [],
+    "accessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "score": 0
+      },
+      {
+        "id": "image-alt",
+        "title": "Image elements have `[alt]` attributes",
+        "score": null
+      }
+    ],
+    "seo": [],
+    "bestPractices": []
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "finalUrl": "https://pre-sustainability.com/about/our-team/",
+  "requestedUrl": "https://pre-sustainability.com/about/our-team",
+  "lighthouseVersion": "10.4.0",
+  "fetchTime": "2025-06-04T15:53:05.288Z",
+  "scores": {
+    "performance": {
+      "score": 0.81,
+      "title": "Performance"
+    },
+    "accessibility": {
+      "score": 0.85,
+      "title": "Accessibility"
+    },
+    "best-practices": {
+      "score": 1,
+      "title": "Best Practices"
+    },
+    "seo": {
+      "score": 1,
+      "title": "SEO"
+    }
+  },
+  "metrics": {
+    "firstContentfulPaint": 628,
+    "largestContentfulPaint": 3385,
+    "interactive": 628,
+    "speedIndex": 736,
+    "totalBlockingTime": 0,
+    "cumulativeLayoutShift": 0.00023435621431662057
+  },
+  "coreWebVitals": {
+    "lcp": {
+      "value": 3385,
+      "score": 0.26
+    },
+    "fid": {
+      "value": 0,
+      "score": 1
+    },
+    "cls": {
+      "value": 0.00023435621431662057,
+      "score": 1
+    }
+  },
+  "issues": {
+    "performance": [],
+    "accessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "score": 0
+      }
+    ],
+    "seo": [],
+    "bestPractices": []
+  }
+}

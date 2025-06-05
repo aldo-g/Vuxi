@@ -1,0 +1,58 @@
+{
+  "finalUrl": "https://www.edinburghpeaceinstitute.org/projects",
+  "requestedUrl": "https://edinburghpeaceinstitute.org/projects",
+  "lighthouseVersion": "10.4.0",
+  "fetchTime": "2025-06-04T16:03:28.369Z",
+  "scores": {
+    "performance": {
+      "score": 0.83,
+      "title": "Performance"
+    },
+    "accessibility": {
+      "score": 0.98,
+      "title": "Accessibility"
+    },
+    "best-practices": {
+      "score": 1,
+      "title": "Best Practices"
+    },
+    "seo": {
+      "score": 0.92,
+      "title": "SEO"
+    }
+  },
+  "metrics": {
+    "firstContentfulPaint": 1201,
+    "largestContentfulPaint": 2463,
+    "interactive": 2403,
+    "speedIndex": 1371,
+    "totalBlockingTime": 45,
+    "cumulativeLayoutShift": 0.0651507614690417
+  },
+  "coreWebVitals": {
+    "lcp": {
+      "value": 2463,
+      "score": 0.48
+    },
+    "fid": {
+      "value": 45,
+      "score": 1
+    },
+    "cls": {
+      "value": 0.0651507614690417,
+      "score": 0.97
+    }
+  },
+  "issues": {
+    "performance": [],
+    "accessibility": [],
+    "seo": [
+      {
+        "id": "meta-description",
+        "title": "Document does not have a meta description",
+        "score": 0
+      }
+    ],
+    "bestPractices": []
+  }
+}

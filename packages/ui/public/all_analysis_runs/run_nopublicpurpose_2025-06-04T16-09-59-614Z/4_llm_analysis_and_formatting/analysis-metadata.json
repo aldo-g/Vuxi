@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-04T16:12:47.672Z",
+  "duration_seconds": 95.286,
+  "provider": "anthropic",
+  "model": "claude-3-7-sonnet-20250219",
+  "concurrency": 2,
+  "screenshots_analyzed": 1,
+  "lighthouse_reports_analyzed": 1,
+  "analysis_version": "1.0.0",
+  "organization": {
+    "org_name": "No Public Purpose",
+    "org_type": "Amsterdam Based Music Collective",
+    "org_purpose": "To Promote there events and org"
+  }
+}

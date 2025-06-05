@@ -1,0 +1,47 @@
+{
+  "timestamp": "2025-06-04T15:51:11.078Z",
+  "startUrl": "https://presustainability.com",
+  "totalFinalUrls": 10,
+  "crawlStats": {
+    "pagesCrawled": 10,
+    "pagesSkipped": 0,
+    "errors": 0,
+    "durationSeconds": 7.048,
+    "totalUrlsDiscoveredByCrawler": 58,
+    "duplicatesSkippedByCrawler": 218,
+    "duplicatesRemovedByCrawler": 0,
+    "urlsAfterInitialCrawlAndDeduplication": 58,
+    "urlsAfterAllFiltering": 10,
+    "hardLimitEnforced": true
+  },
+  "urls": [
+    "https://presustainability.com/",
+    "https://pre-sustainability.com/",
+    "https://pre-sustainability.com/solutions/training",
+    "https://pre-sustainability.com/about/about-pre",
+    "https://pre-sustainability.com/about/our-story",
+    "https://pre-sustainability.com/about/mission-values",
+    "https://pre-sustainability.com/about/our-team",
+    "https://pre-sustainability.com/about/network",
+    "https://pre-sustainability.com/customer-cases/lca-of-frozen-food-products-versus-their-alternatives",
+    "https://pre-sustainability.com/solutions/consulting/sustainable-products"
+  ],
+  "excludePatternsUsed": [],
+  "settings": {
+    "maxPagesSetForCrawl": 10,
+    "fastMode": true,
+    "concurrency": 3,
+    "timeout": 10000,
+    "waitTime": 0.5,
+    "enableHierarchicalSamplingConfig": true,
+    "enableCategoryLimitingConfig": true,
+    "maxUrlsPerCategorySet": 5,
+    "hierarchicalOptionsUsed": {
+      "maxDepth": 3,
+      "samplesPerCategory": 2,
+      "prioritizeOverviews": true,
+      "skipLegalPages": true,
+      "maxUrlsTotal": 10
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "timestamp": "2025-06-04T16:17:43.855Z",
+  "duration_seconds": 147.673,
+  "total_urls": 10,
+  "successful_audits": 10,
+  "failed_audits": 0,
+  "settings": {
+    "mode": "sequential",
+    "retries": 1,
+    "timeout": 60000
+  },
+  "results": [
+    {
+      "url": "https://camgrant.org.uk/",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/000_camgrant.org.uk_index.json",
+      "trimmedPath": "trimmed/000_camgrant.org.uk_index_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/contact-us",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/001_camgrant.org.uk_contact-us.json",
+      "trimmedPath": "trimmed/001_camgrant.org.uk_contact-us_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/about-us",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/002_camgrant.org.uk_about-us.json",
+      "trimmedPath": "trimmed/002_camgrant.org.uk_about-us_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/about-cameron",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/003_camgrant.org.uk_about-cameron.json",
+      "trimmedPath": "trimmed/003_camgrant.org.uk_about-cameron_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/camerons-coasters-and-cards-in-the-emergency-services",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/004_camgrant.org.uk_camerons-coasters-and-cards-in-the-emergency-servi.json",
+      "trimmedPath": "trimmed/004_camgrant.org.uk_camerons-coasters-and-cards-in-the-emergency-servi_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/news",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/005_camgrant.org.uk_news.json",
+      "trimmedPath": "trimmed/005_camgrant.org.uk_news_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/what-we-do",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/006_camgrant.org.uk_what-we-do.json",
+      "trimmedPath": "trimmed/006_camgrant.org.uk_what-we-do_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/coasters",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/007_camgrant.org.uk_coasters.json",
+      "trimmedPath": "trimmed/007_camgrant.org.uk_coasters_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/cards",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/008_camgrant.org.uk_cards.json",
+      "trimmedPath": "trimmed/008_camgrant.org.uk_cards_trimmed.json"
+    },
+    {
+      "url": "https://camgrant.org.uk/postcards",
+      "success": true,
+      "error": null,
+      "reportPath": "reports/009_camgrant.org.uk_postcards.json",
+      "trimmedPath": "trimmed/009_camgrant.org.uk_postcards_trimmed.json"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "finalUrl": "https://www.nopublicpurpose.com/",
+  "requestedUrl": "https://nopublicpurpose.com/",
+  "lighthouseVersion": "10.4.0",
+  "fetchTime": "2025-06-04T16:10:13.462Z",
+  "scores": {
+    "performance": {
+      "score": 0.81,
+      "title": "Performance"
+    },
+    "accessibility": {
+      "score": 1,
+      "title": "Accessibility"
+    },
+    "best-practices": {
+      "score": 1,
+      "title": "Best Practices"
+    },
+    "seo": {
+      "score": 0.91,
+      "title": "SEO"
+    }
+  },
+  "metrics": {
+    "firstContentfulPaint": 1447,
+    "largestContentfulPaint": 2319,
+    "interactive": 1447,
+    "speedIndex": 1570,
+    "totalBlockingTime": 0,
+    "cumulativeLayoutShift": 0.06549921124828532
+  },
+  "coreWebVitals": {
+    "lcp": {
+      "value": 2319,
+      "score": 0.52
+    },
+    "fid": {
+      "value": 0,
+      "score": 1
+    },
+    "cls": {
+      "value": 0.06549921124828532,
+      "score": 0.97
+    }
+  },
+  "issues": {
+    "performance": [],
+    "accessibility": [],
+    "seo": [],
+    "bestPractices": []
+  }
+}

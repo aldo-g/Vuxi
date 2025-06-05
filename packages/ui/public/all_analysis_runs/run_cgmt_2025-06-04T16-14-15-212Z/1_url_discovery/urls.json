@@ -1,0 +1,47 @@
+{
+  "timestamp": "2025-06-04T16:14:35.020Z",
+  "startUrl": "https://www.camgrant.org.uk",
+  "totalFinalUrls": 10,
+  "crawlStats": {
+    "pagesCrawled": 10,
+    "pagesSkipped": 0,
+    "errors": 0,
+    "durationSeconds": 19.541,
+    "totalUrlsDiscoveredByCrawler": 103,
+    "duplicatesSkippedByCrawler": 728,
+    "duplicatesRemovedByCrawler": 0,
+    "urlsAfterInitialCrawlAndDeduplication": 103,
+    "urlsAfterAllFiltering": 10,
+    "hardLimitEnforced": true
+  },
+  "urls": [
+    "https://camgrant.org.uk/",
+    "https://camgrant.org.uk/contact-us",
+    "https://camgrant.org.uk/about-us",
+    "https://camgrant.org.uk/about-cameron",
+    "https://camgrant.org.uk/camerons-coasters-and-cards-in-the-emergency-services",
+    "https://camgrant.org.uk/news",
+    "https://camgrant.org.uk/what-we-do",
+    "https://camgrant.org.uk/coasters",
+    "https://camgrant.org.uk/cards",
+    "https://camgrant.org.uk/postcards"
+  ],
+  "excludePatternsUsed": [],
+  "settings": {
+    "maxPagesSetForCrawl": 10,
+    "fastMode": true,
+    "concurrency": 3,
+    "timeout": 10000,
+    "waitTime": 0.5,
+    "enableHierarchicalSamplingConfig": true,
+    "enableCategoryLimitingConfig": true,
+    "maxUrlsPerCategorySet": 5,
+    "hierarchicalOptionsUsed": {
+      "maxDepth": 3,
+      "samplesPerCategory": 2,
+      "prioritizeOverviews": true,
+      "skipLegalPages": true,
+      "maxUrlsTotal": 10
+    }
+  }
+}

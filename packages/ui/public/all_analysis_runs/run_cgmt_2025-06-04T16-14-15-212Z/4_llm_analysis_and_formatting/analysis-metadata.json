@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-04T16:22:52.313Z",
+  "duration_seconds": 263.346,
+  "provider": "anthropic",
+  "model": "claude-3-7-sonnet-20250219",
+  "concurrency": 2,
+  "screenshots_analyzed": 10,
+  "lighthouse_reports_analyzed": 10,
+  "analysis_version": "1.0.0",
+  "organization": {
+    "org_name": "Cameron Grant Memorial Trust",
+    "org_type": "Mental health non-profit",
+    "org_purpose": "To actively promote the charity, including encouraging engagement and donations, and to encourage people to speak up about mental health"
+  }
+}

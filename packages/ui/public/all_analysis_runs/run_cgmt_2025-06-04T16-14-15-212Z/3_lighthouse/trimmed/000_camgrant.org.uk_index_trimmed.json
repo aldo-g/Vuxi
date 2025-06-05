@@ -1,0 +1,64 @@
+{
+  "finalUrl": "https://www.camgrant.org.uk/",
+  "requestedUrl": "https://camgrant.org.uk/",
+  "lighthouseVersion": "10.4.0",
+  "fetchTime": "2025-06-04T16:15:17.770Z",
+  "scores": {
+    "performance": {
+      "score": 0.62,
+      "title": "Performance"
+    },
+    "accessibility": {
+      "score": 0.7,
+      "title": "Accessibility"
+    },
+    "best-practices": {
+      "score": 0.83,
+      "title": "Best Practices"
+    },
+    "seo": {
+      "score": 0.83,
+      "title": "SEO"
+    }
+  },
+  "metrics": {
+    "firstContentfulPaint": 2868,
+    "largestContentfulPaint": 3488,
+    "interactive": 6760,
+    "speedIndex": 4454,
+    "totalBlockingTime": 3,
+    "cumulativeLayoutShift": 0.0003274348422496571
+  },
+  "coreWebVitals": {
+    "lcp": {
+      "value": 3488,
+      "score": 0.24
+    },
+    "fid": {
+      "value": 3,
+      "score": 1
+    },
+    "cls": {
+      "value": 0.0003274348422496571,
+      "score": 1
+    }
+  },
+  "issues": {
+    "performance": [],
+    "accessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "score": 0
+      }
+    ],
+    "seo": [],
+    "bestPractices": [
+      {
+        "id": "errors-in-console",
+        "title": "Browser errors were logged to the console",
+        "score": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-04T16:33:30.266Z",
+  "duration_seconds": 258.274,
+  "provider": "anthropic",
+  "model": "claude-3-7-sonnet-20250219",
+  "concurrency": 2,
+  "screenshots_analyzed": 10,
+  "lighthouse_reports_analyzed": 10,
+  "analysis_version": "1.0.0",
+  "organization": {
+    "org_name": "AMS Institute",
+    "org_type": "start up accelerater",
+    "org_purpose": "accelerate the development of science-based solutions to make cities resilient, regenerative and just"
+  }
+}

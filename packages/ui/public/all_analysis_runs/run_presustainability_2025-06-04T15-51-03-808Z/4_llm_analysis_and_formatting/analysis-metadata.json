@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-04T15:59:29.216Z",
+  "duration_seconds": 277.203,
+  "provider": "anthropic",
+  "model": "claude-3-7-sonnet-20250219",
+  "concurrency": 2,
+  "screenshots_analyzed": 10,
+  "lighthouse_reports_analyzed": 10,
+  "analysis_version": "1.0.0",
+  "organization": {
+    "org_name": "Presustainability",
+    "org_type": "Environmental Life Cycle Assessment Consultancy Which offers SaaS solution called SimaPro",
+    "org_purpose": "To Promote and offer consulting services, and build professional credibility"
+  }
+}
