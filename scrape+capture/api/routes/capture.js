@@ -1,7 +1,9 @@
+// aldo-g/web-analysis/Web-analysis-ce47fd73470b9414e2e4feac630ba53f4f991579/scrape+capture/api/routes/capture.js
 const express = require('express');
 const router = express.Router();
 const jobManager = require('../lib/jobManager');
 const captureService = require('../lib/captureService');
+const analysisService = require('../lib/analysisService'); // Import the new service
 
 // Start a new capture job
 router.post('/capture', async (req, res) => {
@@ -104,6 +106,37 @@ router.get('/capture/:jobId/screenshot/:filename', async (req, res) => {
     res.status(500).json({ error: 'Failed to get screenshot' });
   }
 });
+
+// NEW: Start the full analysis pipeline for a job
+router.post('/analyze/:jobId', async (req, res) => {
+  const { jobId } = req.params;
+  const { analysisParams } = req.body;
+
+  try {
+    const job = jobManager.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found. Cannot start analysis.' });
+    }
+    if (job.status !== 'completed') {
+      return res.status(400).json({ error: 'Capture is not yet complete. Cannot start analysis.' });
+    }
+    if (!analysisParams) {
+        return res.status(400).json({ error: 'Analysis parameters (orgName, etc.) are required.' });
+    }
+
+    // Start analysis asynchronously
+    analysisService.startFullAnalysis(jobId, analysisParams).catch(err => {
+        console.error(`[${jobId}] Unhandled error in full analysis pipeline: `, err);
+    });
+
+    res.status(202).json({ message: 'Full analysis pipeline started.' });
+
+  } catch (error) {
+    console.error('Error starting full analysis:', error);
+    res.status(500).json({ error: 'Failed to start full analysis job' });
+  }
+});
+
 
 // List all jobs (for debugging)
 router.get('/jobs', (req, res) => {
