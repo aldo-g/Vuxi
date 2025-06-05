@@ -1,56 +1,51 @@
-// This is your Prisma schema file.
-// Learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
+// Switched from sqlite to postgresql
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Uses the .env file
 }
 
-// 1. users Table
 model User {
-  id        Int      @id @default(autoincrement())
-  fullName  String?
-  email     String   @unique
+  id           Int      @id @default(autoincrement())
+  fullName     String?
+  email        String   @unique
   passwordHash String
-  createdAt DateTime @default(now())
-  projects  Project[]
+  createdAt    DateTime @default(now())
+  projects     Project[]
 }
 
-// 2. projects Table
 model Project {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  name        String
-  baseUrl     String
-  orgName     String?
-  orgPurpose  String?
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  name         String
+  baseUrl      String
+  orgName      String?
+  orgPurpose   String?
+  createdAt    DateTime      @default(now())
+  user         User          @relation(fields: [userId], references: [id])
   analysisRuns AnalysisRun[]
 }
 
-// 3. analysis_runs Table
 model AnalysisRun {
-  id             Int      @id @default(autoincrement())
-  projectId      Int
-  status         String
-  finalReport    Json?    // Using Json type for the report
-  overallScore   Int?     // Promoted field for faster lookups
-  createdAt      DateTime @default(now())
-  project        Project  @relation(fields: [projectId], references: [id])
-  analyzedPages  AnalyzedPage[]
+  id            Int      @id @default(autoincrement())
+  projectId     Int
+  status        String
+  progress      Json?    // Changed back to Json
+  finalReport   Json?    // Changed back to Json
+  overallScore  Int?
+  createdAt     DateTime @default(now())
+  project       Project  @relation(fields: [projectId], references: [id])
+  analyzedPages AnalyzedPage[]
 }
 
-// 4. analyzed_pages Table
 model AnalyzedPage {
-  id             Int      @id @default(autoincrement())
-  runId          Int
-  url            String
-  screenshotUrl  String?
-  pageAim        String?
-  analysisRun    AnalysisRun @relation(fields: [runId], references: [id])
+  id            Int      @id @default(autoincrement())
+  runId         Int
+  url           String
+  screenshotUrl String?
+  pageAim       String?
+  analysisRun   AnalysisRun @relation(fields: [runId], references: [id])
 }
