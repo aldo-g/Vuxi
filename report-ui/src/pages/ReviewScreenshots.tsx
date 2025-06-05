@@ -1,4 +1,3 @@
-// src/pages/ReviewScreenshots.tsx
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ const API_BASE_URL = 'http://localhost:3001/api';
 interface ScreenshotInfoFromAPI {
   url: string;    // URL of the page screenshotted
   filename: string; // e.g., "000_example.com_index.png"
-  path: string;   // e.g., "desktop/000_example.com_index.png" - may not be directly used if fetching base64
+  path: string;   // e.g., "desktop/000_example.com_index.png"
   timestamp: string;
 }
 
@@ -21,7 +20,6 @@ interface ScreenshotDisplayInfo extends ScreenshotInfoFromAPI {
   isLoading: boolean;
   error?: string;
 }
-
 
 const ReviewScreenshots = () => {
   const location = useLocation();
@@ -37,11 +35,10 @@ const ReviewScreenshots = () => {
 
   useEffect(() => {
     if (!jobId || !screenshotsFromState || screenshotsFromState.length === 0) {
-        // If no screenshots from state, create placeholder or show error
         const placeholderScreenshots = Array.from({ length: Math.min(analysisParams.maxUrls || 0, 5) || 3 }, (_, i) => ({
             id: `placeholder-${i + 1}`,
             url: `${analysisParams.targetUrl || 'http://example.com'}/page-${i + 1}`,
-            path: '', // No real path for placeholder
+            path: '',
             filename: `placeholder_${i}.png`,
             timestamp: new Date().toISOString(),
             base64Image: `https://via.placeholder.com/400x300.png?text=Review+Screenshot+${i + 1}`,
@@ -58,9 +55,9 @@ const ReviewScreenshots = () => {
 
     const initialDisplayData: ScreenshotDisplayInfo[] = screenshotsFromState.map((ss: ScreenshotInfoFromAPI) => ({
       ...ss,
-      id: ss.filename, // Use filename as a unique ID
+      id: ss.filename,
       altText: `Screenshot of ${ss.url}`,
-      isLoading: true, // Initially true, will fetch
+      isLoading: true,
     }));
     setDisplayScreenshots(initialDisplayData);
 
@@ -79,23 +76,42 @@ const ReviewScreenshots = () => {
         .catch(error => {
           console.error(`Error fetching screenshot ${ss.filename}:`, error);
           setDisplayScreenshots(prev => prev.map(prevSs => 
-            prevSs.id === ss.id ? { ...prevSs, isLoading: false, error: error.message, base64Image: 'https://via.placeholder.com/400x300.png?text=Load+Error' } : prevSs
+            prevSs.id === ss.id ? { ...prevSs, isLoading: false, error: (error as Error).message, base64Image: 'https://via.placeholder.com/400x300.png?text=Load+Error' } : prevSs
           ));
         });
     });
   }, [jobId, screenshotsFromState, analysisParams]);
 
 
-  const handleConfirm = () => {
-    console.log('Screenshots reviewed. Analysis parameters:', analysisParams);
-    console.log('Job ID for this capture:', jobId);
-    // Potentially trigger next analysis steps using jobId and analysisParams
-    alert('Screenshots reviewed. (Placeholder - Next steps like Lighthouse/LLM analysis would be triggered here, using the captured data associated with Job ID: ' + jobId + ')');
-    navigate('/reports'); // Navigate to reports list or a new status page
+  const handleConfirm = async () => {
+    console.log('Confirming screenshots and starting full analysis for Job ID:', jobId);
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/analyze/${jobId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ analysisParams })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to start the analysis pipeline.');
+        }
+
+        const result = await response.json();
+        alert(`Analysis pipeline started successfully! Message: ${result.message}`);
+        
+        navigate('/reports');
+
+    } catch (error) {
+        console.error('Error triggering full analysis:', error);
+        alert(`Error: ${(error as Error).message}`);
+    }
   };
 
   const handleGoBack = () => {
-    // Pass back the original params so the form can be pre-filled if user wants to edit
     navigate('/conduct-analysis', { state: { previousParams: analysisParams } });
   };
 
