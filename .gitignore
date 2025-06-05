@@ -1,9 +1,28 @@
 .compile-context/
-report-ui/public/*.json
-report-ui/public/data/
-report-ui/public/*.json
-report-ui/public/data/
+ui/public/*.json
+ui/public/data/
+ui/public/*.json
+ui/public/data/
 .compile-context/
-report-ui/public/
+ui/public/
 data/
 .env
+
+# Dependency directories
+**/node_modules/
+
+# Local environment variables
+.env
+.env.*
+
+# Generated analysis runs
+**/all_analysis_runs/
+
+# Temporary files
+**/temp/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
