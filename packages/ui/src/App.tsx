@@ -12,6 +12,7 @@ import PageAnalysis from "./pages/PageAnalysis";       // Individual Page Analys
 import ConductAnalysis from "./pages/ConductAnalysis";   // Form to start new analysis
 import ReviewScreenshots from "./pages/ReviewScreenshots"; // New: Page to review screenshots
 import NotFound from "./pages/NotFound";                 // For handling 404 errors
+import CreateAccount from './pages/CreateAccount';
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,8 @@ const App = () => (
           {/* Route for reviewing screenshots after URL discovery and capture */}
           <Route path="/review-screenshots" element={<ReviewScreenshots />} />
 
+          <Route path="/create-account" element={<CreateAccount />} />
+          
           {/* Catch-all route for 404 Not Found pages */}
           <Route path="*" element={<NotFound />} />
         </Routes>

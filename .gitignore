@@ -32,6 +32,7 @@ packages/db/prisma/dev.db
 # Database
 packages/db/prisma/*.db
 packages/db/prisma/*.db-journal
+packages/db/prisma/migrations/
 postgres-data/
 
 # Environment

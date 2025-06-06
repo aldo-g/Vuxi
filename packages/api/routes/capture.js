@@ -1,44 +1,33 @@
-// aldo-g/web-analysis/Web-analysis-ce47fd73470b9414e2e4feac630ba53f4f991579/scrape+capture/api/routes/capture.js
 const express = require('express');
 const router = express.Router();
-const jobManager = require('../lib/jobManager');
-const captureService = require('../lib/captureService');
-const analysisService = require('../lib/analysisService'); // Import the new service
+const jobManager = require('../lib/jobManager.js');
+const captureService = require('../lib/captureService.js');
+const analysisService = require('../lib/analysisService.js');
 
-// Start a new capture job
+// Start a new capture and analysis job
 router.post('/capture', async (req, res) => {
   try {
     const { url, options = {} } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
 
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
-    }
-
-    // Validate URL
-    try {
-      new URL(url);
-    } catch {
-      return res.status(400).json({ error: 'Invalid URL format' });
-    }
-
-    // Create job
-    const job = jobManager.createJob(url, options);
+    // Create the job record and wait for it
+    const job = await jobManager.createJob(url, options);
     
-    // Start capture process asynchronously (don't await)
+    // Start the long-running capture process in the background
     captureService.startCapture(job.id, url, options).catch(error => {
-      console.error(`Background job ${job.id} failed:`, error);
+      console.error(`[Job ${job.id}] Unhandled error in capture pipeline: `, error);
     });
 
+    // Respond immediately that the job has been accepted
     res.status(202).json({
       jobId: job.id,
       status: job.status,
-      message: 'Capture job started',
-      estimatedDuration: '30-60 seconds'
+      message: 'Capture job accepted and started.',
     });
 
   } catch (error) {
-    console.error('Error starting capture:', error);
-    res.status(500).json({ error: 'Failed to start capture job' });
+    console.error('Error in /capture route:', error);
+    res.status(500).json({ error: 'Failed to start capture job.' });
   }
 });
 
@@ -46,109 +35,80 @@ router.post('/capture', async (req, res) => {
 router.get('/capture/:jobId', async (req, res) => {
   try {
     const { jobId } = req.params;
-    const job = jobManager.getJob(jobId);
+    const job = await jobManager.getJob(jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
 
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
+    const progress = (job.progress && typeof job.progress === 'string') ? JSON.parse(job.progress) : job.progress;
+    
+    // Read from job.finalReport, but send it to the frontend as 'result'
+    const result = (job.finalReport && typeof job.finalReport === 'string') ? JSON.parse(job.finalReport) : job.finalReport;
 
-    // Base response
-    const response = {
+    res.json({
       jobId: job.id,
       status: job.status,
-      url: job.url,
-      progress: job.progress,
-      createdAt: job.createdAt
-    };
-
-    // Add results if completed
-    if (job.status === 'completed' && job.result) {
-      response.result = {
-        urls: job.result.urls,
-        screenshots: job.result.screenshots,
-        stats: job.result.stats
-      };
-    }
-
-    // Add error if failed
-    if (job.status === 'failed') {
-      response.error = job.error;
-    }
-
-    res.json(response);
+      progress: progress,
+      createdAt: job.createdAt,
+      result: result, // Frontend expects a 'result' key
+      error: job.error,
+    });
 
   } catch (error) {
-    console.error('Error getting job:', error);
-    res.status(500).json({ error: 'Failed to get job status' });
+    console.error(`Error getting job ${req.params.jobId}:`, error);
+    res.status(500).json({ error: 'Failed to get job status.' });
   }
 });
 
-// Get screenshot file as base64
+// Get a specific screenshot file as a base64 data URL
 router.get('/capture/:jobId/screenshot/:filename', async (req, res) => {
   try {
     const { jobId, filename } = req.params;
     
-    const job = jobManager.getJob(jobId);
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
-
-    const base64Image = await captureService.getScreenshotBase64(jobId, filename);
+    const imageBase64DataUrl = await captureService.getScreenshotBase64(jobId, filename);
     
-    if (!base64Image) {
-      return res.status(404).json({ error: 'Screenshot not found' });
+    if (!imageBase64DataUrl) {
+      return res.status(404).json({ error: 'Screenshot file not found on server.' });
     }
-
-    res.json({ image: base64Image });
+    
+    // The service returns a complete data URL string (e.g., "data:image/png;base64,...")
+    res.json({ image: imageBase64DataUrl });
 
   } catch (error) {
-    console.error('Error getting screenshot:', error);
-    res.status(500).json({ error: 'Failed to get screenshot' });
+    console.error(`Error getting screenshot ${req.params.filename}:`, error);
+    res.status(500).json({ error: 'Failed to get screenshot.' });
   }
 });
 
-// NEW: Start the full analysis pipeline for a job
+
+// Start the full analysis pipeline for a completed capture job
 router.post('/analyze/:jobId', async (req, res) => {
   const { jobId } = req.params;
   const { analysisParams } = req.body;
-
   try {
-    const job = jobManager.getJob(jobId);
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found. Cannot start analysis.' });
-    }
-    if (job.status !== 'completed') {
-      return res.status(400).json({ error: 'Capture is not yet complete. Cannot start analysis.' });
-    }
-    if (!analysisParams) {
-        return res.status(400).json({ error: 'Analysis parameters (orgName, etc.) are required.' });
-    }
+    const job = await jobManager.getJob(jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found.' });
+    if (job.status !== 'completed') return res.status(400).json({ error: 'Capture is not yet complete.' });
+    if (!analysisParams) return res.status(400).json({ error: 'Analysis parameters are required.' });
 
-    // Start analysis asynchronously
-    analysisService.startFullAnalysis(jobId, analysisParams).catch(err => {
-        console.error(`[${jobId}] Unhandled error in full analysis pipeline: `, err);
+    analysisService.startFullAnalysis(job.id, analysisParams).catch(err => {
+      console.error(`[Job ${job.id}] Unhandled error in analysis pipeline: `, err);
     });
-
-    res.status(202).json({ message: 'Full analysis pipeline started.' });
-
+    res.status(202).json({ message: 'Analysis pipeline started.' });
   } catch (error) {
-    console.error('Error starting full analysis:', error);
-    res.status(500).json({ error: 'Failed to start full analysis job' });
+    console.error(`Error starting analysis for job ${jobId}:`, error);
+    res.status(500).json({ error: 'Failed to start analysis job' });
   }
 });
 
-
-// List all jobs (for debugging)
-router.get('/jobs', (req, res) => {
-  const jobs = jobManager.getAllJobs().map(job => ({
-    jobId: job.id,
-    url: job.url,
-    status: job.status,
-    createdAt: job.createdAt,
-    progress: job.progress
-  }));
-  
-  res.json({ jobs });
+// List all jobs (for a future dashboard)
+router.get('/jobs', async (req, res) => {
+  try {
+    const jobs = await jobManager.getAllJobs();
+    res.json({ jobs });
+  } catch (error) {
+    console.error('Error fetching all jobs:', error);
+    res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
 });
+
 
 module.exports = router;

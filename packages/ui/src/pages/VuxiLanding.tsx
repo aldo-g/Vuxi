@@ -1,61 +1,98 @@
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Eye, Search, Zap, PlayCircle, ListChecks } from "lucide-react"; // Added PlayCircle, ListChecks
+// src/pages/VuxiLanding.tsx
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { PlayCircle, Zap, Scale, BarChart2, ArrowRight } from 'lucide-react';
 
 const VuxiLanding = () => {
+  // In a real app, this would come from a context or auth hook.
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white p-8">
-      <header className="text-center mb-16">
-        <div className="inline-flex items-center gap-4 mb-6">
-          <Eye size={64} className="text-indigo-400" />
-          <h1 className="text-6xl sm:text-7xl font-bold tracking-tight">
-            Vuxi
-          </h1>
+    // --- STYLE CHANGE: Dark theme background and white text ---
+    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+      {/* Header */}
+      <header className="py-4 px-6 sm:px-10 flex justify-between items-center w-full">
+        <div className="text-2xl font-bold">
+          Vuxi
         </div>
-        <p className="text-2xl sm:text-3xl text-slate-300 font-light">
-          Visual UX Inspector
-        </p>
-        <p className="text-lg text-slate-400 max-w-2xl mx-auto mt-6">
-          Unlock actionable insights from your web pages with AI-powered analysis, screenshots, and Lighthouse audits.
-        </p>
+        <nav>
+          {!isLoggedIn && (
+            <Link 
+              to="/login" 
+              // --- STYLE CHANGE: Lighter text for dark background ---
+              className="text-slate-300 hover:text-white font-medium transition-colors duration-200"
+            >
+              Log In
+            </Link>
+          )}
+        </nav>
       </header>
 
-      <main className="flex flex-col sm:flex-row items-center gap-8 mb-16">
-        <div className="flex flex-col items-center p-6 bg-slate-800/50 rounded-xl shadow-lg border border-slate-700 max-w-xs text-center h-full">
-          <Search size={40} className="text-indigo-400 mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Detailed Analysis</h2>
-          <p className="text-sm text-slate-300">
-            Go beyond the surface with AI-driven UX/UI feedback and page-specific reports.
-          </p>
+      {/* Main content area */}
+      {/* --- LAYOUT CHANGE: Reduced vertical padding to prevent scrolling --- */}
+      <main className="flex-grow flex flex-col justify-center text-center px-4">
+        <h1 className="text-5xl md:text-6xl font-extrabold">
+          Uncover the 'Why' Behind Your UX
+        </h1>
+        <p className="mt-6 max-w-2xl mx-auto text-lg text-slate-400">
+          Vuxi provides AI-driven analysis of your website's user experience,
+          turning screenshots and user flows into actionable, expert-level reports.
+        </p>
+        <div className="mt-10">
+          {isLoggedIn ? (
+            <Link to="/conduct-analysis">
+              {/* --- STYLE CHANGE: Using original gradient button style --- */}
+              <Button size="lg" className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3 px-8 text-lg shadow-lg hover:shadow-indigo-500/50 transition-shadow">
+                <PlayCircle className="mr-2 h-5 w-5" />
+                Start New Analysis
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/create-account">
+              <Button size="lg" className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3 px-8 text-lg shadow-lg hover:shadow-indigo-500/50 transition-shadow">
+                Create Account to Start
+              </Button>
+            </Link>
+          )}
         </div>
-        <div className="flex flex-col items-center p-6 bg-slate-800/50 rounded-xl shadow-lg border border-slate-700 max-w-xs text-center h-full">
-          <Zap size={40} className="text-indigo-400 mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Actionable Insights</h2>
-          <p className="text-sm text-slate-300">
-            Get clear recommendations to improve user experience and website performance.
-          </p>
+
+        {/* Features Section */}
+        {/* --- LAYOUT CHANGE: Reduced vertical padding --- */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
+          <div className="grid md:grid-cols-3 gap-10 text-center">
+            <div className="feature-item">
+              <div className="mb-4 inline-block p-3 bg-slate-800 rounded-full border border-slate-700">
+                <Zap className="h-6 w-6 text-indigo-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">1. Crawl & Capture</h3>
+              <p className="text-slate-400 text-sm">Vuxi automatically discovers and screenshots the pages of your website.</p>
+            </div>
+            <div className="feature-item">
+              <div className="mb-4 inline-block p-3 bg-slate-800 rounded-full border border-slate-700">
+                <Scale className="h-6 w-6 text-indigo-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">2. AI-Powered Analysis</h3>
+              <p className="text-slate-400 text-sm">Our models analyze each page against UX best practices and your stated goals.</p>
+            </div>
+            <div className="feature-item">
+              <div className="mb-4 inline-block p-3 bg-slate-800 rounded-full border border-slate-700">
+                <BarChart2 className="h-6 w-6 text-indigo-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">3. Actionable Reporting</h3>
+              <p className="text-slate-400 text-sm">Receive a comprehensive report with prioritized recommendations.</p>
+            </div>
+          </div>
+          
+          {/* --- LAYOUT CHANGE: "See Example" link moved here --- */}
+          <div className="mt-12">
+              <Link to="/reports" className="group inline-flex items-center justify-center text-slate-400 hover:text-white transition-colors duration-200">
+                  <span>or see an example report</span>
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+              </Link>
+          </div>
         </div>
       </main>
-
-      <div className="flex flex-col sm:flex-row items-center gap-6">
-        <Link to="/conduct-analysis">
-          <Button size="lg" className="bg-green-600 hover:bg-green-500 text-white text-lg px-10 py-6 rounded-lg shadow-lg transition-transform hover:scale-105 w-full sm:w-auto">
-            <PlayCircle size={22} className="mr-2.5" />
-            Start New Analysis
-          </Button>
-        </Link>
-        <Link to="/reports">
-          <Button variant="outline" size="lg" className="border-indigo-400 text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 text-lg px-10 py-6 rounded-lg shadow-lg transition-transform hover:scale-105 w-full sm:w-auto">
-            <ListChecks size={22} className="mr-2.5" />
-            View Existing Reports
-          </Button>
-        </Link>
-      </div>
-
-      <footer className="mt-24 text-center text-slate-500 text-sm">
-        <p>&copy; {new Date().getFullYear()} Vuxi - Visual UX Inspector. All rights reserved.</p>
-        <p className="mt-1">Powered by advanced AI and web analysis technologies.</p>
-      </footer>
     </div>
   );
 };
