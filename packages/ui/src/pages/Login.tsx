@@ -4,16 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, UserPlus, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, LogIn, Loader2, AlertTriangle } from 'lucide-react';
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
-const CreateAccount = () => {
+const Login = () => {
   const navigate = useNavigate();
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,26 +21,24 @@ const CreateAccount = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Ensure the casing for "Name" matches the backend
-        body: JSON.stringify({ Name: name, email, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create account.');
+        throw new Error(data.error || 'Failed to log in.');
       }
 
-      // If a token is received, save it and navigate to the dashboard
+      // On success, store the token and navigate to the dashboard
       if (data.token) {
         localStorage.setItem('token', data.token);
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       } else {
-        // Fallback in case token is not returned
-        throw new Error('Login failed after account creation.');
+        throw new Error('Login failed: No token received.');
       }
 
     } catch (err) {
@@ -74,14 +70,14 @@ const CreateAccount = () => {
           <CardHeader className="p-6 sm:p-8 bg-slate-50/70 rounded-t-xl border-b border-slate-200/70">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-lg flex items-center justify-center shadow-md">
-                <UserPlus size={24} />
+                <LogIn size={24} />
               </div>
               <div>
                 <CardTitle className="text-2xl sm:text-3xl font-bold text-slate-800">
-                  Create Account
+                  Sign In
                 </CardTitle>
                 <CardDescription className="text-slate-500 mt-1 text-sm sm:text-base">
-                  Join to start your first UX analysis
+                  Welcome back! Please enter your details.
                 </CardDescription>
               </div>
             </div>
@@ -89,22 +85,6 @@ const CreateAccount = () => {
           
           <CardContent className="p-6 sm:p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <Label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Name
-                </Label>
-                <Input 
-                  id="name" 
-                  type="text" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  placeholder="e.g., John Smith"
-                  required 
-                  disabled={isLoading}
-                  className="w-full border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                />
-              </div>
-              
               <div>
                 <Label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
                   Email Address
@@ -130,7 +110,7 @@ const CreateAccount = () => {
                   type="password" 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
-                  placeholder="Create a secure password"
+                  placeholder="Enter your password"
                   required 
                   disabled={isLoading}
                   className="w-full border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
@@ -151,9 +131,9 @@ const CreateAccount = () => {
                 {isLoading ? (
                   <Loader2 size={20} className="mr-2 animate-spin" />
                 ) : (
-                  <UserPlus size={20} className="mr-2" />
+                  <LogIn size={20} className="mr-2" />
                 )}
-                {isLoading ? 'Creating Account...' : 'Create Account'}
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
           </CardContent>
@@ -161,9 +141,9 @@ const CreateAccount = () => {
           <CardFooter className="p-6 sm:p-8 border-t border-slate-200/70 bg-slate-50/30">
             <div className="w-full text-center">
               <p className="text-sm text-slate-600">
-                Already have an account?{' '}
-                <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors duration-200">
-                  Sign in here
+                Don't have an account?{' '}
+                <Link to="/create-account" className="font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors duration-200">
+                  Sign up here
                 </Link>
               </p>
             </div>
@@ -174,4 +154,4 @@ const CreateAccount = () => {
   );
 };
 
-export default CreateAccount;
+export default Login;

@@ -1,139 +1,78 @@
-// aldo-g/web-analysis/Web-analysis-ce47fd73470b9414e2e4feac630ba53f4f991579/scrape+capture/api/lib/analysisService.js
-const path = require('path');
 const { spawn } = require('child_process');
-const jobManager = require('./jobManager');
+const path = require('path');
+const prisma = require('./prisma');
 
-const NODE_SERVICES_BASE_PATH = path.join(__dirname, '..', '..', 'src', 'services');
-
-class AnalysisService {
-
-  // Helper to run a script and update job progress
-  async runScript(jobId, scriptPath, args, stage, startMessage, endMessage) {
-    return new Promise((resolve, reject) => {
-      jobManager.updateProgress(jobId, { stage: stage, message: startMessage });
-      
-      console.log(`[${jobId}] Running: node ${scriptPath} ${args.join(' ')}`);
-      
-      const process = spawn('node', [scriptPath, ...args], { stdio: 'pipe' });
-
-      process.stdout.on('data', (data) => {
-        console.log(`[${jobId} - ${stage} stdout]: ${data}`);
-      });
-
-      process.stderr.on('data', (data) => {
-        console.error(`[${jobId} - ${stage} stderr]: ${data}`);
-      });
-
-      process.on('close', (code) => {
-        if (code !== 0) {
-          const errorMsg = `Stage '${stage}' failed with exit code ${code}.`;
-          console.error(`[${jobId}] ${errorMsg}`);
-          jobManager.updateJob(jobId, { status: 'failed', error: errorMsg });
-          return reject(new Error(errorMsg));
-        }
-        console.log(`[${jobId}] Stage '${stage}' completed successfully.`);
-        jobManager.updateProgress(jobId, { message: endMessage });
-        resolve(true);
-      });
-
-      process.on('error', (err) => {
-        console.error(`[${jobId}] Failed to start stage '${stage}':`, err);
-        jobManager.updateJob(jobId, { status: 'failed', error: err.message });
-        reject(err);
-      });
-    });
+async function startAnalysis({
+  baseUrl,
+  projectName,
+  orgName,
+  orgPurpose,
+  userId,
+}) {
+  if (!baseUrl || !projectName) {
+    throw new Error('Base URL and project name are required.');
+  }
+  if (!userId) {
+    throw new Error('User ID is required to start an analysis.');
   }
 
-  async startFullAnalysis(jobId, analysisParams) {
-    try {
-      const job = jobManager.getJob(jobId);
-      if (!job || !job.result?.tempDir) {
-        throw new Error('Initial capture job data not found or is incomplete.');
-      }
+  try {
+    // Use `upsert` to find an existing project or create a new one.
+    // This prevents the unique constraint error.
+    const project = await prisma.project.upsert({
+      where: {
+        // This syntax targets the composite unique key
+        userId_baseUrl: {
+          userId: userId,
+          baseUrl: baseUrl,
+        },
+      },
+      // If the project exists, you can optionally update its details
+      update: {
+        name: projectName,
+        orgName: orgName,
+        orgPurpose: orgPurpose,
+      },
+      // If the project does not exist, create it
+      create: {
+        name: projectName,
+        baseUrl,
+        orgName,
+        orgPurpose,
+        userId,
+      },
+    });
 
-      const { tempDir } = job.result;
-      const { orgName, orgType, orgPurpose } = analysisParams;
+    // Create a new AnalysisRun for this project
+    const analysisRun = await prisma.analysisRun.create({
+        data: {
+            projectId: project.id,
+            status: 'queued',
+        }
+    });
 
-      // --- Define paths based on the initial capture's temp directory ---
-      const urlDiscoveryOutputDir = path.join(tempDir, 'urls');
-      const screenshotsOutputDir = path.join(tempDir, 'screenshots');
-      const lighthouseOutputDir = path.join(tempDir, 'lighthouse');
-      const llmAndFormattingOutputDir = path.join(tempDir, 'llm_analysis_and_formatting');
-      
-      const discoveredUrlsSimpleFile = path.join(urlDiscoveryOutputDir, 'urls_simple.json');
-      const rawLlmAnalysisFile = path.join(llmAndFormattingOutputDir, 'analysis.json');
-      const formattedDataFile = path.join(llmAndFormattingOutputDir, 'structured-analysis.json');
+    // Spawn the background script to perform the analysis
+    const scriptPath = path.join(__dirname, '..', '..', 'scrape+capture', 'src', 'batch_analyzer.js');
+    const args = [
+        '--runId', analysisRun.id,
+        '--preset', 'default'
+    ];
 
-      // --- Step 1: Lighthouse Audits ---
-      await this.runScript(
-        jobId,
-        path.join(NODE_SERVICES_BASE_PATH, 'lighthouse', 'run.js'),
-        ['--urlsFile', discoveredUrlsSimpleFile, '--outputDir', lighthouseOutputDir],
-        'lighthouse-audit',
-        'Running Lighthouse audits...',
-        'Lighthouse audits complete.'
-      );
+    const child = spawn('node', [scriptPath, ...args], {
+        detached: true,
+        stdio: 'ignore',
+    });
+    child.unref();
 
-      // --- Step 2: LLM Analysis ---
-      await this.runScript(
-        jobId,
-        path.join(NODE_SERVICES_BASE_PATH, 'llm-analysis', 'run.js'),
-        [
-          '--screenshotsDir', path.join(screenshotsOutputDir, 'desktop'),
-          '--lighthouseDir', path.join(lighthouseOutputDir, 'trimmed'),
-          '--outputDir', llmAndFormattingOutputDir,
-          '--orgName', orgName,
-          '--orgType', orgType,
-          '--orgPurpose', orgPurpose,
-        ],
-        'llm-analysis',
-        'Starting AI analysis...',
-        'AI analysis complete. Formatting results...'
-      );
+    console.log(`Started analysis for runId: ${analysisRun.id} with PID: ${child.pid}`);
+    
+    // Return the analysisRun object; its ID is used as the jobId
+    return analysisRun;
 
-      // --- Step 3: Formatting ---
-      await this.runScript(
-        jobId,
-        path.join(NODE_SERVICES_BASE_PATH, 'formatting', 'run.js'),
-        [
-            '--inputPath', rawLlmAnalysisFile,
-            '--outputPath', formattedDataFile,
-            '--orgName', orgName,
-            '--orgType', orgType,
-            '--orgPurpose', orgPurpose,
-        ],
-        'formatting',
-        'Structuring analysis data...',
-        'Formatting complete. Generating final report...'
-      );
-
-      // --- Step 4: HTML Report Generation ---
-      // The output of this step will be the final report, saved into a new directory
-      // For simplicity, we'll log its completion, but won't move files here. The client can poll for final status.
-      await this.runScript(
-        jobId,
-        path.join(NODE_SERVICES_BASE_PATH, 'html-report', 'run.js'),
-        [
-          '--analysisFilePath', formattedDataFile,
-          '--outputDir', job.result.tempDir, // Generate report in the job's temp dir
-          '--screenshotsDir', screenshotsOutputDir,
-        ],
-        'html-report',
-        'Generating HTML report...',
-        'Report generated! Analysis is complete.'
-      );
-
-      // Final job update
-      jobManager.updateJob(jobId, { status: 'analysis-complete' }); // A new status
-      jobManager.updateProgress(jobId, { stage: 'complete', message: 'Full analysis finished.' });
-
-      console.log(`✅ [${jobId}] Full analysis pipeline finished successfully.`);
-
-    } catch (error) {
-      console.error(`❌ [${jobId}] Full analysis pipeline failed:`, error);
-      jobManager.updateJob(jobId, { status: 'failed', error: error.message });
-    }
+  } catch (error) {
+    console.error('Error in analysis process:', error);
+    throw error;
   }
 }
 
-module.exports = new AnalysisService();
+module.exports = { startAnalysis };

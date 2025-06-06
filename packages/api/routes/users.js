@@ -2,41 +2,51 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
-const saltRounds = 10; // Standard value for bcrypt hashing
+const saltRounds = 10;
 
-// POST /api/users - Create a new user
 router.post('/', async (req, res) => {
   try {
-    const { fullName, email, notificationEmail, password } = req.body;
+    // Expect "Name" with a capital N from the request body
+    const { Name, email, password } = req.body;
 
-    // --- Validation ---
-    if (!fullName || !email || !password) {
-      return res.status(400).json({ error: 'Full name, email, and password are required.' });
+    // This validation check also expects "Name" with a capital N
+    if (!Name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required.' });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
+    let user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
       return res.status(409).json({ error: 'An account with this email already exists.' });
     }
 
-    // --- Password Hashing ---
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // --- Create User in Database ---
-    const user = await prisma.user.create({
+    user = await prisma.user.create({
       data: {
-        fullName,
+        Name, // This uses the destructured "Name" variable
         email,
-        notificationEmail: notificationEmail || email, // Default to main email if not provided
         passwordHash,
       },
     });
 
-    // Don't send the password hash back to the client
-    const { passwordHash: _, ...userWithoutPassword } = user;
-    
-    res.status(201).json({ user: userWithoutPassword, message: 'User created successfully.' });
+    const payload = {
+      user: {
+        id: user.id,
+      },
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: '5h' },
+      (err, token) => {
+        if (err) throw err;
+        const { passwordHash: _, ...userWithoutPassword } = user;
+        res.status(201).json({ token, user: userWithoutPassword });
+      }
+    );
 
   } catch (error) {
     console.error('Error creating user:', error);

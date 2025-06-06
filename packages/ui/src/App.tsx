@@ -5,14 +5,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Import your page components
-import VuxiLanding from "./pages/VuxiLanding";         // Vuxi Landing Page
-import ReportList from "./pages/ReportList";           // Lists all reports
-import Index from "./pages/Index";                     // Report Detail Overview
-import PageAnalysis from "./pages/PageAnalysis";       // Individual Page Analysis
-import ConductAnalysis from "./pages/ConductAnalysis";   // Form to start new analysis
-import ReviewScreenshots from "./pages/ReviewScreenshots"; // New: Page to review screenshots
-import NotFound from "./pages/NotFound";                 // For handling 404 errors
+import Home from "./pages/Home";
+import ReportList from "./pages/ReportList";
+import Index from "./pages/Index";
+import PageAnalysis from "./pages/PageAnalysis";
+import ConductAnalysis from "./pages/ConductAnalysis";
+import ReviewScreenshots from "./pages/ReviewScreenshots";
+import NotFound from "./pages/NotFound";
 import CreateAccount from './pages/CreateAccount';
+import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login"; // Import the new Login page
 
 const queryClient = new QueryClient();
 
@@ -23,25 +25,20 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* Route for the new Vuxi Landing Page */}
-          <Route path="/" element={<VuxiLanding />} />
+          {/* Landing & Auth Routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/create-account" element={<CreateAccount />} />
+          <Route path="/login" element={<Login />} /> {/* Use the new Login component */}
 
-          {/* Route to list all available reports */}
-          <Route path="/reports" element={<ReportList />} />
-
-          {/* Route to display the overview of a specific report run */}
-          <Route path="/report/:reportId" element={<Index />} />
-
-          {/* Route to display the detailed analysis of a specific page within a specific report run */}
-          <Route path="/report/:reportId/page/:pageId" element={<PageAnalysis />} />
-
-          {/* Route for the new Conduct Analysis page (form) */}
+          {/* Main App Routes */}
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/conduct-analysis" element={<ConductAnalysis />} />
-
-          {/* Route for reviewing screenshots after URL discovery and capture */}
           <Route path="/review-screenshots" element={<ReviewScreenshots />} />
 
-          <Route path="/create-account" element={<CreateAccount />} />
+          {/* Report Viewing Routes */}
+          <Route path="/reports" element={<ReportList />} />
+          <Route path="/report/:reportId" element={<Index />} />
+          <Route path="/report/:reportId/page/:pageId" element={<PageAnalysis />} />
           
           {/* Catch-all route for 404 Not Found pages */}
           <Route path="*" element={<NotFound />} />
