@@ -1,37 +1,34 @@
 const path = require('path');
 const fs = require('fs-extra');
-const prisma = require('./prisma');
+const jobManager = require('./jobManager');
 const { URLDiscoveryService } = require('../../scrape+capture/src/services/url-discovery');
 const { ScreenshotService } = require('../../scrape+capture/src/services/screenshot');
-const jobManager = require('./jobManager.js');
 
 class CaptureService {
   constructor() {
-    this.tempDir = path.join(__dirname, '../temp');
+    // This temp directory will hold our transient screenshots
+    this.tempDir = path.join(__dirname, '..', 'temp');
     fs.ensureDirSync(this.tempDir);
   }
 
-  // --- THIS NEW FUNCTION IS ADDED ---
+  // This function is now perfect for fetching temporary screenshots
   async getScreenshotBase64(jobId, filename) {
-    // Construct the path to the screenshot file in the job's temporary directory
     const screenshotPath = path.join(this.tempDir, String(jobId), 'screenshots', 'desktop', filename);
-    
     if (await fs.pathExists(screenshotPath)) {
       const buffer = await fs.readFile(screenshotPath);
-      // Return the full data URL prefix which the <img> tag can use directly
       return `data:image/png;base64,${buffer.toString('base64')}`;
     }
-    
-    console.warn(`[Job ${jobId}] Screenshot not found at path: ${screenshotPath}`);
+    console.warn(`[Temp Job ${jobId}] Screenshot not found: ${screenshotPath}`);
     return null;
   }
 
-  async startCapture(jobId, url, options = {}) {
+  // This no longer interacts with Prisma, only the jobManager
+  async startPreviewCapture(jobId, url, options = {}) {
     try {
-      console.log(`🚀 Starting capture job ${jobId} for ${url}`);
-      
-      await jobManager.updateJob(jobId, { status: 'running', progress: { stage: 'url-discovery', message: 'Discovering URLs...' } });
+      console.log(`🚀 Starting PREVIEW capture for temp job ${jobId}`);
+      jobManager.updateJob(jobId, { status: 'processing' });
 
+      // Each job gets a unique temporary folder named after its ID
       const jobTempDir = path.join(this.tempDir, String(jobId));
       await fs.ensureDir(jobTempDir);
 
@@ -40,72 +37,32 @@ class CaptureService {
       if (!urlResult.success) throw new Error(`URL discovery failed: ${urlResult.error}`);
       
       const discoveredUrls = urlResult.urls;
-      console.log(`[Job ${jobId}] 📋 Discovered ${discoveredUrls.length} URLs.`);
+      console.log(`[Temp Job ${jobId}] 📋 Discovered ${discoveredUrls.length} URLs.`);
 
-      await jobManager.updateJob(jobId, { progress: { stage: 'creating-pages', message: 'Saving discovered pages...' } });
-
-      const analyzedPages = await Promise.all(
-        discoveredUrls.map(pageUrl =>
-          prisma.analyzedPage.create({ data: { runId: jobId, url: pageUrl } })
-        )
-      );
-      console.log(`[Job ${jobId}] 💾 Saved ${analyzedPages.length} page records.`);
-
-      await jobManager.updateJob(jobId, { progress: { stage: 'screenshots', message: `Taking ${analyzedPages.length} screenshots...` } });
-      
       const screenshotsDir = path.join(jobTempDir, 'screenshots');
-      await fs.ensureDir(screenshotsDir);
-      
       const screenshotService = new ScreenshotService({ outputDir: screenshotsDir });
       const screenshotResult = await screenshotService.captureAll(discoveredUrls);
-      if (!screenshotResult.success && screenshotResult.successful.length === 0) {
-        throw new Error(`Screenshot capture failed: ${screenshotResult.error}`);
-      }
+      if (!screenshotResult.success) throw new Error('Screenshot capture failed.');
 
-      const screenshotRecords = await Promise.all(
-        screenshotResult.successful.map(screenshot => {
-          const matchingPage = analyzedPages.find(p => p.url === screenshot.data.url);
-          if (matchingPage) {
-            return prisma.screenshot.create({
-              data: {
-                analyzedPageId: matchingPage.id,
-                storageUrl: screenshot.data.path,
-                viewport: 'desktop',
-              },
-            });
-          }
-          return null;
-        })
-      );
-      console.log(`[Job ${jobId}] 💾 Saved ${screenshotRecords.filter(Boolean).length} screenshot records.`);
+      const screenshotInfo = screenshotResult.successful.map(s => ({
+          url: s.data.url,
+          filename: path.basename(s.data.path),
+          path: s.data.path,
+      }));
       
-      const finalReport = {
-        urls: discoveredUrls,
-        screenshots: screenshotResult.successful.map(s => ({
-            url: s.data.url,
-            filename: path.basename(s.data.path),
-            path: s.data.path
-        })),
-        stats: {
-          urlsDiscovered: discoveredUrls.length,
-          screenshotsSuccessful: screenshotResult.successful.length,
+      jobManager.updateJob(jobId, {
+        status: 'screenshots_ready',
+        // We store the results in memory for the frontend to fetch
+        results: {
+          screenshots: screenshotInfo,
         }
-      };
-
-      await jobManager.updateJob(jobId, { 
-        status: 'completed',
-        progress: { stage: 'completed', message: 'Capture phase completed successfully!' },
-        finalReport: finalReport
       });
 
-      console.log(`[Job ${jobId}] ✅ Capture phase completed successfully.`);
+      console.log(`[Temp Job ${jobId}] ✅ Preview capture complete. Awaiting user review.`);
       
     } catch (error) {
-      console.error(`[Job ${jobId}] ❌ Capture job failed:`, error);
-      await jobManager.updateJob(jobId, {
-        status: 'failed',
-        error: { message: error.message, stack: error.stack },
-      });
+      console.error(`[Temp Job ${jobId}] ❌ Preview capture failed:`, error);
+      jobManager.updateJob(jobId, { status: 'failed' });
     }
   }
 }

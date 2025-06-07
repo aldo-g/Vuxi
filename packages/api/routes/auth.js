@@ -33,6 +33,7 @@ router.post('/login', async (req, res) => {
         id: user.id,
       },
     };
+    console.log('SECRET USED FOR SIGNING:', process.env.JWT_SECRET);
 
     jwt.sign(
       payload,

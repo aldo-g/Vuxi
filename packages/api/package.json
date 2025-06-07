@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "scripts": {
         "start": "node server.js",
-        "dev": "dotenv -e ../../.env -- nodemon --ignore temp/ --ignore 'temp/**' server.js"
+        "dev": "nodemon --ignore temp/ --ignore 'temp/**' server.js"
     },
     "dependencies": {
         "@anthropic-ai/sdk": "^0.53.0",

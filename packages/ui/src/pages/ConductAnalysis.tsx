@@ -28,8 +28,10 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal, CheckCircle } from 'lucide-react';
 
+// The backend API URL
 const API_BASE_URL = 'http://localhost:3001/api';
 
+// Zod schema for form validation
 const formSchema = z.object({
   projectName: z.string().min(2, 'Project name must be at least 2 characters.'),
   baseUrl: z.string().url('Please enter a valid URL.'),
@@ -42,7 +44,7 @@ type FormData = z.infer<typeof formSchema>;
 const ConductAnalysis = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null); // This will now be a temporary UUID
   const [jobStatus, setJobStatus] = useState<any>(null);
   const navigate = useNavigate();
 
@@ -56,74 +58,105 @@ const ConductAnalysis = () => {
     },
   });
 
+  // This effect polls for the status of the temporary preview job
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-    if (jobId && jobStatus?.status !== 'completed' && jobStatus?.status !== 'failed') {
+    
+    // Start polling only if we have a job ID and it's not in a final state
+    if (jobId && jobStatus?.status !== 'screenshots_ready' && jobStatus?.status !== 'failed') {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`${API_BASE_URL}/capture/status/${jobId}`);
+          // IMPORTANT: Poll the new status endpoint for preview jobs
+          const res = await fetch(`${API_BASE_URL}/capture/preview/status/${jobId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+
           if (res.ok) {
             const status = await res.json();
             setJobStatus(status);
-            if (status.status === 'completed' || status.status === 'failed') {
+            // Stop polling if the job is done or has failed
+            if (status.status === 'screenshots_ready' || status.status === 'failed') {
               if (interval) clearInterval(interval);
             }
           }
         } catch (err) {
           console.error('Failed to fetch job status:', err);
+          setError('Could not connect to the server to get job status.');
           if (interval) clearInterval(interval);
         }
-      }, 2000);
+      }, 2000); // Poll every 2 seconds
     }
+
+    // This block handles the navigation once screenshots are ready
+    if (jobStatus?.status === 'screenshots_ready') {
+      toast({
+        title: "Screenshots Ready!",
+        description: "Proceed to the next step to review captured images.",
+      });
+      
+      // Navigate to the review page, passing all necessary data in the state.
+      // This includes the temp job ID, the screenshot list, and the original form data
+      // which is needed for the final commit.
+      navigate('/review-screenshots', {
+        state: {
+          jobId: jobId,
+          screenshots: jobStatus.results.screenshots,
+          analysisParams: form.getValues(),
+        },
+      });
+    }
+
+    // Cleanup function to clear the interval when the component unmounts
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [jobId, jobStatus]);
+  }, [jobId, jobStatus, navigate, form]);
 
+
+  // This function handles the initial form submission
   const handleSubmit = async (values: FormData) => {
     setIsLoading(true);
     setError(null);
     setJobId(null);
+    setJobStatus(null);
     
     const token = localStorage.getItem('token');
     if (!token) {
         setError('You must be logged in to start an analysis.');
         setIsLoading(false);
-        toast({
-            title: "Authentication Error",
-            description: "You must be logged in to start an analysis.",
-            variant: "destructive",
-        });
         return;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/capture`, {
+      // IMPORTANT: Call the new `/preview` endpoint
+      const response = await fetch(`${API_BASE_URL}/capture/preview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`, // Include the auth token
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(values),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to start job.');
+        // Handle non-2xx responses from the server
+        const errorData = await response.json().catch(() => ({ error: 'An unknown server error occurred.' }));
+        throw new Error(errorData.error || `Server responded with status ${response.status}`);
       }
 
       const data = await response.json();
-      setJobId(data.jobId);
+      setJobId(data.jobId); // Set the temporary job ID to start polling
       toast({
-        title: 'Analysis Started',
-        description: `Job ID: ${data.jobId}. You can now monitor its progress.`,
+        title: 'Preview Started',
+        description: `Job ID: ${data.jobId}. Capturing screenshots for review.`,
       });
     } catch (error) {
-      console.error('Failed to start analysis job:', error);
-      setError((error as Error).message);
+      const errorMessage = (error as Error).message;
+      console.error('Failed to start analysis job:', errorMessage);
+      setError(errorMessage);
       toast({
         title: 'Error',
-        description: `Failed to start analysis: ${(error as Error).message}`,
+        description: `Failed to start preview: ${errorMessage}`,
         variant: 'destructive',
       });
     } finally {
@@ -131,12 +164,6 @@ const ConductAnalysis = () => {
     }
   };
 
-  const handleNavigateToReport = () => {
-    if (jobStatus && jobStatus.analysisRunId) {
-      navigate(`/report/${jobStatus.analysisRunId}`);
-    }
-  };
-  
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <Card className="max-w-2xl mx-auto">
@@ -149,6 +176,7 @@ const ConductAnalysis = () => {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+              {/* FormField for projectName */}
               <FormField
                 control={form.control}
                 name="projectName"
@@ -163,6 +191,7 @@ const ConductAnalysis = () => {
                   </FormItem>
                 )}
               />
+              {/* FormField for baseUrl */}
               <FormField
                 control={form.control}
                 name="baseUrl"
@@ -177,6 +206,7 @@ const ConductAnalysis = () => {
                   </FormItem>
                 )}
               />
+              {/* FormField for orgName */}
               <FormField
                 control={form.control}
                 name="orgName"
@@ -190,6 +220,7 @@ const ConductAnalysis = () => {
                   </FormItem>
                 )}
               />
+              {/* FormField for orgPurpose */}
               <FormField
                 control={form.control}
                 name="orgPurpose"
@@ -210,7 +241,7 @@ const ConductAnalysis = () => {
                 )}
               />
               <Button type="submit" disabled={isLoading || !!jobId}>
-                {isLoading ? 'Starting...' : 'Confirm and Start Analysis'}
+                {isLoading ? 'Starting...' : 'Start Preview'}
               </Button>
             </form>
           </Form>
@@ -229,8 +260,8 @@ const ConductAnalysis = () => {
       {jobId && (
         <Card className="max-w-2xl mx-auto mt-8">
             <CardHeader>
-                <CardTitle>Analysis in Progress</CardTitle>
-                <CardDescription>Job ID: {jobId}</CardDescription>
+                <CardTitle>Preview in Progress</CardTitle>
+                <CardDescription>Temporary Job ID: {jobId}</CardDescription>
             </CardHeader>
             <CardContent>
                 {jobStatus ? (
@@ -239,26 +270,26 @@ const ConductAnalysis = () => {
                             <span className="text-base font-medium text-blue-700">
                                 {jobStatus.status.charAt(0).toUpperCase() + jobStatus.status.slice(1)}
                             </span>
-                            <span className="text-sm font-medium text-blue-700">
-                                {jobStatus.progress ? `${Math.round(jobStatus.progress * 100)}%` : '0%'}
-                            </span>
                         </div>
-                        <Progress value={jobStatus.progress ? jobStatus.progress * 100 : 0} className="w-full" />
-                        {jobStatus.message && <p className="mt-2 text-sm text-gray-500">{jobStatus.message}</p>}
+                        {jobStatus.status === 'processing' && <Progress value={50} className="w-full" />}
+                        {jobStatus.status === 'screenshots_ready' && (
+                          <div className="flex items-center text-green-600">
+                            <CheckCircle className="h-5 w-5 mr-2" />
+                            <span>Ready for review! Navigating...</span>
+                          </div>
+                        )}
+                        {jobStatus.status === 'failed' && (
+                          <Alert variant="destructive">
+                              <Terminal className="h-4 w-4" />
+                              <AlertTitle>Job Failed</AlertTitle>
+                              <AlertDescription>The preview capture failed. Please try again.</AlertDescription>
+                          </Alert>
+                        )}
                     </div>
                 ) : (
                     <p>Waiting for job status...</p>
                 )}
             </CardContent>
-            {jobStatus?.status === 'completed' && (
-                <CardFooter className="flex justify-between items-center">
-                    <div className="flex items-center text-green-600">
-                        <CheckCircle className="h-5 w-5 mr-2" />
-                        <span>Analysis Complete!</span>
-                    </div>
-                    <Button onClick={handleNavigateToReport}>View Report</Button>
-                </CardFooter>
-            )}
         </Card>
       )}
     </div>

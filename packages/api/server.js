@@ -1,7 +1,10 @@
+const path = require('path');
+// --- ADD THESE TWO LINES AT THE TOP ---
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
 const express = require('express');
 const cors = require('cors');
 const { spawn } = require('child_process');
-const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs-extra');
 const { getJob, setJob, updateJob } = require('./lib/jobManager');

@@ -1,38 +1,34 @@
-const prisma = require('./prisma');
+const { v4: uuidv4 } = require('uuid');
 
-/**
- * Fetches the status of an analysis run directly from the database.
- * @param {string} analysisRunId - The ID of the analysis run to check.
- * @returns {Promise<object|null>} The status object or null if not found.
- */
-async function getJobStatus(analysisRunId) {
-    try {
-        // The ID from the URL is a string, so we need to parse it to an integer
-        const runId = parseInt(analysisRunId, 10);
-        if (isNaN(runId)) {
-            return null; // Invalid ID format
-        }
+// This is a simple in-memory store. In a real production app, you might use Redis.
+const jobs = new Map();
 
-        const analysisRun = await prisma.analysisRun.findUnique({
-            where: { id: runId },
-        });
+class JobManager {
+  createJob() {
+    const jobId = uuidv4(); // Generate a unique temporary ID
+    const job = {
+      id: jobId,
+      status: 'queued',
+      createdAt: new Date(),
+    };
+    jobs.set(jobId, job);
+    return job;
+  }
 
-        if (!analysisRun) {
-            return null; // Job not found in the database
-        }
+  updateJob(jobId, updates) {
+    if (!jobs.has(jobId)) return;
+    const job = jobs.get(jobId);
+    Object.assign(job, updates, { updatedAt: new Date() });
+    jobs.set(jobId, job);
+  }
 
-        return {
-            status: analysisRun.status,
-            progress: analysisRun.progress || 0,
-            message: `Processing analysis run ${analysisRunId}`,
-            analysisRunId: analysisRun.id
-        };
-    } catch (error) {
-        console.error(`Error fetching status for run ${analysisRunId}:`, error);
-        return null;
-    }
+  getJob(jobId) {
+    return jobs.get(jobId);
+  }
+
+  removeJob(jobId) {
+    jobs.delete(jobId);
+  }
 }
 
-// The createJob and getJob functions are no longer needed
-// as we are now persisting the job state in the database.
-module.exports = { getJobStatus };
+module.exports = new JobManager();
