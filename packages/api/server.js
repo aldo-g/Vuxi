@@ -1,54 +1,51 @@
-const path = require('path');
-// --- ADD THESE TWO LINES AT THE TOP ---
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
-
-const express = require('express');
-const cors = require('cors');
-const { spawn } = require('child_process');
-const { v4: uuidv4 } = require('uuid');
+const prisma = require('./prisma');
 const fs = require('fs-extra');
-const { getJob, setJob, updateJob } = require('./lib/jobManager');
+const path = require('path');
 
-// Import routers
-const usersRouter = require('./routes/users');
-const captureRouter = require('./routes/capture');
-const projectsRouter = require('./routes/projects'); // The new projects router
-const authRouter = require('./routes/auth');
+/**
+ * Creates the final Project and AnalysisRun records in the database
+ * from a completed preview job.
+ * @param {object} previewData - Contains projectName, baseUrl, etc.
+ * @param {string} userId - The ID of the authenticated user.
+ * @returns The newly created analysisRun record.
+ */
+async function createProjectFromPreview(previewData, userId) {
+  const { projectName, baseUrl, orgName, orgPurpose } = previewData;
 
-const app = express();
-const port = 3001;
-
-// CORS configuration
-const allowedOrigins = ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'];
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+  if (!projectName || !baseUrl || !userId) {
+    throw new Error('Project details and a user ID are required to create a project.');
   }
-}));
 
-// Middleware to parse JSON bodies
-app.use(express.json());
+  try {
+    const project = await prisma.project.upsert({
+      where: {
+        userId_baseUrl: {
+          userId: userId,
+          baseUrl: baseUrl,
+        },
+      },
+      update: { name: projectName, orgName, orgPurpose },
+      create: { name: projectName, baseUrl, orgName, orgPurpose, userId },
+    });
 
-// Define API Routes
-app.use('/api/users', usersRouter);
-app.use('/api/capture', captureRouter);
-app.use('/api/projects', projectsRouter); // Use the new projects router
-app.use('/api/auth', authRouter);
+    const analysisRun = await prisma.analysisRun.create({
+      data: {
+        projectId: project.id,
+        status: 'completed', // The initial capture is done, so we can mark it as complete
+      },
+    });
 
-// Welcome route
-app.get('/', (req, res) => {
-  res.send('Welcome to the Vuxi Website Capture API');
-});
+    console.log(`Successfully committed project. New AnalysisRun ID: ${analysisRun.id}`);
 
-console.log(`🚀 Website Capture API running on port ${port}`);
-console.log(`📸 Capture Endpoints: http://localhost:${port}/api/capture`);
-console.log(`👤 User Endpoints: http://localhost:${port}/api/users`);
-console.log(`💡 Allowing origins: ${allowedOrigins.join(', ')}`);
+    // You could add logic here to move screenshots from the temp folder
+    // to a permanent folder named after `analysisRun.id`.
 
-app.listen(port, () => {
-  // Note: The console logs are moved above to show status immediately
-});
+    return analysisRun;
+
+  } catch (error) {
+    console.error('Error committing project to database:', error);
+    throw error;
+  }
+}
+
+module.exports = { createProjectFromPreview };
