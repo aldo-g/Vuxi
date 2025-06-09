@@ -1,6 +1,6 @@
 const fs = require('fs-extra');
 const path = require('path');
-const { FormattingService } = require('../src/services/formatting');
+const { FormattingService } = require('../formatting');
 
 // Configuration for different organization types (same as LLM test)
 const ORG_CONFIGS = {
