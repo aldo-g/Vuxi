@@ -1,0 +1,17 @@
+{
+  "name": "@vuxi/e2e-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node test-full-flow.js"
+  },
+  "dependencies": {
+    "@vuxi/analysis": "1.0.0",
+    "@vuxi/capture": "1.0.0",
+    "inquirer": "^8.2.4"
+  },
+  "devDependencies": {
+    "chai": "^4.3.4",
+    "mocha": "^9.1.3"
+  }
+}

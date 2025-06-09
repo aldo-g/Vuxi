@@ -11,10 +11,7 @@
   "author": "",
   "license": "ISC",
   "workspaces": [
-    "packages/db",
-    "packages/capture",
-    "packages/analysis",
-    "packages/next-app"
+    "packages/*"
   ],
   "dependencies": {
     "next": "^15.3.3",
