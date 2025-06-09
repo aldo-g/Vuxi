@@ -1,19 +1,22 @@
 {
-    "name": "vuxi-monorepo",
-    "version": "1.0.0",
-    "private": true,
-    "workspaces": [
-        "packages/api",
-        "packages/db",
-        "packages/scrape+capture",
-        "packages/ui"
-    ],
-    "scripts": {
-        "dev:ui": "npm run dev -w packages/ui",
-        "dev:api": "npm run dev -w packages/api",
-        "db:migrate": "npm run db:migrate -w packages/db"
-    },
-    "devDependencies": {
-        "dotenv-cli": "^8.0.0"
-    }
+  "name": "vuxi",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npm run dev -w next-app"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "workspaces": [
+    "packages/db",
+    "packages/capture",
+    "packages/analysis",
+    "packages/next-app"
+  ],
+  "dependencies": {
+    "radix-ui": "^1.4.2"
+  }
 }
