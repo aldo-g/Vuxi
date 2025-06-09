@@ -38,33 +38,53 @@ function trimReport(fullReport) {
     });
   }
   
-  // Extract ONLY core metrics (no descriptions, no details)
-  if (fullReport.audits && fullReport.audits.metrics) {
+  // Extract ONLY core metrics (no descriptions, no details) - with safety checks
+  if (fullReport.audits && fullReport.audits.metrics && 
+      fullReport.audits.metrics.details && 
+      fullReport.audits.metrics.details.items && 
+      fullReport.audits.metrics.details.items.length > 0) {
+    
     const metricsData = fullReport.audits.metrics.details.items[0];
     
     trimmed.metrics = {
-      firstContentfulPaint: metricsData.firstContentfulPaint,
-      largestContentfulPaint: metricsData.largestContentfulPaint,
-      interactive: metricsData.interactive,
-      speedIndex: metricsData.speedIndex,
-      totalBlockingTime: metricsData.totalBlockingTime,
-      cumulativeLayoutShift: metricsData.cumulativeLayoutShift,
+      firstContentfulPaint: metricsData.firstContentfulPaint || 0,
+      largestContentfulPaint: metricsData.largestContentfulPaint || 0,
+      interactive: metricsData.interactive || 0,
+      speedIndex: metricsData.speedIndex || 0,
+      totalBlockingTime: metricsData.totalBlockingTime || 0,
+      cumulativeLayoutShift: metricsData.cumulativeLayoutShift || 0,
     };
     
     // Core Web Vitals (essential values only)
     trimmed.coreWebVitals = {
       lcp: {
-        value: metricsData.largestContentfulPaint,
-        score: fullReport.audits['largest-contentful-paint']?.score
+        value: metricsData.largestContentfulPaint || 0,
+        score: fullReport.audits['largest-contentful-paint']?.score || 0
       },
       fid: {
-        value: metricsData.totalBlockingTime, // TBT as proxy for FID
-        score: fullReport.audits['total-blocking-time']?.score
+        value: metricsData.totalBlockingTime || 0, // TBT as proxy for FID
+        score: fullReport.audits['total-blocking-time']?.score || 0
       },
       cls: {
-        value: metricsData.cumulativeLayoutShift,
-        score: fullReport.audits['cumulative-layout-shift']?.score
+        value: metricsData.cumulativeLayoutShift || 0,
+        score: fullReport.audits['cumulative-layout-shift']?.score || 0
       }
+    };
+  } else {
+    // Fallback with zero values if metrics are not available
+    trimmed.metrics = {
+      firstContentfulPaint: 0,
+      largestContentfulPaint: 0,
+      interactive: 0,
+      speedIndex: 0,
+      totalBlockingTime: 0,
+      cumulativeLayoutShift: 0,
+    };
+    
+    trimmed.coreWebVitals = {
+      lcp: { value: 0, score: 0 },
+      fid: { value: 0, score: 0 },
+      cls: { value: 0, score: 0 }
     };
   }
   

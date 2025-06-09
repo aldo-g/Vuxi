@@ -1,6 +1,7 @@
 require('dotenv').config(); // Load environment variables
 
-const Anthropic = require('@anthropic-ai/sdk/index.mjs');
+const Anthropic = require('@anthropic-ai/sdk');
+
 // Import OpenAI only when needed
 let OpenAI;
 

@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test": "node test-full-flow.js"
+    "test": "node test-full-flow.js",
+    "test:capture": "node test-capture-only.js",
+    "test:analysis": "node test-analysis-only.js"
   },
   "dependencies": {
     "@vuxi/analysis": "1.0.0",

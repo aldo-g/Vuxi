@@ -16,7 +16,7 @@ class ScreenshotCapture {
     this.enhancer = new ScreenshotEnhancer();
     
     // Create output directory structure
-    this.screenshotsDir = path.join(outputDir, 'desktop');
+    this.screenshotsDir = path.join(outputDir, 'screenshots', 'desktop');
     fs.ensureDirSync(this.screenshotsDir);
   }
   
@@ -110,7 +110,7 @@ class ScreenshotCapture {
       return {
         url: url,
         filename: filename,
-        path: `desktop/${filename}`,
+        path: `screenshots/desktop/${filename}`,
         timestamp: new Date().toISOString(),
         duration_ms: duration,
         viewport: this.viewport

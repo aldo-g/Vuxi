@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const Anthropic = require('@anthropic-ai/sdk/index.mjs');
+const Anthropic = require('@anthropic-ai/sdk');
 const { getFormattingPrompts } = require('./prompts/formatting-prompts');
 const { validateStructuredData } = require('./utils/validator');
 

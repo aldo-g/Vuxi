@@ -68,3 +68,5 @@ out/
 # Miscellaneous
 .DS_Store
 *.pem
+
+data/
