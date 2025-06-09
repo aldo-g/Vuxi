@@ -1,15 +1,17 @@
-const prisma = require('./prisma');
-const captureService = require('./captureService');
+const prisma = require('./prisma'); // This path is CORRECT for a file inside /lib
 
-async function startAnalysis({
-  baseUrl,
-  projectName,
-  orgName,
-  orgPurpose,
-  userId,
-}) {
-  if (!baseUrl || !projectName || !userId) {
-    throw new Error('Base URL, project name, and User ID are required.');
+/**
+ * Creates the final Project and AnalysisRun records in the database
+ * from a completed preview job.
+ * @param {object} previewData - Contains projectName, baseUrl, etc.
+ * @param {string} userId - The ID of the authenticated user.
+ * @returns The newly created analysisRun record.
+ */
+async function createProjectFromPreview(previewData, userId) {
+  const { projectName, baseUrl, orgName, orgPurpose } = previewData;
+
+  if (!projectName || !baseUrl || !userId) {
+    throw new Error('Project details and a user ID are required to create a project.');
   }
 
   try {
@@ -20,46 +22,24 @@ async function startAnalysis({
           baseUrl: baseUrl,
         },
       },
-      update: {
-        name: projectName,
-        orgName: orgName,
-        orgPurpose: orgPurpose,
-      },
-      create: {
-        name: projectName,
-        baseUrl,
-        orgName,
-        orgPurpose,
-        userId,
-      },
+      update: { name: projectName, orgName, orgPurpose },
+      create: { name: projectName, baseUrl, orgName, orgPurpose, userId },
     });
 
     const analysisRun = await prisma.analysisRun.create({
       data: {
         projectId: project.id,
-        status: 'queued',
+        status: 'completed',
       },
     });
 
-    const jobId = analysisRun.id;
-    console.log(`Created AnalysisRun with ID (jobId): ${jobId}`);
-
-    // UPDATED to call startCapture
-    captureService.startCapture(jobId, baseUrl, { maxUrls: 10 })
-      .catch(err => {
-        console.error(`[Job ${jobId}] A critical error occurred during the background capture task:`, err);
-        prisma.analysisRun.update({
-            where: { id: jobId },
-            data: { status: 'failed' }
-        }).catch(console.error);
-      });
-
+    console.log(`Successfully committed project. New AnalysisRun ID: ${analysisRun.id}`);
     return analysisRun;
 
   } catch (error) {
-    console.error('Error in startAnalysis service:', error);
+    console.error('Error committing project to database:', error);
     throw error;
   }
 }
 
-module.exports = { startAnalysis };
+module.exports = { createProjectFromPreview };

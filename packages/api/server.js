@@ -1,51 +1,37 @@
-const prisma = require('./prisma');
-const fs = require('fs-extra');
 const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
-/**
- * Creates the final Project and AnalysisRun records in the database
- * from a completed preview job.
- * @param {object} previewData - Contains projectName, baseUrl, etc.
- * @param {string} userId - The ID of the authenticated user.
- * @returns The newly created analysisRun record.
- */
-async function createProjectFromPreview(previewData, userId) {
-  const { projectName, baseUrl, orgName, orgPurpose } = previewData;
+const express = require('express');
+const cors = require('cors');
 
-  if (!projectName || !baseUrl || !userId) {
-    throw new Error('Project details and a user ID are required to create a project.');
-  }
+const authRouter = require('./routes/auth');
+const captureRouter = require('./routes/capture');
+const projectsRouter = require('./routes/projects');
 
-  try {
-    const project = await prisma.project.upsert({
-      where: {
-        userId_baseUrl: {
-          userId: userId,
-          baseUrl: baseUrl,
-        },
-      },
-      update: { name: projectName, orgName, orgPurpose },
-      create: { name: projectName, baseUrl, orgName, orgPurpose, userId },
-    });
+const app = express();
+const port = process.env.PORT || 3001;
 
-    const analysisRun = await prisma.analysisRun.create({
-      data: {
-        projectId: project.id,
-        status: 'completed', // The initial capture is done, so we can mark it as complete
-      },
-    });
+// --- THIS IS THE UPDATED CORS SETUP ---
+const allowedOrigins = ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'];
+const corsOptions = {
+  origin: allowedOrigins,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  // This explicitly allows the Authorization header
+  allowedHeaders: 'Content-Type,Authorization' 
+};
+app.use(cors(corsOptions));
+// --- END OF UPDATE ---
 
-    console.log(`Successfully committed project. New AnalysisRun ID: ${analysisRun.id}`);
+app.use(express.json());
 
-    // You could add logic here to move screenshots from the temp folder
-    // to a permanent folder named after `analysisRun.id`.
+app.use('/api/auth', authRouter);
+app.use('/api/capture', captureRouter);
+app.use('/api/projects', projectsRouter);
 
-    return analysisRun;
+app.get('/', (req, res) => {
+  res.send('Welcome to the Website Capture API');
+});
 
-  } catch (error) {
-    console.error('Error committing project to database:', error);
-    throw error;
-  }
-}
-
-module.exports = { createProjectFromPreview };
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+});
