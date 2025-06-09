@@ -37,3 +37,34 @@ postgres-data/
 
 # Environment
 .env
+
+# --- Next.js ---
+# Build output
+.next/
+# Production build
+out/
+
+# --- Environment Variables ---
+# Local environment variables
+.env*.local
+
+# --- Other ---
+# Mac-specific file
+.DS_Store
+
+# Dependencies
+/node_modules
+
+# Next.js build output
+/.next/
+/out/
+
+# Local environment variables
+.env*.local
+
+# Production
+/build
+
+# Miscellaneous
+.DS_Store
+*.pem

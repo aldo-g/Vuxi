@@ -1,0 +1,32 @@
+[
+  {
+    "id": "run_amsterdam_2025-06-04T16-25-49-686Z",
+    "name": "AMS Institute Analysis (2025-06-04)",
+    "date": "2025-06-04T16:25:49.686Z",
+    "description": "Analysis report for AMS Institute generated on June 4, 2025."
+  },
+  {
+    "id": "run_cgmt_2025-06-04T16-14-15-212Z",
+    "name": "Cameron Grant Memorial Trust Analysis (2025-06-04)",
+    "date": "2025-06-04T16:14:15.212Z",
+    "description": "Analysis report for Cameron Grant Memorial Trust generated on June 4, 2025."
+  },
+  {
+    "id": "run_nopublicpurpose_2025-06-04T16-09-59-614Z",
+    "name": "No Public Purpose Analysis (2025-06-04)",
+    "date": "2025-06-04T16:09:59.614Z",
+    "description": "Analysis report for No Public Purpose generated on June 4, 2025."
+  },
+  {
+    "id": "run_epi_2025-06-04T16-02-21-226Z",
+    "name": "Edinburgh Peace Institute Analysis (2025-06-04)",
+    "date": "2025-06-04T16:02:21.226Z",
+    "description": "Analysis report for Edinburgh Peace Institute generated on June 4, 2025."
+  },
+  {
+    "id": "run_presustainability_2025-06-04T15-51-03-808Z",
+    "name": "Presustainability Analysis (2025-06-04)",
+    "date": "2025-06-04T15:51:03.808Z",
+    "description": "Analysis report for Presustainability generated on June 4, 2025."
+  }
+]
