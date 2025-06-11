@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ArrowRight, Bot, Search, FileText, Loader2 } from 'lucide-react';
+import { ArrowRight, Bot, FileText, Users } from 'lucide-react';
 
 // Main UI Component for the landing page
 function VuxiLandingPage() {
@@ -16,11 +16,6 @@ function VuxiLandingPage() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // New state for the website URL analysis
-  const [websiteUrl, setWebsiteUrl] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -47,51 +42,6 @@ function VuxiLandingPage() {
     }
   };
 
-  const handleStartAnalysis = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-
-    // Validate URL format
-    try {
-      new URL(websiteUrl);
-    } catch {
-      setAnalysisError('Please enter a valid URL (e.g., https://example.com)');
-      setIsAnalyzing(false);
-      return;
-    }
-
-    try {
-      console.log('🚀 Starting analysis for:', websiteUrl);
-      
-      const response = await fetch('/api/analysis/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          websiteUrl: websiteUrl,
-          anonymous: true // Flag to indicate this is an anonymous analysis
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to start analysis');
-      }
-
-      const result = await response.json();
-      console.log('✅ Analysis started:', result);
-      
-      // Redirect to the screenshots page to show progress
-      router.push(`/screenshots/${result.analysisId}`);
-      
-    } catch (err) {
-      console.error('❌ Analysis failed:', err);
-      setAnalysisError((err as Error).message);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <header className="px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-white">
@@ -108,7 +58,7 @@ function VuxiLandingPage() {
                 <div className="grid gap-4">
                   <div className="space-y-2">
                     <h4 className="font-medium leading-none">Sign In</h4>
-                    <p className="text-sm text-muted-foreground">Access your project dashboard.</p>
+                    <p className="text-sm text-muted-foreground">Access your dashboard.</p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
@@ -154,89 +104,64 @@ function VuxiLandingPage() {
               Uncover the 'Why' Behind Your UX
             </h1>
             <p className="max-w-[700px] text-muted-foreground md:text-xl mx-auto my-6">
-              Vuxi provides AI-driven analysis of your website's user experience, turning screenshots and user flows into actionable, expert-level reports.
+              Vuxi provides AI-driven analysis of website user experience, turning insights into actionable, expert-level reports.
             </p>
             
-            {/* URL Input Form */}
-            <div className="flex justify-center">
-              <form onSubmit={handleStartAnalysis} className="flex flex-col gap-4 max-w-md w-full">
-                <Input
-                  type="url"
-                  placeholder="Enter your website URL (e.g., https://example.com)"
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                  required
-                  disabled={isAnalyzing}
-                  className="text-center"
-                />
-                <Button 
-                  type="submit" 
-                  size="lg"
-                  disabled={isAnalyzing}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Starting Analysis...
-                    </>
-                  ) : (
-                    <>
-                      Start Free Analysis <ArrowRight className="ml-2 h-5 w-5" />
-                    </>
-                  )}
+            <div className="flex justify-center gap-4 mt-8">
+              <Link href="/create-account">
+                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  Get Started <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-              </form>
+              </Link>
+              <Link href="/reports">
+                <Button variant="outline" size="lg">
+                  View Sample Reports
+                </Button>
+              </Link>
             </div>
-            
-            {analysisError && (
-              <div className="mt-4 max-w-md mx-auto p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">{analysisError}</p>
-              </div>
-            )}
-            
-            <p className="text-xs text-slate-500 mt-4 max-w-md mx-auto">
-              Free analysis includes up to 10 pages. No registration required.
-            </p>
           </div>
         </section>
 
-        {/* How it Works Section */}
+        {/* Features Section */}
         <section className="w-full py-20 md:py-28 lg:py-36 bg-white border-t border-b">
           <div className="container px-4 md:px-6">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+                Professional UX Analysis
+              </h2>
+              <p className="max-w-[600px] text-muted-foreground md:text-xl mx-auto mt-4">
+                Access comprehensive UX reports and insights from our expert analysis platform.
+              </p>
+            </div>
+            
             <div className="grid gap-10 sm:grid-cols-1 md:grid-cols-3">
-              <div className="flex flex-col items-center text-center">
-                <div className="p-3 rounded-full bg-primary/10 mb-4">
-                  <Search className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold">1. Crawl & Capture</h3>
-                <p className="text-muted-foreground mt-2">
-                  Vuxi automatically discovers and screenshots the pages of your website, creating a comprehensive visual inventory.
-                </p>
-              </div>
               <div className="flex flex-col items-center text-center">
                 <div className="p-3 rounded-full bg-primary/10 mb-4">
                   <Bot className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="text-2xl font-bold">2. AI-Powered Analysis</h3>
+                <h3 className="text-2xl font-bold">AI-Powered Insights</h3>
                 <p className="text-muted-foreground mt-2">
-                  Our advanced models analyze each page against UX best practices and your stated business goals.
+                  Advanced AI models analyze user experience against industry best practices and proven methodologies.
                 </p>
               </div>
               <div className="flex flex-col items-center text-center">
                 <div className="p-3 rounded-full bg-primary/10 mb-4">
                   <FileText className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="text-2xl font-bold">3. Actionable Reporting</h3>
+                <h3 className="text-2xl font-bold">Detailed Reports</h3>
                 <p className="text-muted-foreground mt-2">
-                  Receive comprehensive reports with prioritized recommendations and clear implementation guidance.
+                  Comprehensive reports with prioritized recommendations and clear implementation guidance.
                 </p>
               </div>
-            </div>
-            <div className="mt-16 text-center">
-              <Link href="/reports">
-                <Button variant="outline" size="lg">View Example Reports</Button>
-              </Link>
+              <div className="flex flex-col items-center text-center">
+                <div className="p-3 rounded-full bg-primary/10 mb-4">
+                  <Users className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-2xl font-bold">Expert Analysis</h3>
+                <p className="text-muted-foreground mt-2">
+                  Professional-grade UX evaluation backed by years of user experience research and best practices.
+                </p>
+              </div>
             </div>
           </div>
         </section>
