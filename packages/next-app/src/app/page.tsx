@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ArrowRight, Bot, Search, FileText } from 'lucide-react';
+import { ArrowRight, Bot, Search, FileText, Loader2 } from 'lucide-react';
 
 // Main UI Component for the landing page
 function VuxiLandingPage() {
@@ -16,6 +16,11 @@ function VuxiLandingPage() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // New state for the website URL analysis
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -39,6 +44,51 @@ function VuxiLandingPage() {
       setLoginError((err as Error).message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleStartAnalysis = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+
+    // Validate URL format
+    try {
+      new URL(websiteUrl);
+    } catch {
+      setAnalysisError('Please enter a valid URL (e.g., https://example.com)');
+      setIsAnalyzing(false);
+      return;
+    }
+
+    try {
+      console.log('🚀 Starting analysis for:', websiteUrl);
+      
+      const response = await fetch('/api/analysis/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          websiteUrl: websiteUrl,
+          anonymous: true // Flag to indicate this is an anonymous analysis
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to start analysis');
+      }
+
+      const result = await response.json();
+      console.log('✅ Analysis started:', result);
+      
+      // Redirect to the screenshots page to show progress
+      router.push(`/screenshots/${result.analysisId}`);
+      
+    } catch (err) {
+      console.error('❌ Analysis failed:', err);
+      setAnalysisError((err as Error).message);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -106,13 +156,48 @@ function VuxiLandingPage() {
             <p className="max-w-[700px] text-muted-foreground md:text-xl mx-auto my-6">
               Vuxi provides AI-driven analysis of your website's user experience, turning screenshots and user flows into actionable, expert-level reports.
             </p>
+            
+            {/* URL Input Form */}
             <div className="flex justify-center">
-              <Link href="/create-account">
-                <Button size="lg">
-                  Start Your First Analysis <ArrowRight className="ml-2 h-5 w-5" />
+              <form onSubmit={handleStartAnalysis} className="flex flex-col gap-4 max-w-md w-full">
+                <Input
+                  type="url"
+                  placeholder="Enter your website URL (e.g., https://example.com)"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  required
+                  disabled={isAnalyzing}
+                  className="text-center"
+                />
+                <Button 
+                  type="submit" 
+                  size="lg"
+                  disabled={isAnalyzing}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Starting Analysis...
+                    </>
+                  ) : (
+                    <>
+                      Start Free Analysis <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
+                  )}
                 </Button>
-              </Link>
+              </form>
             </div>
+            
+            {analysisError && (
+              <div className="mt-4 max-w-md mx-auto p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{analysisError}</p>
+              </div>
+            )}
+            
+            <p className="text-xs text-slate-500 mt-4 max-w-md mx-auto">
+              Free analysis includes up to 10 pages. No registration required.
+            </p>
           </div>
         </section>
 

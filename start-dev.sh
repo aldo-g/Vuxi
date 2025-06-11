@@ -6,10 +6,6 @@ echo "🚀 Starting Vuxi Development Environment"
 # Check if .env file exists
 if [ ! -f ".env" ]; then
     echo "❌ .env file not found in root directory!"
-    echo "Please create .env file with required variables:"
-    echo "CAPTURE_SERVICE_URL=http://localhost:3001"
-    echo "JWT_SECRET=your_jwt_secret_here"
-    echo "DATABASE_URL=\"file:./dev.db\""
     exit 1
 fi
 
@@ -19,18 +15,16 @@ pkill -f "node.*server.js" 2>/dev/null || true
 pkill -f "next" 2>/dev/null || true
 sleep 2
 
-# Install dependencies if needed
+# Install dependencies
 echo "📦 Installing capture service dependencies..."
-cd packages/capture
-if [ ! -d "node_modules" ]; then
-    npm install
-else
-    echo "Dependencies already installed"
-fi
+cd packages/capture && npm install > /dev/null 2>&1
+cd ../..
 
-# Start capture service in background
+# Start capture service with live console output
 echo "📦 Starting Capture Service on port 3001..."
-node server.js > ../../capture.log 2>&1 &
+cd packages/capture
+# Start in background but don't redirect output
+node server.js &
 CAPTURE_PID=$!
 cd ../..
 
@@ -42,41 +36,28 @@ for i in {1..10}; do
         break
     fi
     if [ $i -eq 10 ]; then
-        echo "❌ Capture Service failed to start after 10 seconds"
-        echo "📋 Capture service logs:"
-        cat capture.log
+        echo "❌ Capture Service failed to start"
         kill $CAPTURE_PID 2>/dev/null
         exit 1
     fi
     sleep 1
 done
 
-# Install Next.js dependencies
-echo "📦 Installing Next.js dependencies..."
-cd packages/next-app
-if [ ! -d "node_modules" ]; then
-    npm install
-else
-    echo "Dependencies already installed"
-fi
-
-# Start Next.js app
+# Start Next.js app (redirect only Next.js output since it's verbose)
 echo "🌐 Starting Next.js App on port 3000..."
-npm run dev > ../../nextjs.log 2>&1 &
+cd packages/next-app && npm run dev > ../nextjs.log 2>&1 &
 NEXTJS_PID=$!
 cd ../..
 
-# Wait for user to stop
+# Display status
 echo ""
 echo "✅ Both services are running!"
 echo "📊 Capture Service: http://localhost:3001/health"
 echo "🌐 Next.js App: http://localhost:3000"
-echo "🔧 Conduct Analysis: http://localhost:3000/conduct-analysis"
 echo ""
-echo "📝 Environment loaded from root .env file"
-echo "📋 Logs: capture.log and nextjs.log"
+echo "📋 Capture service logs will appear below:"
+echo "   (URL discovery progress should show here)"
 echo ""
-echo "Press Ctrl+C to stop both services"
 
 # Function to cleanup when script exits
 cleanup() {
@@ -91,5 +72,5 @@ cleanup() {
 # Set trap to cleanup on script termination
 trap cleanup SIGINT SIGTERM
 
-# Wait for services
+# Wait for services (this will show capture service output)
 wait

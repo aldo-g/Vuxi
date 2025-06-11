@@ -3,11 +3,28 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs-extra');
-const { URLDiscoveryService } = require('./url-discovery');
-const { ScreenshotService } = require('./screenshot');
+
+// Load environment variables from root .env file
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Import services with error handling
+let URLDiscoveryService, ScreenshotService;
+try {
+  console.log('📦 Loading URL Discovery Service...');
+  ({ URLDiscoveryService } = require('./url-discovery'));
+  console.log('✅ URL Discovery Service loaded');
+  
+  console.log('📦 Loading Screenshot Service...');
+  ({ ScreenshotService } = require('./screenshot'));
+  console.log('✅ Screenshot Service loaded');
+} catch (error) {
+  console.error('❌ Failed to load services:', error);
+  console.error('Make sure the service files exist and export the correct classes');
+  process.exit(1);
+}
 
 // Middleware
 app.use(cors());
@@ -33,13 +50,44 @@ function updateJobStatus(jobId, status, data = {}) {
     job.status = status;
     job.updatedAt = new Date().toISOString();
     Object.assign(job, data);
-    console.log(`📊 Job ${jobId}: ${status}`);
+    console.log(`📊 Job ${jobId.slice(0,8)}: ${status} - ${data.progress?.message || ''}`);
   }
 }
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'vuxi-capture-service',
+    version: '1.0.0',
+    activeJobs: Array.from(jobs.values()).filter(j => 
+      j.status === JOB_STATUS.RUNNING || 
+      j.status === JOB_STATUS.URL_DISCOVERY || 
+      j.status === JOB_STATUS.SCREENSHOT_CAPTURE
+    ).length
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Vuxi Capture Service',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      createJob: 'POST /api/capture',
+      getJob: 'GET /api/capture/:jobId',
+      listJobs: 'GET /api/jobs'
+    }
+  });
+});
 
 // Create a new capture job
 app.post('/api/capture', async (req, res) => {
   try {
+    console.log('🚀 Creating new capture job:', req.body);
+    
     const { baseUrl, options = {} } = req.body;
     
     if (!baseUrl) {
@@ -48,6 +96,8 @@ app.post('/api/capture', async (req, res) => {
 
     const jobId = uuidv4();
     const outputDir = path.join(__dirname, 'data', `job_${jobId}`);
+    
+    console.log(`📁 Job ${jobId.slice(0,8)} output directory: ${outputDir}`);
     
     // Create job record
     const job = {
@@ -71,17 +121,20 @@ app.post('/api/capture', async (req, res) => {
     };
     
     jobs.set(jobId, job);
+    console.log(`✅ Job ${jobId.slice(0,8)} created for ${baseUrl}`);
     
-    // Start processing asynchronously
-    processJob(jobId).catch(error => {
-      console.error(`❌ Job ${jobId} failed:`, error);
-      updateJobStatus(jobId, JOB_STATUS.FAILED, {
-        error: error.message,
-        progress: {
-          stage: 'failed',
-          percentage: 0,
-          message: `Job failed: ${error.message}`
-        }
+    // Start processing asynchronously with better error handling
+    setImmediate(() => {
+      processJob(jobId).catch(error => {
+        console.error(`❌ Job ${jobId.slice(0,8)} failed:`, error);
+        updateJobStatus(jobId, JOB_STATUS.FAILED, {
+          error: error.message,
+          progress: {
+            stage: 'failed',
+            percentage: 0,
+            message: `Job failed: ${error.message}`
+          }
+        });
       });
     });
     
@@ -134,23 +187,12 @@ app.get('/api/jobs', (req, res) => {
 // Serve static files (screenshots, reports)
 app.use('/data', express.static(path.join(__dirname, 'data')));
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    activeJobs: Array.from(jobs.values()).filter(j => 
-      j.status === JOB_STATUS.RUNNING || 
-      j.status === JOB_STATUS.URL_DISCOVERY || 
-      j.status === JOB_STATUS.SCREENSHOT_CAPTURE
-    ).length
-  });
-});
-
-// Process a job
+// Process a job with timeout and better error handling
 async function processJob(jobId) {
   const job = jobs.get(jobId);
   if (!job) throw new Error('Job not found');
+  
+  console.log(`🚀 Starting job processing: ${jobId.slice(0,8)}`);
   
   try {
     updateJobStatus(jobId, JOB_STATUS.RUNNING, {
@@ -162,8 +204,10 @@ async function processJob(jobId) {
     });
     
     await fs.ensureDir(job.options.outputDir);
+    console.log(`📁 Created output directory: ${job.options.outputDir}`);
     
-    // Phase 1: URL Discovery
+    // Phase 1: URL Discovery with timeout
+    console.log(`🔍 Starting URL discovery for: ${job.baseUrl}`);
     updateJobStatus(jobId, JOB_STATUS.URL_DISCOVERY, {
       progress: {
         stage: 'url_discovery',
@@ -177,10 +221,33 @@ async function processJob(jobId) {
       outputDir: job.options.outputDir
     });
     
-    const urlResult = await urlService.discover(job.baseUrl);
+    console.log(`🔍 URL Discovery options:`, {
+      maxPages: job.options.maxPages,
+      timeout: job.options.timeout,
+      concurrency: job.options.concurrency,
+      fastMode: job.options.fastMode
+    });
+    
+    // Add timeout wrapper for URL discovery
+    const urlResult = await Promise.race([
+      urlService.discover(job.baseUrl),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('URL discovery timeout after 2 minutes')), 120000)
+      )
+    ]);
+    
+    console.log(`✅ URL discovery completed:`, {
+      success: urlResult.success,
+      urlCount: urlResult.urls?.length || 0,
+      error: urlResult.error
+    });
     
     if (!urlResult.success) {
       throw new Error(`URL discovery failed: ${urlResult.error}`);
+    }
+    
+    if (!urlResult.urls || urlResult.urls.length === 0) {
+      throw new Error('No URLs discovered from the website');
     }
     
     updateJobStatus(jobId, JOB_STATUS.URL_DISCOVERY, {
@@ -196,6 +263,7 @@ async function processJob(jobId) {
     });
     
     // Phase 2: Screenshot Capture
+    console.log(`📸 Starting screenshot capture for ${urlResult.urls.length} URLs`);
     updateJobStatus(jobId, JOB_STATUS.SCREENSHOT_CAPTURE, {
       progress: {
         stage: 'screenshot_capture',
@@ -207,12 +275,19 @@ async function processJob(jobId) {
     const screenshotService = new ScreenshotService({
       outputDir: path.join(job.options.outputDir, 'screenshots'),
       concurrent: job.options.concurrency || 4,
-      timeout: job.options.timeout || 30000
+      timeout: job.options.timeout || 30000,
+      viewport: { width: 1440, height: 900 }
     });
     
     const screenshotResult = await screenshotService.captureAll(urlResult.urls);
     
-    if (!screenshotResult.success) {
+    console.log(`📸 Screenshot capture completed:`, {
+      success: screenshotResult.success,
+      successful: screenshotResult.successful?.length || 0,
+      failed: screenshotResult.failed?.length || 0
+    });
+    
+    if (!screenshotResult.success && screenshotResult.successful.length === 0) {
       throw new Error(`Screenshot capture failed: ${screenshotResult.error}`);
     }
     
@@ -231,6 +306,7 @@ async function processJob(jobId) {
       outputDir: job.options.outputDir
     };
     
+    console.log(`✅ Job ${jobId.slice(0,8)} completed successfully`);
     updateJobStatus(jobId, JOB_STATUS.COMPLETED, {
       results,
       progress: {
@@ -241,7 +317,8 @@ async function processJob(jobId) {
     });
     
   } catch (error) {
-    console.error(`Job ${jobId} failed:`, error);
+    console.error(`❌ Job ${jobId.slice(0,8)} failed:`, error);
+    console.error('Error stack:', error.stack);
     updateJobStatus(jobId, JOB_STATUS.FAILED, {
       error: error.message,
       progress: {
@@ -254,11 +331,18 @@ async function processJob(jobId) {
   }
 }
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Capture Service running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`📝 API docs: http://localhost:${PORT}/api/jobs`);
+  console.log(`🏠 Root endpoint: http://localhost:${PORT}/`);
 });
 
 module.exports = app;
