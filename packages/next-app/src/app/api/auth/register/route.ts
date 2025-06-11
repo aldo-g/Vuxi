@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       data: {
         Name,
         email,
-        password: hashedPassword, // Ensure your prisma schema uses `password`
+        passwordHash: hashedPassword, // Ensure your prisma schema uses `password`
       },
     });
 
