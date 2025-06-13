@@ -28,7 +28,31 @@ export function DashboardClient({ projects }: { projects?: Project[] }) {
         </div>
 
         {/* Quick Actions Grid */}
-        <div className="grid gap-8 md:grid-cols-2 mb-16">
+        <div className="grid gap-8 md:grid-cols-3 mb-16">
+          {/* Create New Analysis Card */}
+          <Card className="group hover:shadow-xl transition-all duration-300 border-slate-200/80 bg-white/90 backdrop-blur-sm hover:scale-[1.02]">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                <Plus className="h-6 w-6 text-white" />
+              </div>
+              <CardTitle className="text-2xl font-semibold text-slate-900 group-hover:text-purple-700 transition-colors">
+                Create New Analysis
+              </CardTitle>
+              <CardDescription className="text-slate-600 text-base">
+                Start a comprehensive UX analysis of any website
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/create-analysis">
+                <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 group">
+                  <Plus className="mr-2 h-5 w-5" />
+                  Start Analysis
+                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           {/* View Example Reports Card */}
           <Card className="group hover:shadow-xl transition-all duration-300 border-slate-200/80 bg-white/90 backdrop-blur-sm hover:scale-[1.02]">
             <CardHeader className="pb-4">
@@ -111,23 +135,23 @@ export function DashboardClient({ projects }: { projects?: Project[] }) {
         {(!projects || projects.length === 0) && (
           <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-lg">
             <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-2xl font-semibold text-slate-900">No Analysis Reports Yet</CardTitle>
+              <CardTitle className="text-2xl font-semibold text-slate-900">Ready to Get Started?</CardTitle>
               <CardDescription className="text-slate-600">
-                Please conduct an analysis to see your reports here.
+                Create your first UX analysis to start gaining valuable insights.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center py-16">
-              <div className="w-20 h-20 bg-gradient-to-br from-orange-100 to-amber-100 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
-                <Plus className="h-10 w-10 text-orange-600" />
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+                <Plus className="h-10 w-10 text-purple-600" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">Ready to Get Started?</h3>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Create Your First Analysis</h3>
               <p className="text-slate-600 mb-8 max-w-md mx-auto text-lg leading-relaxed">
-                Create your first UX analysis to start gaining valuable insights into user experience and optimization opportunities.
+                Start analyzing any website to gain valuable UX insights and optimization opportunities.
               </p>
               <Link href="/create-analysis">
-                <Button size="lg" className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-semibold px-8 py-4 text-lg">
+                <Button size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold px-8 py-4 text-lg">
                   <Plus className="mr-3 h-6 w-6" />
-                  Get Started
+                  Create Analysis
                   <ArrowRight className="ml-3 h-5 w-5" />
                 </Button>
               </Link>
