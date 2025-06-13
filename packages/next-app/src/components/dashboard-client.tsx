@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, Eye } from 'lucide-react';
+import { FileText, Eye, TrendingUp, Zap, ArrowRight, Plus } from 'lucide-react';
 import { FormattedDate } from './formatted-date';
 
 interface Project {
@@ -13,108 +13,128 @@ interface Project {
   createdAt: string;
 }
 
-export function DashboardClient({ projects }: { projects: Project[] }) {
+export function DashboardClient({ projects }: { projects?: Project[] }) {
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Vuxi</h1>
-        <p className="text-lg text-muted-foreground">
-          Access your UX analysis reports and explore insights from previous evaluations.
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Welcome Section */}
+        <div className="text-center mb-16">
+          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-4 tracking-tight">
+            Welcome to Vuxi
+          </h1>
+          <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
+            Access your UX analysis reports and explore insights from professional evaluations.
+          </p>
+        </div>
+
+        {/* Quick Actions Grid */}
+        <div className="grid gap-8 md:grid-cols-2 mb-16">
+          {/* View Example Reports Card */}
+          <Card className="group hover:shadow-xl transition-all duration-300 border-slate-200/80 bg-white/90 backdrop-blur-sm hover:scale-[1.02]">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <CardTitle className="text-2xl font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
+                View Example Reports
+              </CardTitle>
+              <CardDescription className="text-slate-600 text-base">
+                Browse through sample UX analysis reports and insights
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/reports">
+                <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 group">
+                  <Eye className="mr-2 h-5 w-5" />
+                  Browse Examples
+                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Latest Analysis Card */}
+          <Card className="group hover:shadow-xl transition-all duration-300 border-slate-200/80 bg-white/90 backdrop-blur-sm hover:scale-[1.02]">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
+              <CardTitle className="text-2xl font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                Latest Analysis
+              </CardTitle>
+              <CardDescription className="text-slate-600 text-base">
+                Quick access to the most recent UX evaluation report
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/reports">
+                <Button variant="outline" className="w-full border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 text-emerald-700 font-semibold py-3 group">
+                  <Zap className="mr-2 h-5 w-5" />
+                  View Latest
+                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Historical Projects Section - Keep for historical data if any exists */}
+        {projects && projects.length > 0 && (
+          <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-lg">
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-2xl font-semibold text-slate-900">Historical Projects</CardTitle>
+              <CardDescription className="text-slate-600">
+                Previous analysis projects and their associated data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-8">
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {projects.map((project) => (
+                  <Card key={project.id} className="hover:shadow-lg transition-shadow duration-300 border-slate-200">
+                    <CardHeader>
+                      <CardTitle className="text-lg text-slate-900">{project.name}</CardTitle>
+                      <CardDescription className="text-slate-600">{project.baseUrl}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-slate-500">
+                        Created: <FormattedDate dateString={project.createdAt} />
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty State when no projects */}
+        {(!projects || projects.length === 0) && (
+          <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-lg">
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-2xl font-semibold text-slate-900">No Analysis Reports Yet</CardTitle>
+              <CardDescription className="text-slate-600">
+                Please conduct an analysis to see your reports here.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center py-16">
+              <div className="w-20 h-20 bg-gradient-to-br from-orange-100 to-amber-100 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+                <Plus className="h-10 w-10 text-orange-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Ready to Get Started?</h3>
+              <p className="text-slate-600 mb-8 max-w-md mx-auto text-lg leading-relaxed">
+                Create your first UX analysis to start gaining valuable insights into user experience and optimization opportunities.
+              </p>
+              <Link href="/create-analysis">
+                <Button size="lg" className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-semibold px-8 py-4 text-lg">
+                  <Plus className="mr-3 h-6 w-6" />
+                  Get Started
+                  <ArrowRight className="ml-3 h-5 w-5" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
       </div>
-
-      {/* Quick Actions */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
-        <Card className="hover:shadow-lg transition-shadow duration-300">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              View Reports
-            </CardTitle>
-            <CardDescription>
-              Browse through all available UX analysis reports
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/reports">
-              <Button className="w-full">
-                <Eye className="mr-2 h-4 w-4" />
-                Browse Reports
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow duration-300">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Latest Analysis
-            </CardTitle>
-            <CardDescription>
-              Quick access to the most recent report
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/reports">
-              <Button variant="outline" className="w-full">
-                View Latest
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Projects Section - Keep for historical data if any exists */}
-      {projects && projects.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Historical Projects</CardTitle>
-            <CardDescription>
-              Previous analysis projects and their associated data.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
-              <Card key={project.id} className="hover:shadow-lg transition-shadow duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg">{project.name}</CardTitle>
-                  <CardDescription>{project.baseUrl}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Created: <FormattedDate dateString={project.createdAt} />
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Empty State when no projects */}
-      {(!projects || projects.length === 0) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Get Started</CardTitle>
-            <CardDescription>
-              Explore available UX analysis reports to gain insights into user experience best practices.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center py-8">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-6">
-              Ready to explore UX analysis reports? View our collection of professional evaluations.
-            </p>
-            <Link href="/reports">
-              <Button size="lg">
-                <Eye className="mr-2 h-5 w-5" />
-                Browse Reports
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
