@@ -19,10 +19,23 @@ import {
   ExternalLink,
   ArrowRight,
   ArrowLeft,
-  Clock
+  Clock,
+  ImageOff
 } from 'lucide-react';
 
 // Types
+interface Screenshot {
+  url?: string;
+  filename?: string;
+  path?: string;
+  timestamp?: string;
+  duration_ms?: number;
+  viewport?: {
+    width: number;
+    height: number;
+  };
+}
+
 interface CaptureJob {
   id: string;
   status: 'pending' | 'running' | 'url_discovery' | 'screenshot_capture' | 'completed' | 'failed';
@@ -32,12 +45,15 @@ interface CaptureJob {
     message: string;
   };
   results?: {
-    screenshots: Array<{
-      url: string;
-      filename: string;
-      path: string;
-    }>;
+    screenshots: Screenshot[];
     urls: string[];
+    stats?: {
+      screenshots?: {
+        duration: number;
+        successful: number;
+        failed: number;
+      };
+    };
   };
   error?: string;
 }
@@ -47,11 +63,7 @@ interface AnalysisData {
   organizationName: string;
   sitePurpose: string;
   captureJobId?: string;
-  screenshots?: Array<{
-    url: string;
-    filename: string;
-    path: string;
-  }>;
+  screenshots?: Screenshot[];
 }
 
 const WIZARD_STEPS = [
@@ -61,6 +73,50 @@ const WIZARD_STEPS = [
   { id: 4, title: 'Processing', icon: Camera },
   { id: 5, title: 'Review Captures', icon: CheckCircle2 }
 ];
+
+// Helper function to safely construct screenshot URLs
+const getScreenshotUrl = (screenshot: Screenshot, jobId: string): string => {
+  const baseUrl = `http://localhost:3001/data/job_${jobId}`;
+  
+  console.log('Constructing screenshot URL for:', { screenshot, jobId });
+  
+  // The capture service returns the correct path in screenshot.path
+  // This path is relative to the job directory and includes the full subdirectory structure
+  if (screenshot.path && typeof screenshot.path === 'string') {
+    const url = `${baseUrl}/${screenshot.path}`;
+    console.log('Using path from service:', url);
+    return url;
+  }
+  
+  // Fallback: try to construct from filename if path is not available
+  if (screenshot.filename && typeof screenshot.filename === 'string') {
+    // Screenshots are stored in screenshots/desktop/ subdirectory
+    const url = `${baseUrl}/screenshots/desktop/${screenshot.filename}`;
+    console.log('Using filename with desktop path:', url);
+    return url;
+  }
+  
+  // Last resort: try to construct filename from URL
+  if (screenshot.url && typeof screenshot.url === 'string') {
+    try {
+      const urlObj = new URL(screenshot.url);
+      const domain = urlObj.hostname.replace(/^www\./, '');
+      const pathname = urlObj.pathname.replace(/\//g, '_') || 'index';
+      // Note: We can't reliably construct the index prefix, so this is just a guess
+      const fallbackFilename = `001_${domain}_${pathname}.png`;
+      const url = `${baseUrl}/screenshots/desktop/${fallbackFilename}`;
+      console.log('Using URL-based filename with desktop path:', url);
+      return url;
+    } catch {
+      console.log('Failed to parse URL for filename generation');
+    }
+  }
+  
+  // Final fallback
+  const fallback = `${baseUrl}/screenshots/desktop/screenshot.png`;
+  console.log('Using final fallback URL:', fallback);
+  return fallback;
+};
 
 // Separate component for capture status to isolate re-renders
 const CaptureStatus = memo(({ captureJob, captureStarted }: { captureJob: CaptureJob | null, captureStarted: boolean }) => {
@@ -77,7 +133,18 @@ const CaptureStatus = memo(({ captureJob, captureStarted }: { captureJob: Captur
     );
   }
 
-  if (captureJob.status !== 'completed') {
+  if (captureJob.status === 'failed') {
+    return (
+      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-center gap-2 text-red-700 text-sm">
+          <AlertCircle className="w-4 h-4" />
+          <span>Analysis failed: {captureJob.error || 'Unknown error'}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!['completed', 'failed'].includes(captureJob.status)) {
     return (
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <div className="flex items-center gap-2 text-blue-700 text-sm">
@@ -338,13 +405,14 @@ export function AnalysisWizard() {
             setCaptureJob(prevJob => {
               if (!prevJob || 
                   prevJob.status !== updatedJob.status || 
-                  Math.abs(prevJob.progress.percentage - updatedJob.progress.percentage) >= 5) { // Only update on significant progress changes
+                  Math.abs(prevJob.progress.percentage - updatedJob.progress.percentage) >= 5) {
                 return updatedJob;
               }
               return prevJob;
             });
             
             if (updatedJob.status === 'completed') {
+              console.log('Capture completed, screenshots:', updatedJob.results?.screenshots);
               setAnalysisData(prev => ({ 
                 ...prev, 
                 screenshots: updatedJob.results?.screenshots || [] 
@@ -376,7 +444,7 @@ export function AnalysisWizard() {
       };
 
       // Start polling
-      pollingIntervalRef.current = setInterval(poll, 5000); // Even less frequent polling
+      pollingIntervalRef.current = setInterval(poll, 3000);
       poll(); // Initial poll
     };
 
@@ -440,7 +508,8 @@ export function AnalysisWizard() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to start capture process');
+        const errorText = await response.text();
+        throw new Error(`Failed to start capture process: ${errorText}`);
       }
 
       const result = await response.json();
@@ -453,7 +522,9 @@ export function AnalysisWizard() {
       setCaptureStarted(true);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start capture');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to start capture';
+      console.error('Capture start error:', errorMessage);
+      setError(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
@@ -485,68 +556,13 @@ export function AnalysisWizard() {
     }
   };
 
-  const getScreenshotUrl = (screenshot: any, jobId: string) => {
-    const baseUrl = `http://localhost:3001/data/job_${jobId}`;
-    
-    if (screenshot.path.startsWith('screenshots/')) {
-      return `${baseUrl}/${screenshot.path}`;
-    } else if (screenshot.filename) {
-      return `${baseUrl}/screenshots/desktop/${screenshot.filename}`;
-    } else {
-      return `${baseUrl}/screenshots/desktop/${screenshot.path}`;
-    }
-  };
-
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <URLInputStep
-            websiteUrl={analysisData.websiteUrl}
-            onUrlChange={handleUrlChange}
-            onNext={handleNextFromURL}
-            isLoading={isLoading}
-            error={error}
-          />
-        );
-      case 2:
-        return (
-          <OrganizationStep
-            organizationName={analysisData.organizationName}
-            onOrgChange={handleOrgChange}
-            onNext={handleNextFromOrg}
-            onBack={() => setCurrentStep(1)}
-            captureJob={captureJob}
-            captureStarted={captureStarted}
-          />
-        );
-      case 3:
-        return (
-          <PurposeStep
-            sitePurpose={analysisData.sitePurpose}
-            onPurposeChange={handlePurposeChange}
-            onNext={handleNextFromPurpose}
-            onBack={() => setCurrentStep(2)}
-            captureJob={captureJob}
-            captureStarted={captureStarted}
-          />
-        );
-      case 4:
-        return <ProcessingStep />;
-      case 5:
-        return <ScreenshotReviewStep />;
-      default:
-        return null;
-    }
-  };
-
   const ProcessingStep = () => (
     <Card className="border-slate-200 bg-white shadow-lg">
       <CardHeader className="text-center pb-6">
         <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Camera className="w-8 h-8 text-white" />
         </div>
-        <CardTitle className="text-2xl font-semibold">Finalizing Website Analysis</CardTitle>
+        <CardTitle className="text-2xl font-semibold">Capturing Screenshots</CardTitle>
         <p className="text-slate-600 mt-2">
           We're just finishing up the website capture process. This should only take a moment more.
         </p>
@@ -661,38 +677,66 @@ export function AnalysisWizard() {
             </div>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {analysisData.screenshots.map((screenshot, index) => (
-                <div key={index} className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-                  <div className="aspect-video bg-slate-100 relative">
-                    <img 
-                      src={getScreenshotUrl(screenshot, analysisData.captureJobId!)}
-                      alt={`Screenshot of ${screenshot.url}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        console.log('Image failed to load:', target.src);
-                        const originalSrc = target.src;
-                        if (originalSrc.includes('/screenshots/desktop/')) {
-                          target.src = `http://localhost:3001/data/job_${analysisData.captureJobId}/${screenshot.filename || screenshot.path}`;
-                        } else {
-                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjM3NGIzIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+SW1hZ2UgTm90IEF2YWlsYWJsZTwvdGV4dD48L3N2Zz4=';
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="p-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                      <span className="text-slate-600 truncate font-mono text-xs" title={screenshot.url}>
-                        {screenshot.url}
-                      </span>
+              {analysisData.screenshots.map((screenshot, index) => {
+                const screenshotUrl = screenshot.url || `Page ${index + 1}`;
+                const imageUrl = analysisData.captureJobId ? getScreenshotUrl(screenshot, analysisData.captureJobId) : '';
+                
+                return (
+                  <div key={index} className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+                    <div className="aspect-video bg-slate-100 relative flex items-center justify-center">
+                      {imageUrl ? (
+                        <img 
+                          src={imageUrl}
+                          alt={`Screenshot of ${screenshotUrl}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            console.error('Image failed to load:', {
+                              originalSrc: target.src,
+                              screenshot: screenshot,
+                              jobId: analysisData.captureJobId
+                            });
+                            
+                            // Show placeholder immediately without retries
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = `
+                                <div class="flex flex-col items-center justify-center h-full text-slate-400 p-4">
+                                  <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                  </svg>
+                                  <span class="text-sm text-center">Image Not Available</span>
+                                  <span class="text-xs text-slate-300 mt-1 text-center break-all">${screenshot.filename || screenshot.path || 'Unknown file'}</span>
+                                </div>
+                              `;
+                            }
+                          }}
+                          onLoad={() => {
+                            console.log('Image loaded successfully:', imageUrl);
+                          }}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                          <ImageOff className="w-12 h-12 mb-2" />
+                          <span className="text-sm">No preview available</span>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {screenshot.filename || screenshot.path}
-                    </p>
+                    <div className="p-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                        <span className="text-slate-600 truncate font-mono text-xs" title={screenshotUrl}>
+                          {screenshotUrl}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {screenshot.filename || screenshot.path || 'Unknown file'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex gap-3">
@@ -728,6 +772,49 @@ export function AnalysisWizard() {
       </CardContent>
     </Card>
   );
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <URLInputStep
+            websiteUrl={analysisData.websiteUrl}
+            onUrlChange={handleUrlChange}
+            onNext={handleNextFromURL}
+            isLoading={isLoading}
+            error={error}
+          />
+        );
+      case 2:
+        return (
+          <OrganizationStep
+            organizationName={analysisData.organizationName}
+            onOrgChange={handleOrgChange}
+            onNext={handleNextFromOrg}
+            onBack={() => setCurrentStep(1)}
+            captureJob={captureJob}
+            captureStarted={captureStarted}
+          />
+        );
+      case 3:
+        return (
+          <PurposeStep
+            sitePurpose={analysisData.sitePurpose}
+            onPurposeChange={handlePurposeChange}
+            onNext={handleNextFromPurpose}
+            onBack={() => setCurrentStep(2)}
+            captureJob={captureJob}
+            captureStarted={captureStarted}
+          />
+        );
+      case 4:
+        return <ProcessingStep />;
+      case 5:
+        return <ScreenshotReviewStep />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto">

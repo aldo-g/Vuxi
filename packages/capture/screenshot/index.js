@@ -27,7 +27,6 @@ class ScreenshotService {
       // Ensure output directory exists
       await fs.ensureDir(this.outputDir);
       
-      // Initialize capture service
       screenshotCapture = new ScreenshotCapture(this.outputDir, {
         width: this.viewport.width,
         height: this.viewport.height,

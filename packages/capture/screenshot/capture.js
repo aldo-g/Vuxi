@@ -15,9 +15,12 @@ class ScreenshotCapture {
     this.browser = null;
     this.enhancer = new ScreenshotEnhancer();
     
-    // Create output directory structure
-    this.screenshotsDir = path.join(outputDir, 'screenshots', 'desktop');
+    // Create output directory structure - screenshots will be saved directly to outputDir/desktop
+    // No extra "screenshots" subdirectory since outputDir is already the screenshots directory
+    this.screenshotsDir = path.join(outputDir, 'desktop');
     fs.ensureDirSync(this.screenshotsDir);
+    
+    console.log(`📁 Screenshots will be saved to: ${this.screenshotsDir}`);
   }
   
   async init() {
@@ -110,7 +113,7 @@ class ScreenshotCapture {
       return {
         url: url,
         filename: filename,
-        path: `screenshots/desktop/${filename}`,
+        path: `desktop/${filename}`, // Return path relative to outputDir, not including extra "screenshots"
         timestamp: new Date().toISOString(),
         duration_ms: duration,
         viewport: this.viewport

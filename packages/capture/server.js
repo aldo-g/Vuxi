@@ -273,7 +273,7 @@ async function processJob(jobId) {
     });
     
     const screenshotService = new ScreenshotService({
-      outputDir: path.join(job.options.outputDir, 'screenshots'),
+      outputDir: job.options.outputDir,
       concurrent: job.options.concurrency || 4,
       timeout: job.options.timeout || 30000,
       viewport: { width: 1440, height: 900 }
