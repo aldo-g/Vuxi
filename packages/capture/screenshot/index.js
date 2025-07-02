@@ -24,10 +24,11 @@ class ScreenshotService {
     let screenshotCapture = null;
     
     try {
-      // Ensure output directory exists
-      await fs.ensureDir(this.outputDir);
+      // Create the screenshots subdirectory inside the job directory
+      const screenshotsDir = path.join(this.outputDir, 'screenshots');
+      await fs.ensureDir(screenshotsDir);
       
-      screenshotCapture = new ScreenshotCapture(this.outputDir, {
+      screenshotCapture = new ScreenshotCapture(screenshotsDir, {
         width: this.viewport.width,
         height: this.viewport.height,
         timeout: this.timeout
@@ -61,7 +62,7 @@ class ScreenshotService {
       const failed = allResults.filter(r => !r.success);
       const duration = (Date.now() - startTime) / 1000;
       
-      // Save metadata
+      // Save metadata in the screenshots directory
       const metadata = {
         timestamp: new Date().toISOString(),
         duration_seconds: duration,
@@ -76,7 +77,7 @@ class ScreenshotService {
         }
       };
       
-      const metadataPath = path.join(this.outputDir, 'metadata.json');
+      const metadataPath = path.join(screenshotsDir, 'metadata.json');
       await fs.writeJson(metadataPath, metadata, { spaces: 2 });
       
       // Summary
@@ -100,7 +101,7 @@ class ScreenshotService {
         },
         files: {
           metadata: metadataPath,
-          screenshotsDir: path.join(this.outputDir, 'desktop')
+          screenshotsDir: path.join(screenshotsDir, 'desktop')
         }
       };
       
