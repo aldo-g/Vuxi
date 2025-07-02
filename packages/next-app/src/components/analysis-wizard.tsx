@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 // Types
-interface Screenshot {
+interface ScreenshotData {
   url?: string;
   filename?: string;
   path?: string;
@@ -34,6 +34,13 @@ interface Screenshot {
     width: number;
     height: number;
   };
+}
+
+interface Screenshot {
+  url: string;
+  success: boolean;
+  data?: ScreenshotData;
+  error?: string | null;
 }
 
 interface CaptureJob {
@@ -80,42 +87,35 @@ const getScreenshotUrl = (screenshot: Screenshot, jobId: string): string => {
   
   console.log('Constructing screenshot URL for:', { screenshot, jobId });
   
-  // The capture service returns the correct path in screenshot.path
-  // This path is relative to the job directory and includes the full subdirectory structure
-  if (screenshot.path && typeof screenshot.path === 'string') {
-    const url = `${baseUrl}/${screenshot.path}`;
-    console.log('Using path from service:', url);
+  // The screenshot service returns results in format: {url, success, data, error}
+  // where data contains the actual screenshot metadata
+  const screenshotData = screenshot.success ? screenshot.data : null;
+  
+  if (!screenshotData) {
+    console.log('No screenshot data available (capture failed)');
+    return `${baseUrl}/screenshots/desktop/placeholder.png`;
+  }
+  
+  // Priority 1: Use the path directly from the service data
+  if (screenshotData.path && typeof screenshotData.path === 'string') {
+    // The path includes the subdirectory structure (e.g., "desktop/001_example.png")
+    // We need to add "screenshots/" prefix since that's the actual directory structure
+    const url = `${baseUrl}/screenshots/${screenshotData.path}`;
+    console.log('Using path from service data:', url);
     return url;
   }
   
-  // Fallback: try to construct from filename if path is not available
-  if (screenshot.filename && typeof screenshot.filename === 'string') {
+  // Priority 2: Use filename with the correct directory structure
+  if (screenshotData.filename && typeof screenshotData.filename === 'string') {
     // Screenshots are stored in screenshots/desktop/ subdirectory
-    const url = `${baseUrl}/screenshots/desktop/${screenshot.filename}`;
+    const url = `${baseUrl}/screenshots/desktop/${screenshotData.filename}`;
     console.log('Using filename with desktop path:', url);
     return url;
   }
   
-  // Last resort: try to construct filename from URL
-  if (screenshot.url && typeof screenshot.url === 'string') {
-    try {
-      const urlObj = new URL(screenshot.url);
-      const domain = urlObj.hostname.replace(/^www\./, '');
-      const pathname = urlObj.pathname.replace(/\//g, '_') || 'index';
-      // Note: We can't reliably construct the index prefix, so this is just a guess
-      const fallbackFilename = `001_${domain}_${pathname}.png`;
-      const url = `${baseUrl}/screenshots/desktop/${fallbackFilename}`;
-      console.log('Using URL-based filename with desktop path:', url);
-      return url;
-    } catch {
-      console.log('Failed to parse URL for filename generation');
-    }
-  }
-  
-  // Final fallback
-  const fallback = `${baseUrl}/screenshots/desktop/screenshot.png`;
-  console.log('Using final fallback URL:', fallback);
-  return fallback;
+  // Priority 3: Fallback to placeholder
+  console.log('Cannot construct reliable filename - insufficient data in screenshot.data');
+  return `${baseUrl}/screenshots/desktop/placeholder.png`;
 };
 
 // Separate component for capture status to isolate re-renders
@@ -694,6 +694,7 @@ export function AnalysisWizard() {
                             console.error('Image failed to load:', {
                               originalSrc: target.src,
                               screenshot: screenshot,
+                              screenshotData: screenshot.success ? screenshot.data : null,
                               jobId: analysisData.captureJobId
                             });
                             
@@ -707,7 +708,7 @@ export function AnalysisWizard() {
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                   </svg>
                                   <span class="text-sm text-center">Image Not Available</span>
-                                  <span class="text-xs text-slate-300 mt-1 text-center break-all">${screenshot.filename || screenshot.path || 'Unknown file'}</span>
+                                  <span class="text-xs text-slate-300 mt-1 text-center break-all">${screenshot.success && screenshot.data ? (screenshot.data.filename || screenshot.data.path || 'Unknown file') : 'Capture failed'}</span>
                                 </div>
                               `;
                             }
@@ -731,7 +732,9 @@ export function AnalysisWizard() {
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1">
-                        {screenshot.filename || screenshot.path || 'Unknown file'}
+                        {screenshot.success && screenshot.data ? 
+                          (screenshot.data.filename || screenshot.data.path || 'Unknown file') : 
+                          'Capture failed'}
                       </p>
                     </div>
                   </div>
