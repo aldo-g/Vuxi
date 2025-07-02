@@ -34,6 +34,9 @@ interface ScreenshotData {
     width: number;
     height: number;
   };
+  isCustom?: boolean;
+  dataUrl?: string;
+  customPageName?: string;
 }
 
 interface Screenshot {
@@ -94,6 +97,12 @@ const getScreenshotUrl = (screenshot: Screenshot, jobId: string): string => {
   if (!screenshotData) {
     console.log('No screenshot data available (capture failed)');
     return `${baseUrl}/screenshots/desktop/placeholder.png`;
+  }
+
+  // Check if this is a custom uploaded image
+  if (screenshotData.isCustom && screenshotData.dataUrl) {
+    console.log('Using custom uploaded image data URL');
+    return screenshotData.dataUrl;
   }
   
   // Priority 1: Use the path directly from the service data
@@ -381,10 +390,302 @@ export function AnalysisWizard() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [captureStarted, setCaptureStarted] = useState(false);
+  const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState<number | null>(null);
+  const [editingScreenshot, setEditingScreenshot] = useState<number | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newPageData, setNewPageData] = useState({ name: '', url: '' });
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   
   // Use refs to avoid re-renders
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isPollingRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle file upload for screenshot replacement/addition
+  const handleFileUpload = (file: File, screenshotIndex: number) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageDataUrl = e.target?.result as string;
+      
+      // Update the screenshot in our data while preserving original URL and page info
+      setAnalysisData(prev => {
+        if (!prev.screenshots) return prev;
+        
+        const newScreenshots = [...prev.screenshots];
+        const originalScreenshot = newScreenshots[screenshotIndex];
+        
+        newScreenshots[screenshotIndex] = {
+          ...originalScreenshot, // Keep original URL and page info
+          success: true,
+          data: {
+            ...originalScreenshot.data,
+            filename: file.name,
+            path: `custom/${file.name}`,
+            timestamp: new Date().toISOString(),
+            isCustom: true,
+            dataUrl: imageDataUrl
+          }
+        };
+        
+        return {
+          ...prev,
+          screenshots: newScreenshots
+        };
+      });
+      
+      setEditingScreenshot(null);
+    };
+    
+    reader.readAsDataURL(file);
+  };
+
+  // Handle adding a new screenshot - now with form
+  const handleAddNewScreenshot = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Store the file and show the form
+    setPendingFile(file);
+    setShowAddForm(true);
+    setIsAddingNew(false);
+  };
+
+  // Complete adding new screenshot with page info
+  const completeAddNewScreenshot = () => {
+    if (!pendingFile || !newPageData.name.trim()) {
+      alert('Please provide a page name');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageDataUrl = e.target?.result as string;
+      
+      // Create URL if not provided
+      const pageUrl = newPageData.url.trim() || `https://custom-page-${Date.now()}.com`;
+      
+      const newScreenshot: Screenshot = {
+        url: pageUrl,
+        success: true,
+        data: {
+          filename: pendingFile.name,
+          path: `custom/${pendingFile.name}`,
+          timestamp: new Date().toISOString(),
+          isCustom: true,
+          dataUrl: imageDataUrl,
+          customPageName: newPageData.name.trim()
+        },
+        error: null
+      };
+
+      setAnalysisData(prev => ({
+        ...prev,
+        screenshots: [...(prev.screenshots || []), newScreenshot]
+      }));
+
+      // Reset form
+      setShowAddForm(false);
+      setNewPageData({ name: '', url: '' });
+      setPendingFile(null);
+    };
+    
+    reader.readAsDataURL(pendingFile);
+  };
+
+  // Handle keyboard navigation for modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (selectedScreenshotIndex === null || !analysisData.screenshots) return;
+      
+      switch (e.key) {
+        case 'Escape':
+          setSelectedScreenshotIndex(null);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          setSelectedScreenshotIndex(prev => 
+            prev !== null && prev > 0 ? prev - 1 : prev
+          );
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          setSelectedScreenshotIndex(prev => 
+            prev !== null && prev < analysisData.screenshots!.length - 1 ? prev + 1 : prev
+          );
+          break;
+      }
+    };
+
+    if (selectedScreenshotIndex !== null) {
+      document.addEventListener('keydown', handleKeyDown);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedScreenshotIndex, analysisData.screenshots]);
+
+  // Screenshot Modal Component
+  const ScreenshotModal = ({ index, screenshots, jobId, onClose, onNext, onPrev }: {
+    index: number;
+    screenshots: Screenshot[];
+    jobId: string;
+    onClose: () => void;
+    onNext: () => void;
+    onPrev: () => void;
+  }) => {
+    const screenshot = screenshots[index];
+    const imageUrl = getScreenshotUrl(screenshot, jobId);
+    const canGoPrev = index > 0;
+    const canGoNext = index < screenshots.length - 1;
+
+    return (
+      <div 
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <div 
+          className="relative bg-white rounded-lg shadow-2xl max-w-7xl max-h-[90vh] w-full overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
+            <div className="flex-1">
+              <h3 className="font-semibold text-slate-900 truncate">
+                {screenshot.data?.customPageName || screenshot.url}
+              </h3>
+              <p className="text-sm text-slate-600">
+                Screenshot {index + 1} of {screenshots.length}
+                {screenshot.success && screenshot.data && (
+                  <span className="ml-2 text-slate-400">
+                    • {screenshot.data.isCustom ? 'Custom Upload' : screenshot.data.filename}
+                    {screenshot.data.isCustom && (
+                      <span className="ml-1 text-green-600">✓</span>
+                    )}
+                  </span>
+                )}
+              </p>
+            </div>
+            
+            {/* Navigation and Close */}
+            <div className="flex items-center gap-2 ml-4">
+              <Button
+                onClick={onPrev}
+                disabled={!canGoPrev}
+                variant="outline"
+                size="sm"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                onClick={onNext}
+                disabled={!canGoNext}
+                variant="outline"
+                size="sm"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+              <Button
+                onClick={onClose}
+                variant="outline"
+                size="sm"
+                className="ml-2"
+              >
+                ✕
+              </Button>
+            </div>
+          </div>
+
+          {/* Image Container */}
+          <div className="relative overflow-auto max-h-[calc(90vh-120px)]">
+            {imageUrl ? (
+              <img 
+                src={imageUrl}
+                alt={`Full screenshot of ${screenshot.url}`}
+                className="w-full h-auto"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = `
+                      <div class="flex flex-col items-center justify-center h-64 text-slate-400 p-8">
+                        <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <p class="text-lg font-medium text-center">Image Not Available</p>
+                        <p class="text-sm text-center mt-1">Failed to load screenshot</p>
+                      </div>
+                    `;
+                  }
+                }}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-400 p-8">
+                <ImageOff className="w-16 h-16 mb-4" />
+                <p className="text-lg font-medium text-center">Image Not Available</p>
+                <p className="text-sm text-center mt-1">No screenshot data available</p>
+              </div>
+            )}
+          </div>
+
+          {/* Footer with metadata */}
+          {screenshot.success && screenshot.data && (
+            <div className="border-t border-slate-200 bg-slate-50 p-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                {screenshot.data.timestamp && (
+                  <div>
+                    <span className="font-medium text-slate-700">
+                      {screenshot.data.isCustom ? 'Uploaded:' : 'Captured:'}
+                    </span>
+                    <p className="text-slate-600">
+                      {new Date(screenshot.data.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+                {screenshot.data.duration_ms && !screenshot.data.isCustom && (
+                  <div>
+                    <span className="font-medium text-slate-700">Duration:</span>
+                    <p className="text-slate-600">
+                      {(screenshot.data.duration_ms / 1000).toFixed(2)}s
+                    </p>
+                  </div>
+                )}
+                {screenshot.data.viewport && !screenshot.data.isCustom && (
+                  <div>
+                    <span className="font-medium text-slate-700">Viewport:</span>
+                    <p className="text-slate-600">
+                      {screenshot.data.viewport.width} × {screenshot.data.viewport.height}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <span className="font-medium text-slate-700">Type:</span>
+                  <p className={`font-medium ${screenshot.data.isCustom ? 'text-green-600' : 'text-blue-600'}`}>
+                    {screenshot.data.isCustom ? 'Custom Upload' : 'Auto Captured'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // Separate polling logic that doesn't affect form rendering
   useEffect(() => {
@@ -647,14 +948,17 @@ export function AnalysisWizard() {
   );
 
   const ScreenshotReviewStep = () => (
-    <Card className="border-slate-200 bg-white shadow-lg">
+    <Card className="border-slate-200 bg-white shadow-lg w-full">
       <CardHeader className="text-center pb-6">
         <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 className="w-8 h-8 text-white" />
         </div>
-        <CardTitle className="text-2xl font-semibold">Review Captured Screenshots</CardTitle>
+        <CardTitle className="text-2xl font-semibold">Review & Edit Screenshots</CardTitle>
         <p className="text-slate-600 mt-2">
-          Here are the pages we captured for analysis. Review them before proceeding.
+          Review the captured screenshots and customize them as needed. Click any screenshot to view full size, hover to edit/replace, or add your own screenshots.
+        </p>
+        <p className="text-xs text-slate-500 mt-1">
+          Use arrow keys to navigate between screenshots, ESC to close modal
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -676,71 +980,243 @@ export function AnalysisWizard() {
               </div>
             </div>
             
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {analysisData.screenshots.map((screenshot, index) => {
                 const screenshotUrl = screenshot.url || `Page ${index + 1}`;
                 const imageUrl = analysisData.captureJobId ? getScreenshotUrl(screenshot, analysisData.captureJobId) : '';
                 
                 return (
-                  <div key={index} className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-                    <div className="aspect-video bg-slate-100 relative flex items-center justify-center">
-                      {imageUrl ? (
-                        <img 
-                          src={imageUrl}
-                          alt={`Screenshot of ${screenshotUrl}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            console.error('Image failed to load:', {
-                              originalSrc: target.src,
-                              screenshot: screenshot,
-                              screenshotData: screenshot.success ? screenshot.data : null,
-                              jobId: analysisData.captureJobId
-                            });
-                            
-                            // Show placeholder immediately without retries
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent) {
-                              parent.innerHTML = `
-                                <div class="flex flex-col items-center justify-center h-full text-slate-400 p-4">
-                                  <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                  </svg>
-                                  <span class="text-sm text-center">Image Not Available</span>
-                                  <span class="text-xs text-slate-300 mt-1 text-center break-all">${screenshot.success && screenshot.data ? (screenshot.data.filename || screenshot.data.path || 'Unknown file') : 'Capture failed'}</span>
-                                </div>
-                              `;
+                  <div 
+                    key={index} 
+                    className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow group relative"
+                  >
+                    {/* URL Title */}
+                    <div className="p-4 pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <ExternalLink className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-slate-900 text-sm leading-tight">
+                            {screenshot.data?.isCustom ? 'Custom Page' :
+                             new URL(screenshotUrl).pathname === '/' ? 'Homepage' : 
+                             new URL(screenshotUrl).pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || 'Page'
                             }
-                          }}
-                          onLoad={() => {
-                            console.log('Image loaded successfully:', imageUrl);
-                          }}
-                        />
+                          </h3>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Screenshot Image */}
+                    <div 
+                      className="aspect-video bg-slate-100 relative flex items-center justify-center cursor-pointer"
+                      onClick={() => setSelectedScreenshotIndex(index)}
+                    >
+                      {imageUrl ? (
+                        <>
+                          <img 
+                            src={imageUrl}
+                            alt={`Screenshot of ${screenshotUrl}`}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              console.error('Image failed to load:', {
+                                originalSrc: target.src,
+                                screenshot: screenshot,
+                                screenshotData: screenshot.success ? screenshot.data : null,
+                                jobId: analysisData.captureJobId
+                              });
+                              
+                              // Show placeholder immediately without retries
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="flex flex-col items-center justify-center h-full text-slate-400 p-4">
+                                    <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <span class="text-sm text-center">Image Not Available</span>
+                                  </div>
+                                `;
+                              }
+                            }}
+                            onLoad={() => {
+                              console.log('Image loaded successfully:', imageUrl);
+                            }}
+                          />
+                          {/* View overlay */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2">
+                              <span className="text-sm font-medium text-slate-700">Click to view full size</span>
+                            </div>
+                          </div>
+                        </>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full text-slate-400">
                           <ImageOff className="w-12 h-12 mb-2" />
                           <span className="text-sm">No preview available</span>
                         </div>
                       )}
-                    </div>
-                    <div className="p-3">
-                      <div className="flex items-center gap-2 text-sm">
-                        <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                        <span className="text-slate-600 truncate font-mono text-xs" title={screenshotUrl}>
-                          {screenshotUrl}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {screenshot.success && screenshot.data ? 
-                          (screenshot.data.filename || screenshot.data.path || 'Unknown file') : 
-                          'Capture failed'}
-                      </p>
+
+                      {/* Edit Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingScreenshot(index);
+                          fileInputRef.current?.click();
+                        }}
+                        className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white hover:shadow-md"
+                        title="Replace screenshot"
+                      >
+                        <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+
+                      {/* Custom indicator */}
+                      {screenshot.success && screenshot.data?.isCustom && (
+                        <div className="absolute top-3 left-3 bg-green-100 border border-green-200 rounded-full px-2 py-1 flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-xs text-green-700 font-medium">Custom</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
               })}
+
+              {/* Add Screenshot Card */}
+              <div 
+                className="border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition-colors cursor-pointer group"
+                onClick={() => {
+                  setIsAddingNew(true);
+                  addFileInputRef.current?.click();
+                }}
+              >
+                {/* Add Title */}
+                <div className="p-4 pb-3 border-b border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-slate-200 group-hover:bg-slate-300 rounded-lg flex items-center justify-center transition-colors">
+                      <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-slate-600 group-hover:text-slate-700 text-sm leading-tight transition-colors">
+                        Add Screenshot
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Add Content */}
+                <div className="aspect-video flex items-center justify-center">
+                  <div className="flex flex-col items-center text-slate-400 group-hover:text-slate-500 transition-colors">
+                    <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="text-sm font-medium">Upload Screenshot</span>
+                    <span className="text-xs mt-1">Click to select image</span>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Hidden file inputs */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file && editingScreenshot !== null) {
+                  handleFileUpload(file, editingScreenshot);
+                }
+                // Reset the input
+                e.target.value = '';
+              }}
+            />
+
+            <input
+              ref={addFileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file && isAddingNew) {
+                  handleAddNewScreenshot(file);
+                }
+                // Reset the input
+                e.target.value = '';
+              }}
+            />
+
+            {/* Add Page Form Modal */}
+            {showAddForm && (
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add New Page</h3>
+                  <p className="text-sm text-slate-600 mb-6">
+                    Provide details for this new page screenshot.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="page-name" className="text-sm font-medium">
+                        Page Name *
+                      </Label>
+                      <Input
+                        id="page-name"
+                        placeholder="e.g., About Us, Contact, Product Details"
+                        value={newPageData.name}
+                        onChange={(e) => setNewPageData(prev => ({ ...prev, name: e.target.value }))}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="page-url" className="text-sm font-medium">
+                        Page URL (optional)
+                      </Label>
+                      <Input
+                        id="page-url"
+                        placeholder="https://example.com/about"
+                        value={newPageData.url}
+                        onChange={(e) => setNewPageData(prev => ({ ...prev, url: e.target.value }))}
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Leave blank to auto-generate
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-6">
+                    <Button 
+                      onClick={() => {
+                        setShowAddForm(false);
+                        setNewPageData({ name: '', url: '' });
+                        setPendingFile(null);
+                      }}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={completeAddNewScreenshot}
+                      disabled={!newPageData.name.trim()}
+                      className="flex-1"
+                    >
+                      Add Screenshot
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button 
@@ -868,6 +1344,22 @@ export function AnalysisWizard() {
       <div className="transition-all duration-300 ease-in-out">
         {renderStepContent()}
       </div>
+
+      {/* Screenshot Modal */}
+      {selectedScreenshotIndex !== null && analysisData.screenshots && analysisData.captureJobId && (
+        <ScreenshotModal
+          index={selectedScreenshotIndex}
+          screenshots={analysisData.screenshots}
+          jobId={analysisData.captureJobId}
+          onClose={() => setSelectedScreenshotIndex(null)}
+          onNext={() => setSelectedScreenshotIndex(prev => 
+            prev !== null && prev < analysisData.screenshots!.length - 1 ? prev + 1 : prev
+          )}
+          onPrev={() => setSelectedScreenshotIndex(prev => 
+            prev !== null && prev > 0 ? prev - 1 : prev
+          )}
+        />
+      )}
     </div>
   );
 }
