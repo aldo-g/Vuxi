@@ -127,6 +127,142 @@ const getScreenshotUrl = (screenshot: Screenshot, jobId: string): string => {
   return `${baseUrl}/screenshots/desktop/placeholder.png`;
 };
 
+// Improved URL validation and normalization
+const validateAndNormalizeUrl = (url: string): { isValid: boolean; normalizedUrl: string; error?: string } => {
+  if (!url || !url.trim()) {
+    return { isValid: false, normalizedUrl: url, error: 'Please enter a website URL' };
+  }
+
+  const trimmedUrl = url.trim();
+  
+  // Try the URL as-is first
+  try {
+    const testUrl = new URL(trimmedUrl);
+    // Valid URL with protocol
+    return { isValid: true, normalizedUrl: trimmedUrl };
+  } catch {
+    // Failed, try adding https://
+  }
+  
+  // Try adding https:// prefix
+  try {
+    const withHttps = `https://${trimmedUrl}`;
+    const testUrl = new URL(withHttps);
+    
+    // Additional validation to ensure it looks like a real domain
+    const hostname = testUrl.hostname;
+    
+    // Basic domain validation - should have at least one dot and valid characters
+    if (hostname.includes('.') && /^[a-zA-Z0-9.-]+$/.test(hostname)) {
+      return { isValid: true, normalizedUrl: withHttps };
+    } else {
+      return { isValid: false, normalizedUrl: trimmedUrl, error: 'Please enter a valid website URL (e.g., example.com or https://example.com)' };
+    }
+  } catch {
+    return { isValid: false, normalizedUrl: trimmedUrl, error: 'Please enter a valid website URL (e.g., example.com or https://example.com)' };
+  }
+};
+
+// Separate Add Page Modal Component to prevent re-renders
+const AddPageModal = memo(({ 
+  isOpen, 
+  newPageData, 
+  onPageDataChange, 
+  onCancel, 
+  onConfirm 
+}: {
+  isOpen: boolean;
+  newPageData: { name: string; url: string };
+  onPageDataChange: (data: { name: string; url: string }) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) => {
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  
+  // Focus the name input when modal opens
+  useEffect(() => {
+    if (isOpen && nameInputRef.current) {
+      // Small delay to ensure modal is fully rendered
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen]);
+
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onPageDataChange({ ...newPageData, name: e.target.value });
+  }, [newPageData, onPageDataChange]);
+
+  const handleUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onPageDataChange({ ...newPageData, url: e.target.value });
+  }, [newPageData, onPageDataChange]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">Add New Page</h3>
+        <p className="text-sm text-slate-600 mb-6">
+          Provide details for this new page screenshot.
+        </p>
+        
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="modal-page-name" className="text-sm font-medium">
+              Page Name *
+            </Label>
+            <Input
+              ref={nameInputRef}
+              id="modal-page-name"
+              placeholder="e.g., About Us, Contact, Product Details"
+              value={newPageData.name}
+              onChange={handleNameChange}
+              className="mt-1"
+              autoFocus
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="modal-page-url" className="text-sm font-medium">
+              Page URL (optional)
+            </Label>
+            <Input
+              id="modal-page-url"
+              placeholder="https://example.com/about"
+              value={newPageData.url}
+              onChange={handleUrlChange}
+              className="mt-1"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              Leave blank to auto-generate
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <Button 
+            onClick={onCancel}
+            variant="outline"
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={onConfirm}
+            disabled={!newPageData.name.trim()}
+            className="flex-1"
+          >
+            Add Screenshot
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+AddPageModal.displayName = 'AddPageModal';
+
 // Separate component for capture status to isolate re-renders
 const CaptureStatus = memo(({ captureJob, captureStarted }: { captureJob: CaptureJob | null, captureStarted: boolean }) => {
   if (!captureStarted || !captureJob) return null;
@@ -204,13 +340,13 @@ const URLInputStep = memo(({
         <Input
           id="website-url"
           type="url"
-          placeholder="https://example.com"
+          placeholder="example.com or https://example.com"
           value={websiteUrl}
           onChange={(e) => onUrlChange(e.target.value)}
           className="text-lg py-3"
         />
         <p className="text-xs text-slate-500">
-          Enter the full URL including https://
+          Enter a website URL (with or without https://)
         </p>
       </div>
 
@@ -402,7 +538,32 @@ export function AnalysisWizard() {
   const isPollingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use refs to store current state values for file handlers
   const editingScreenshotRef = useRef<number | null>(null);
+  const isAddingNewRef = useRef<boolean>(false);
+
+  // Update refs when state changes
+  useEffect(() => {
+    editingScreenshotRef.current = editingScreenshot;
+  }, [editingScreenshot]);
+
+  useEffect(() => {
+    isAddingNewRef.current = isAddingNew;
+  }, [isAddingNew]);
+
+  // Memoized callback for page data changes to prevent re-renders
+  const handlePageDataChange = useCallback((data: { name: string; url: string }) => {
+    setNewPageData(data);
+  }, []);
+
+  // Memoized callback for modal cancel
+  const handleModalCancel = useCallback(() => {
+    setShowAddForm(false);
+    setNewPageData({ name: '', url: '' });
+    setPendingFile(null);
+    resetFileStates();
+  }, []);
 
   // Handle file upload for screenshot replacement/addition
   const handleFileUpload = (file: File, screenshotIndex: number) => {
@@ -444,8 +605,6 @@ export function AnalysisWizard() {
           screenshots: newScreenshots
         };
       });
-      
-      setEditingScreenshot(null);
     };
     
     reader.onerror = () => {
@@ -497,11 +656,10 @@ export function AnalysisWizard() {
     // Store the file and show the form
     setPendingFile(file);
     setShowAddForm(true);
-    setIsAddingNew(false);
   };
 
   // Complete adding new screenshot with page info
-  const completeAddNewScreenshot = () => {
+  const completeAddNewScreenshot = useCallback(() => {
     if (!pendingFile || !newPageData.name.trim()) {
       alert('Please provide a page name');
       return;
@@ -548,6 +706,42 @@ export function AnalysisWizard() {
     };
     
     reader.readAsDataURL(pendingFile);
+  }, [pendingFile, newPageData]);
+
+  // Handle edit button click
+  const handleEditClick = (index: number) => {
+    setEditingScreenshot(index);
+    editingScreenshotRef.current = index;
+    // Small delay to ensure state is set before triggering file input
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 10);
+  };
+
+  // Handle add button click
+  const handleAddClick = () => {
+    setIsAddingNew(true);
+    isAddingNewRef.current = true;
+    // Small delay to ensure state is set before triggering file input
+    setTimeout(() => {
+      addFileInputRef.current?.click();
+    }, 10);
+  };
+
+  // Reset states after file operations
+  const resetFileStates = () => {
+    setEditingScreenshot(null);
+    setIsAddingNew(false);
+    editingScreenshotRef.current = null;
+    isAddingNewRef.current = false;
+    
+    // Clear file input values
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    if (addFileInputRef.current) {
+      addFileInputRef.current.value = '';
+    }
   };
 
   // Handle keyboard navigation for modal
@@ -835,19 +1029,17 @@ export function AnalysisWizard() {
     setAnalysisData(prev => ({ ...prev, sitePurpose: purpose }));
   }, []);
 
-  const validateUrl = (url: string): boolean => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
+  const startCapture = async (url: string) => {
+    const validation = validateAndNormalizeUrl(url);
+    
+    if (!validation.isValid) {
+      setError(validation.error || 'Please enter a valid website URL');
       return false;
     }
-  };
 
-  const startCapture = async (url: string) => {
-    if (!validateUrl(url)) {
-      setError('Please enter a valid website URL');
-      return false;
+    // Update the URL in state if it was normalized (had https:// added)
+    if (validation.normalizedUrl !== url) {
+      setAnalysisData(prev => ({ ...prev, websiteUrl: validation.normalizedUrl }));
     }
 
     setIsLoading(true);
@@ -858,7 +1050,7 @@ export function AnalysisWizard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          baseUrl: url,
+          baseUrl: validation.normalizedUrl,
           options: {
             maxPages: 10,
             timeout: 15000,
@@ -1132,35 +1324,6 @@ export function AnalysisWizard() {
                         </div>
                       )}
 
-                      {/* Edit and Delete Buttons */}
-                      <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingScreenshot(index);
-                            fileInputRef.current?.click();
-                          }}
-                          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg flex items-center justify-center hover:bg-white hover:shadow-md transition-all"
-                          title="Replace screenshot"
-                        >
-                          <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteScreenshot(index);
-                          }}
-                          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-red-200 rounded-lg flex items-center justify-center hover:bg-red-50 hover:shadow-md transition-all"
-                          title="Delete screenshot"
-                        >
-                          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-
                       {/* Custom indicator */}
                       {screenshot.success && screenshot.data?.isCustom && (
                         <div className="absolute top-3 left-3 bg-green-100 border border-green-200 rounded-full px-2 py-1 flex items-center gap-1">
@@ -1183,8 +1346,7 @@ export function AnalysisWizard() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setEditingScreenshot(index);
-                              fileInputRef.current?.click();
+                              handleEditClick(index);
                             }}
                             className="w-7 h-7 bg-white border border-slate-200 rounded-md flex items-center justify-center hover:bg-slate-50 hover:border-slate-300 transition-all"
                             title="Replace screenshot"
@@ -1215,10 +1377,7 @@ export function AnalysisWizard() {
               {/* Add Screenshot Card */}
               <div 
                 className="border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition-colors cursor-pointer group"
-                onClick={() => {
-                  setIsAddingNew(true);
-                  addFileInputRef.current?.click();
-                }}
+                onClick={handleAddClick}
               >
                 {/* Add Title */}
                 <div className="p-4 pb-3 border-b border-slate-200">
@@ -1267,15 +1426,13 @@ export function AnalysisWizard() {
               style={{ display: 'none' }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file && editingScreenshot !== null) {
-                  handleFileUpload(file, editingScreenshot);
-                  // Reset after a short delay to ensure FileReader completes
-                  setTimeout(() => {
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = '';
-                    }
-                  }, 100);
+                const currentEditingIndex = editingScreenshotRef.current;
+                
+                if (file && currentEditingIndex !== null) {
+                  handleFileUpload(file, currentEditingIndex);
                 }
+                // Reset states and clear input
+                resetFileStates();
               }}
             />
 
@@ -1286,81 +1443,15 @@ export function AnalysisWizard() {
               style={{ display: 'none' }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file && isAddingNew) {
+                const currentIsAddingNew = isAddingNewRef.current;
+                
+                if (file && currentIsAddingNew) {
                   handleAddNewScreenshot(file);
-                  // Reset after a short delay to ensure FileReader completes
-                  setTimeout(() => {
-                    if (addFileInputRef.current) {
-                      addFileInputRef.current.value = '';
-                    }
-                  }, 100);
                 }
+                // Reset states and clear input
+                resetFileStates();
               }}
             />
-
-            {/* Add Page Form Modal */}
-            {showAddForm && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add New Page</h3>
-                  <p className="text-sm text-slate-600 mb-6">
-                    Provide details for this new page screenshot.
-                  </p>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="page-name" className="text-sm font-medium">
-                        Page Name *
-                      </Label>
-                      <Input
-                        id="page-name"
-                        placeholder="e.g., About Us, Contact, Product Details"
-                        value={newPageData.name}
-                        onChange={(e) => setNewPageData(prev => ({ ...prev, name: e.target.value }))}
-                        className="mt-1"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="page-url" className="text-sm font-medium">
-                        Page URL (optional)
-                      </Label>
-                      <Input
-                        id="page-url"
-                        placeholder="https://example.com/about"
-                        value={newPageData.url}
-                        onChange={(e) => setNewPageData(prev => ({ ...prev, url: e.target.value }))}
-                        className="mt-1"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">
-                        Leave blank to auto-generate
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 mt-6">
-                    <Button 
-                      onClick={() => {
-                        setShowAddForm(false);
-                        setNewPageData({ name: '', url: '' });
-                        setPendingFile(null);
-                      }}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={completeAddNewScreenshot}
-                      disabled={!newPageData.name.trim()}
-                      className="flex-1"
-                    >
-                      Add Screenshot
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="flex gap-3">
               <Button 
@@ -1395,10 +1486,7 @@ export function AnalysisWizard() {
             </p>
             <div className="flex gap-3 justify-center">
               <Button 
-                onClick={() => {
-                  setIsAddingNew(true);
-                  addFileInputRef.current?.click();
-                }}
+                onClick={handleAddClick}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 Add Screenshot
@@ -1505,6 +1593,15 @@ export function AnalysisWizard() {
       <div className="transition-all duration-300 ease-in-out">
         {renderStepContent()}
       </div>
+
+      {/* Add Page Modal */}
+      <AddPageModal
+        isOpen={showAddForm}
+        newPageData={newPageData}
+        onPageDataChange={handlePageDataChange}
+        onCancel={handleModalCancel}
+        onConfirm={completeAddNewScreenshot}
+      />
 
       {/* Screenshot Modal */}
       {selectedScreenshotIndex !== null && analysisData.screenshots && analysisData.captureJobId && (
