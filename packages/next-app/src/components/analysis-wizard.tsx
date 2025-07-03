@@ -397,11 +397,12 @@ export function AnalysisWizard() {
   const [newPageData, setNewPageData] = useState({ name: '', url: '' });
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   
-  // Use refs to avoid re-renders
+  // Use refs to avoid re-renders and state timing issues
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isPollingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addFileInputRef = useRef<HTMLInputElement>(null);
+  const editingScreenshotRef = useRef<number | null>(null);
 
   // Handle file upload for screenshot replacement/addition
   const handleFileUpload = (file: File, screenshotIndex: number) => {
@@ -413,6 +414,10 @@ export function AnalysisWizard() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const imageDataUrl = e.target?.result as string;
+      if (!imageDataUrl) {
+        alert('Failed to read the image file');
+        return;
+      }
       
       // Update the screenshot in our data while preserving original URL and page info
       setAnalysisData(prev => {
@@ -443,7 +448,43 @@ export function AnalysisWizard() {
       setEditingScreenshot(null);
     };
     
+    reader.onerror = () => {
+      alert('Failed to read the image file');
+    };
+    
     reader.readAsDataURL(file);
+  };
+
+  // Handle deleting a screenshot
+  const handleDeleteScreenshot = (screenshotIndex: number) => {
+    const screenshot = analysisData.screenshots?.[screenshotIndex];
+    if (!screenshot) return;
+
+    const pageName = screenshot.data?.customPageName || 
+                    (screenshot.data?.isCustom ? 'Custom Page' :
+                     new URL(screenshot.url).pathname === '/' ? 'Homepage' : 
+                     new URL(screenshot.url).pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || 'Page');
+
+    if (confirm(`Are you sure you want to delete the screenshot for "${pageName}"?`)) {
+      setAnalysisData(prev => {
+        if (!prev.screenshots) return prev;
+        
+        const newScreenshots = prev.screenshots.filter((_, index) => index !== screenshotIndex);
+        
+        return {
+          ...prev,
+          screenshots: newScreenshots
+        };
+      });
+
+      // If we're viewing this screenshot in the modal, close the modal
+      if (selectedScreenshotIndex === screenshotIndex) {
+        setSelectedScreenshotIndex(null);
+      } else if (selectedScreenshotIndex !== null && selectedScreenshotIndex > screenshotIndex) {
+        // Adjust the selected index if we deleted a screenshot before the currently selected one
+        setSelectedScreenshotIndex(prev => prev !== null ? prev - 1 : null);
+      }
+    }
   };
 
   // Handle adding a new screenshot - now with form
@@ -469,6 +510,10 @@ export function AnalysisWizard() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const imageDataUrl = e.target?.result as string;
+      if (!imageDataUrl) {
+        alert('Failed to read the image file');
+        return;
+      }
       
       // Create URL if not provided
       const pageUrl = newPageData.url.trim() || `https://custom-page-${Date.now()}.com`;
@@ -496,6 +541,10 @@ export function AnalysisWizard() {
       setShowAddForm(false);
       setNewPageData({ name: '', url: '' });
       setPendingFile(null);
+    };
+    
+    reader.onerror = () => {
+      alert('Failed to read the image file');
     };
     
     reader.readAsDataURL(pendingFile);
@@ -600,6 +649,17 @@ export function AnalysisWizard() {
                 <ArrowRight className="w-4 h-4" />
               </Button>
               <Button
+                onClick={() => handleDeleteScreenshot(index)}
+                variant="outline"
+                size="sm"
+                className="ml-2 border-red-200 text-red-600 hover:bg-red-50"
+                title="Delete screenshot"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </Button>
+              <Button
                 onClick={onClose}
                 variant="outline"
                 size="sm"
@@ -625,7 +685,7 @@ export function AnalysisWizard() {
                     parent.innerHTML = `
                       <div class="flex flex-col items-center justify-center h-64 text-slate-400 p-8">
                         <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
                         <p class="text-lg font-medium text-center">Image Not Available</p>
                         <p class="text-sm text-center mt-1">Failed to load screenshot</p>
@@ -955,7 +1015,7 @@ export function AnalysisWizard() {
         </div>
         <CardTitle className="text-2xl font-semibold">Review & Edit Screenshots</CardTitle>
         <p className="text-slate-600 mt-2">
-          Review the captured screenshots and customize them as needed. Click any screenshot to view full size, hover to edit/replace, or add your own screenshots.
+          Review the captured screenshots and customize them as needed. Click any screenshot to view full size, click the link icon to open the URL, or use the edit/delete buttons in each card's footer.
         </p>
         <p className="text-xs text-slate-500 mt-1">
           Use arrow keys to navigate between screenshots, ESC to close modal
@@ -964,12 +1024,6 @@ export function AnalysisWizard() {
       <CardContent className="space-y-6">
         {analysisData.screenshots && analysisData.screenshots.length > 0 ? (
           <>
-            <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-green-700 font-medium">
-                Successfully captured {analysisData.screenshots.length} screenshots
-              </p>
-            </div>
-            
             <div className="bg-slate-50 rounded-lg p-4 space-y-2">
               <h4 className="font-medium text-slate-900">Analysis Summary</h4>
               <div className="text-sm text-slate-600 space-y-1">
@@ -993,9 +1047,28 @@ export function AnalysisWizard() {
                     {/* URL Title */}
                     <div className="p-4 pb-3 border-b border-slate-100">
                       <div className="flex items-center gap-3">
-                        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Open the URL for both regular and custom screenshots
+                            if (screenshotUrl.startsWith('http')) {
+                              window.open(screenshotUrl, '_blank', 'noopener,noreferrer');
+                            }
+                          }}
+                          disabled={!screenshotUrl.startsWith('http')}
+                          className={`flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center transition-all ${
+                            screenshotUrl.startsWith('http')
+                              ? 'hover:bg-blue-200 hover:scale-105 cursor-pointer' 
+                              : 'opacity-50 cursor-not-allowed'
+                          }`}
+                          title={
+                            screenshotUrl.startsWith('http')
+                              ? `Open ${screenshotUrl} in new tab`
+                              : 'No valid URL available'
+                          }
+                        >
                           <ExternalLink className="w-4 h-4 text-blue-600" />
-                        </div>
+                        </button>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-slate-900 text-sm leading-tight">
                             {screenshot.data?.isCustom ? 'Custom Page' :
@@ -1059,20 +1132,34 @@ export function AnalysisWizard() {
                         </div>
                       )}
 
-                      {/* Edit Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingScreenshot(index);
-                          fileInputRef.current?.click();
-                        }}
-                        className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white hover:shadow-md"
-                        title="Replace screenshot"
-                      >
-                        <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </button>
+                      {/* Edit and Delete Buttons */}
+                      <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingScreenshot(index);
+                            fileInputRef.current?.click();
+                          }}
+                          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg flex items-center justify-center hover:bg-white hover:shadow-md transition-all"
+                          title="Replace screenshot"
+                        >
+                          <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteScreenshot(index);
+                          }}
+                          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-red-200 rounded-lg flex items-center justify-center hover:bg-red-50 hover:shadow-md transition-all"
+                          title="Delete screenshot"
+                        >
+                          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
 
                       {/* Custom indicator */}
                       {screenshot.success && screenshot.data?.isCustom && (
@@ -1081,6 +1168,45 @@ export function AnalysisWizard() {
                           <span className="text-xs text-green-700 font-medium">Custom</span>
                         </div>
                       )}
+                    </div>
+
+                    {/* Footer with URL and Actions */}
+                    <div className="p-3 bg-slate-50 border-t border-slate-100">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <Globe className="w-3 h-3 text-slate-400 flex-shrink-0 mt-0.5" />
+                          <span className="text-xs text-slate-600 font-mono break-all leading-relaxed">
+                            {screenshotUrl}
+                          </span>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingScreenshot(index);
+                              fileInputRef.current?.click();
+                            }}
+                            className="w-7 h-7 bg-white border border-slate-200 rounded-md flex items-center justify-center hover:bg-slate-50 hover:border-slate-300 transition-all"
+                            title="Replace screenshot"
+                          >
+                            <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteScreenshot(index);
+                            }}
+                            className="w-7 h-7 bg-white border border-red-200 rounded-md flex items-center justify-center hover:bg-red-50 hover:border-red-300 transition-all"
+                            title="Delete screenshot"
+                          >
+                            <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1120,6 +1246,16 @@ export function AnalysisWizard() {
                     <span className="text-xs mt-1">Click to select image</span>
                   </div>
                 </div>
+
+                {/* Footer for consistency */}
+                <div className="p-3 bg-slate-50 border-t border-slate-100">
+                  <div className="flex items-start gap-2">
+                    <Globe className="w-3 h-3 text-slate-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-xs text-slate-500 font-mono break-all leading-relaxed">
+                      Add new page...
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1133,9 +1269,13 @@ export function AnalysisWizard() {
                 const file = e.target.files?.[0];
                 if (file && editingScreenshot !== null) {
                   handleFileUpload(file, editingScreenshot);
+                  // Reset after a short delay to ensure FileReader completes
+                  setTimeout(() => {
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }, 100);
                 }
-                // Reset the input
-                e.target.value = '';
               }}
             />
 
@@ -1148,9 +1288,13 @@ export function AnalysisWizard() {
                 const file = e.target.files?.[0];
                 if (file && isAddingNew) {
                   handleAddNewScreenshot(file);
+                  // Reset after a short delay to ensure FileReader completes
+                  setTimeout(() => {
+                    if (addFileInputRef.current) {
+                      addFileInputRef.current.value = '';
+                    }
+                  }, 100);
                 }
-                // Reset the input
-                e.target.value = '';
               }}
             />
 
@@ -1231,7 +1375,8 @@ export function AnalysisWizard() {
                 onClick={() => {
                   alert(`Ready to proceed to LLM analysis!\n\nAnalysis Data:\n- Website: ${analysisData.websiteUrl}\n- Organization: ${analysisData.organizationName}\n- Purpose: ${analysisData.sitePurpose}\n- Screenshots: ${analysisData.screenshots?.length || 0}`);
                 }}
-                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                disabled={!analysisData.screenshots || analysisData.screenshots.length === 0}
+                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-400 disabled:to-slate-400"
               >
                 Start LLM Analysis
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -1242,10 +1387,26 @@ export function AnalysisWizard() {
           <div className="text-center py-8">
             <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No Screenshots Available</h3>
-            <p className="text-slate-600 mb-4">The capture process may have failed or is still in progress.</p>
-            <Button onClick={() => setCurrentStep(1)} variant="outline">
-              Start Over
-            </Button>
+            <p className="text-slate-600 mb-4">
+              {analysisData.screenshots?.length === 0 ? 
+                'All screenshots have been removed. Add new screenshots to continue with the analysis.' :
+                'The capture process may have failed or is still in progress.'
+              }
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button 
+                onClick={() => {
+                  setIsAddingNew(true);
+                  addFileInputRef.current?.click();
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Add Screenshot
+              </Button>
+              <Button onClick={() => setCurrentStep(1)} variant="outline">
+                Start Over
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
