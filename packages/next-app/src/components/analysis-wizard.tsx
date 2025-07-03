@@ -68,6 +68,24 @@ interface CaptureJob {
   error?: string;
 }
 
+interface AnalysisJob {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: {
+    stage: string;
+    percentage: number;
+    message: string;
+  };
+  results?: {
+    reportPath?: string;
+    lighthouse?: any;
+    llmAnalysis?: any;
+    formatting?: any;
+    htmlReport?: any;
+  };
+  error?: string;
+}
+
 interface AnalysisData {
   websiteUrl: string;
   organizationName: string;
@@ -81,7 +99,9 @@ const WIZARD_STEPS = [
   { id: 2, title: 'Organization', icon: Building2 },
   { id: 3, title: 'Site Purpose', icon: Target },
   { id: 4, title: 'Processing', icon: Camera },
-  { id: 5, title: 'Review Captures', icon: CheckCircle2 }
+  { id: 5, title: 'Review Captures', icon: CheckCircle2 },
+  { id: 6, title: 'Analyzing', icon: Loader2 },
+  { id: 7, title: 'Results', icon: CheckCircle2 }
 ];
 
 // Helper function to safely construct screenshot URLs
@@ -517,15 +537,17 @@ PurposeStep.displayName = 'PurposeStep';
 
 export function AnalysisWizard() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [captureJob, setCaptureJob] = useState<CaptureJob | null>(null);
+  const [captureStarted, setCaptureStarted] = useState(false);
+  const [analysisJob, setAnalysisJob] = useState<AnalysisJob | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisData>({
     websiteUrl: '',
     organizationName: '',
     sitePurpose: ''
   });
-  const [captureJob, setCaptureJob] = useState<CaptureJob | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [captureStarted, setCaptureStarted] = useState(false);
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState<number | null>(null);
   const [editingScreenshot, setEditingScreenshot] = useState<number | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -533,9 +555,11 @@ export function AnalysisWizard() {
   const [newPageData, setNewPageData] = useState({ name: '', url: '' });
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   
-  // Use refs to avoid re-renders and state timing issues
+  // Refs for managing polling and state
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isPollingRef = useRef(false);
+  const analysisPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const isAnalysisPollingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addFileInputRef = useRef<HTMLInputElement>(null);
   
@@ -564,6 +588,154 @@ export function AnalysisWizard() {
     setPendingFile(null);
     resetFileStates();
   }, []);
+
+  // Poll for capture job status
+  const pollCaptureJobStatus = useCallback(async () => {
+    if (!captureJob?.id || isPollingRef.current) return;
+    
+    isPollingRef.current = true;
+    
+    try {
+      const response = await fetch(`http://localhost:3001/api/capture/${captureJob.id}`);
+      if (response.ok) {
+        const jobData = await response.json();
+        setCaptureJob(jobData);
+        
+        if (jobData.status === 'completed') {
+          setAnalysisData(prev => ({ ...prev, screenshots: jobData.results?.screenshots || [] }));
+          setCurrentStep(5);
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+        } else if (jobData.status === 'failed') {
+          setError(jobData.error || 'Capture process failed');
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error polling job status:', err);
+    } finally {
+      isPollingRef.current = false;
+    }
+  }, [captureJob?.id]);
+
+  // Poll for analysis job status
+  const pollAnalysisJobStatus = useCallback(async () => {
+    if (!analysisJob?.id || isAnalysisPollingRef.current) return;
+    
+    isAnalysisPollingRef.current = true;
+    
+    try {
+      const response = await fetch(`/api/start-analysis?jobId=${analysisJob.id}`);
+      if (response.ok) {
+        const jobData = await response.json();
+        setAnalysisJob(jobData);
+        
+        if (jobData.status === 'completed') {
+          setIsAnalyzing(false);
+          setCurrentStep(7); // Analysis results step
+          if (analysisPollingRef.current) {
+            clearInterval(analysisPollingRef.current);
+            analysisPollingRef.current = null;
+          }
+        } else if (jobData.status === 'failed') {
+          setError(jobData.error || 'Analysis failed');
+          setIsAnalyzing(false);
+          if (analysisPollingRef.current) {
+            clearInterval(analysisPollingRef.current);
+            analysisPollingRef.current = null;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error polling analysis status:', err);
+    } finally {
+      isAnalysisPollingRef.current = false;
+    }
+  }, [analysisJob?.id]);
+
+  // Start analysis function
+  const startAnalysis = async () => {
+    if (!analysisData.captureJobId || !analysisData.screenshots?.length) {
+      setError('No screenshots available for analysis');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+    setCurrentStep(6); // Analysis waiting step
+
+    try {
+      const response = await fetch('/api/start-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysisData,
+          captureJobId: analysisData.captureJobId
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to start analysis: ${errorText}`);
+      }
+
+      const result = await response.json();
+      setAnalysisJob({
+        id: result.analysisJobId,
+        status: result.status,
+        progress: { stage: 'starting', percentage: 0, message: 'Starting analysis...' }
+      });
+
+      // Start polling for analysis progress
+      analysisPollingRef.current = setInterval(pollAnalysisJobStatus, 2000);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to start analysis';
+      setError(errorMessage);
+      setIsAnalyzing(false);
+      setCurrentStep(5); // Back to review step
+    }
+  };
+
+  // Start polling when step 4 is reached and job exists
+  useEffect(() => {
+    // Capture job polling
+    if (currentStep === 4 && captureJob?.id && !['completed', 'failed'].includes(captureJob.status)) {
+      const startPolling = () => {
+        if (pollingIntervalRef.current) return;
+        pollingIntervalRef.current = setInterval(pollCaptureJobStatus, 2000);
+      };
+      startPolling();
+    }
+    
+    // Analysis job polling
+    if (currentStep === 6 && analysisJob?.id && !['completed', 'failed'].includes(analysisJob.status)) {
+      const startAnalysisPolling = () => {
+        if (analysisPollingRef.current) return;
+        analysisPollingRef.current = setInterval(pollAnalysisJobStatus, 2000);
+      };
+      startAnalysisPolling();
+    }
+
+    // Cleanup function
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      if (analysisPollingRef.current) {
+        clearInterval(analysisPollingRef.current);
+        analysisPollingRef.current = null;
+      }
+      isPollingRef.current = false;
+      isAnalysisPollingRef.current = false;
+    };
+  }, [captureJob?.id, captureJob?.status, analysisJob?.id, analysisJob?.status, currentStep, pollCaptureJobStatus, pollAnalysisJobStatus]);
 
   // Handle file upload for screenshot replacement/addition
   const handleFileUpload = (file: File, screenshotIndex: number) => {
@@ -940,81 +1112,6 @@ export function AnalysisWizard() {
       </div>
     );
   };
-
-  // Separate polling logic that doesn't affect form rendering
-  useEffect(() => {
-    const startPolling = async () => {
-      if (!captureJob?.id || ['completed', 'failed'].includes(captureJob.status) || isPollingRef.current) {
-        return;
-      }
-
-      isPollingRef.current = true;
-
-      const poll = async () => {
-        try {
-          const response = await fetch(`http://localhost:3001/api/capture/${captureJob.id}`);
-          if (response.ok) {
-            const updatedJob = await response.json();
-            
-            // Only update if status actually changed
-            setCaptureJob(prevJob => {
-              if (!prevJob || 
-                  prevJob.status !== updatedJob.status || 
-                  Math.abs(prevJob.progress.percentage - updatedJob.progress.percentage) >= 5) {
-                return updatedJob;
-              }
-              return prevJob;
-            });
-            
-            if (updatedJob.status === 'completed') {
-              console.log('Capture completed, screenshots:', updatedJob.results?.screenshots);
-              setAnalysisData(prev => ({ 
-                ...prev, 
-                screenshots: updatedJob.results?.screenshots || [] 
-              }));
-              
-              // Clear polling
-              if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-                pollingIntervalRef.current = null;
-              }
-              isPollingRef.current = false;
-              
-              // Auto-advance if on processing step
-              if (currentStep === 4) {
-                setTimeout(() => setCurrentStep(5), 1000);
-              }
-            } else if (updatedJob.status === 'failed') {
-              setError(updatedJob.error || 'Capture process failed');
-              if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-                pollingIntervalRef.current = null;
-              }
-              isPollingRef.current = false;
-            }
-          }
-        } catch (err) {
-          console.error('Error polling job status:', err);
-        }
-      };
-
-      // Start polling
-      pollingIntervalRef.current = setInterval(poll, 3000);
-      poll(); // Initial poll
-    };
-
-    if (captureJob?.id && !['completed', 'failed'].includes(captureJob.status)) {
-      startPolling();
-    }
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-      isPollingRef.current = false;
-    };
-  }, [captureJob?.id, captureJob?.status, currentStep]);
 
   // Memoized handlers to prevent re-renders
   const handleUrlChange = useCallback((url: string) => {
@@ -1463,14 +1560,21 @@ export function AnalysisWizard() {
                 Back
               </Button>
               <Button 
-                onClick={() => {
-                  alert(`Ready to proceed to LLM analysis!\n\nAnalysis Data:\n- Website: ${analysisData.websiteUrl}\n- Organization: ${analysisData.organizationName}\n- Purpose: ${analysisData.sitePurpose}\n- Screenshots: ${analysisData.screenshots?.length || 0}`);
-                }}
-                disabled={!analysisData.screenshots || analysisData.screenshots.length === 0}
+                onClick={startAnalysis}
+                disabled={!analysisData.screenshots || analysisData.screenshots.length === 0 || isAnalyzing}
                 className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-400 disabled:to-slate-400"
               >
-                Start LLM Analysis
-                <ArrowRight className="w-4 h-4 ml-2" />
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Starting Analysis...
+                  </>
+                ) : (
+                  <>
+                    Start LLM Analysis
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </>
+                )}
               </Button>
             </div>
           </>
@@ -1497,6 +1601,150 @@ export function AnalysisWizard() {
             </div>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+
+  // Analysis Waiting Step Component
+  const AnalysisWaitingStep = () => (
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader className="text-center pb-6">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        </div>
+        <CardTitle className="text-2xl text-slate-900 mb-2">Analyzing Your Website</CardTitle>
+        <p className="text-slate-600">
+          Our AI is analyzing your website screenshots and running comprehensive audits. This may take a few minutes.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {analysisJob && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-slate-700">
+                {analysisJob.progress?.stage?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Processing'}
+              </span>
+              <span className="text-sm text-slate-500">
+                {analysisJob.progress?.percentage || 0}%
+              </span>
+            </div>
+            <Progress value={analysisJob.progress?.percentage || 0} className="h-2" />
+            <p className="text-sm text-slate-600 text-center">
+              {analysisJob.progress?.message || 'Processing...'}
+            </p>
+          </div>
+        )}
+
+        <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+          <h4 className="font-medium text-slate-900">What we're analyzing:</h4>
+          <div className="text-sm text-slate-600 space-y-1">
+            <p><strong>Website:</strong> {analysisData.websiteUrl}</p>
+            <p><strong>Organization:</strong> {analysisData.organizationName}</p>
+            <p><strong>Screenshots:</strong> {analysisData.screenshots?.length || 0} pages</p>
+          </div>
+        </div>
+
+        <div className="text-center">
+          <Button 
+            onClick={() => setCurrentStep(5)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Screenshots
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Analysis Results Step Component
+  const AnalysisResultsStep = () => (
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader className="text-center pb-6">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle2 className="w-8 h-8 text-green-600" />
+        </div>
+        <CardTitle className="text-2xl text-slate-900 mb-2">Analysis Complete!</CardTitle>
+        <p className="text-slate-600">
+          Your website analysis has been completed successfully. View your comprehensive report below.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {analysisJob?.results && (
+          <div className="space-y-4">
+            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+              <h4 className="font-medium text-green-900 mb-2">✅ Analysis Summary</h4>
+              <div className="text-sm text-green-800 space-y-1">
+                <p><strong>Website:</strong> {analysisData.websiteUrl}</p>
+                <p><strong>Organization:</strong> {analysisData.organizationName}</p>
+                <p><strong>Pages Analyzed:</strong> {analysisData.screenshots?.length || 0}</p>
+                <p><strong>Report Generated:</strong> {new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+
+            {analysisJob.results.reportPath && (
+              <div className="text-center">
+                <Button 
+                  onClick={() => {
+                    // Open the HTML report
+                    const reportUrl = analysisJob.results!.reportPath!.replace(/\\/g, '/');
+                    window.open(`file://${reportUrl}`, '_blank');
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View Complete Report
+                </Button>
+              </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="bg-slate-50 rounded-lg p-4">
+                <h5 className="font-medium text-slate-900 mb-2">Lighthouse Audit</h5>
+                <p className="text-sm text-slate-600">
+                  {analysisJob.results.lighthouse?.success ? '✅ Completed' : '❌ Failed'}
+                </p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <h5 className="font-medium text-slate-900 mb-2">AI Analysis</h5>
+                <p className="text-sm text-slate-600">
+                  {analysisJob.results.llmAnalysis?.success ? '✅ Completed' : '❌ Failed'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Button 
+            onClick={() => setCurrentStep(5)}
+            variant="outline"
+            className="flex-1"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Screenshots
+          </Button>
+          <Button 
+            onClick={() => {
+              // Reset wizard for new analysis
+              setCurrentStep(1);
+              setAnalysisData({
+                websiteUrl: '',
+                organizationName: '',
+                sitePurpose: ''
+              });
+              setCaptureJob(null);
+              setAnalysisJob(null);
+              setCaptureStarted(false);
+              setIsAnalyzing(false);
+              setError(null);
+            }}
+            className="flex-1 bg-green-600 hover:bg-green-700"
+          >
+            Start New Analysis
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -1539,6 +1787,10 @@ export function AnalysisWizard() {
         return <ProcessingStep />;
       case 5:
         return <ScreenshotReviewStep />;
+      case 6:
+        return <AnalysisWaitingStep />;
+      case 7:
+        return <AnalysisResultsStep />;
       default:
         return null;
     }
@@ -1548,7 +1800,7 @@ export function AnalysisWizard() {
     <div className="max-w-2xl mx-auto">
       {/* Progress Steps */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between overflow-x-auto">
           {WIZARD_STEPS.map((step, index) => {
             const Icon = step.icon;
             const isActive = currentStep === step.id;
@@ -1556,7 +1808,7 @@ export function AnalysisWizard() {
             const isAccessible = currentStep >= step.id;
 
             return (
-              <div key={step.id} className="flex flex-col items-center relative">
+              <div key={step.id} className="flex flex-col items-center relative min-w-0 flex-1">
                 <div 
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
                     isCompleted 
@@ -1571,18 +1823,18 @@ export function AnalysisWizard() {
                   {isCompleted ? (
                     <CheckCircle2 className="w-5 h-5" />
                   ) : (
-                    <Icon className="w-5 h-5" />
+                    <Icon className={`w-5 h-5 ${isActive && (step.id === 4 || step.id === 6) ? 'animate-spin' : ''}`} />
                   )}
                 </div>
-                <span className={`text-xs mt-2 font-medium transition-colors ${
+                <span className={`text-xs mt-2 font-medium text-center px-1 ${
                   isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-slate-500'
                 }`}>
                   {step.title}
                 </span>
                 {index < WIZARD_STEPS.length - 1 && (
-                  <div className={`absolute top-5 left-10 w-full h-0.5 -z-10 transition-colors ${
-                    isCompleted ? 'bg-green-600' : 'bg-slate-200'
-                  }`} />
+                  <div className={`absolute top-5 left-12 w-full h-0.5 ${
+                    currentStep > step.id ? 'bg-green-600' : 'bg-slate-200'
+                  }`} style={{ width: 'calc(100% - 1.5rem)' }} />
                 )}
               </div>
             );
