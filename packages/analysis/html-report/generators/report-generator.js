@@ -3,79 +3,46 @@ const path = require('path');
 
 class ReportGenerator {
   constructor(options = {}) {
-    // Change output to Next.js public directory structure
     this.outputDir = options.outputDir || '/app/data/reports'; 
-    this.nextJsPublicDir = options.nextJsPublicDir || path.join(__dirname, '../../../next-app/public');
     this.screenshotsSourceDir = options.screenshotsSourceDir || options.screenshotsDir || '/app/data/screenshots';
     this.usedIds = new Set();
 
     console.log(`📁 ReportGenerator initialized:`);
-    console.log(`   Next.js public dir: ${this.nextJsPublicDir}`);
     console.log(`   Screenshots source: ${this.screenshotsSourceDir}`);
-    
-    // Ensure Next.js directories exist
-    fs.ensureDirSync(path.join(this.nextJsPublicDir, 'all_analysis_runs'));
   }
 
-  async generateAllReports(analysisData) {
+  async generateTemporaryReport(analysisData) {
     try {
-      console.log(`🔍 Generating reports for Next.js app`);
+      console.log(`🔍 Generating temporary report for immediate display`);
 
       // Reset used IDs for each generation
       this.usedIds.clear();
 
-      // Generate unique report ID
-      const reportId = this.generateReportId(analysisData);
-      const reportDir = path.join(this.nextJsPublicDir, 'all_analysis_runs', reportId);
-      
-      console.log(`📁 Creating report directory: ${reportDir}`);
-      await fs.ensureDir(reportDir);
+      // Process the analysis data for Next.js consumption
+      const reportData = await this.prepareReportDataForNextJs(analysisData);
 
-      // 1. Prepare report-data.json for Next.js app
-      await this.prepareNextJsReportData(analysisData, reportDir);
-
-      // 2. Copy screenshots to Next.js public directory
-      await this.copyScreenshotsToNextJs(reportDir);
-
-      // 3. Update the manifest file
-      await this.updateManifest(reportId, analysisData);
-
-      // 4. Create success marker
-      const testFilePath = path.join(reportDir, 'generation-successful.txt');
-      await fs.writeFile(testFilePath, `Reports generated at ${new Date().toISOString()}`);
-      console.log(`✅ Generation verification file created: ${testFilePath}`);
-
-      console.log(`✅ Report generated successfully with ID: ${reportId}`);
-      console.log(`🌐 View at: http://localhost:3000/report/${reportId}`);
-
-      return true;
+      console.log(`✅ Temporary report data prepared successfully`);
+      return {
+        success: true,
+        reportData: reportData,
+        reportId: `temp_${Date.now()}` // Temporary ID for this session
+      };
     } catch (error) {
-      console.error(`❌ Error generating reports: ${error.message}`);
+      console.error(`❌ Error generating temporary report: ${error.message}`);
       console.error(error.stack);
-      return false;
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
-  generateReportId(analysisData) {
-    // Generate a unique ID based on timestamp and organization
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const orgName = (analysisData.metadata?.organization_name || 'analysis')
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
-      .substring(0, 20);
-    return `run_${orgName}_${timestamp}`;
-  }
-
-  async prepareNextJsReportData(analysisData, reportDir) {
-    console.log('  📊 Preparing report-data.json for Next.js...');
+  async prepareReportDataForNextJs(analysisData) {
+    console.log('  📊 Preparing report data for Next.js...');
     
     if (!analysisData || !analysisData.page_analyses || !analysisData.overall_summary || !analysisData.metadata) {
       throw new Error('Invalid analysisData structure: missing overall_summary, page_analyses, or metadata.');
     }
-
-    // Create assets directory structure
-    const assetsDir = path.join(reportDir, 'assets', 'screenshots');
-    await fs.ensureDir(assetsDir);
 
     const processedPageAnalyses = analysisData.page_analyses.map((page, index) => {
       const pageId = this.createUniquePageId(page, index);
@@ -86,7 +53,7 @@ class ReportGenerator {
         id: pageId,
         detailed_analysis: this.cleanAnalysisContent(page.original_analysis || ''), 
         raw_analysis: page.original_analysis || 'No raw analysis data.',
-        screenshot_path: screenshotFilename ? `assets/screenshots/${screenshotFilename}` : null
+        screenshot_path: screenshotFilename ? `temp_screenshots/${screenshotFilename}` : null
       };
     });
 
@@ -103,28 +70,26 @@ class ReportGenerator {
         organization_name: analysisData.metadata.organization_name,
         generated_at: new Date().toISOString(),
         total_pages: processedPageAnalyses.length
-      }
+      },
+      // Add screenshot data directly to the report
+      screenshots: await this.getScreenshotData()
     };
 
-    const reportDataPath = path.join(reportDir, 'report-data.json');
-    await fs.writeJson(reportDataPath, reportData, { spaces: 2 });
-    console.log(`    ✅ report-data.json saved to: ${reportDataPath}`);
+    console.log(`    ✅ Report data prepared for ${processedPageAnalyses.length} pages`);
+    return reportData;
   }
 
-  async copyScreenshotsToNextJs(reportDir) {
-    console.log('  📸 Copying screenshots to Next.js assets...');
+  async getScreenshotData() {
+    console.log('  📸 Collecting screenshot data...');
     
     try {
-      const assetsScreenshotsDir = path.join(reportDir, 'assets', 'screenshots');
-      await fs.ensureDir(assetsScreenshotsDir);
-
       // Check for screenshots in desktop subdirectory first
       const desktopDir = path.join(this.screenshotsSourceDir, 'desktop');
       const sourceDir = await fs.pathExists(desktopDir) ? desktopDir : this.screenshotsSourceDir;
       
       if (!await fs.pathExists(sourceDir)) {
         console.log(`    ⚠️  Screenshots directory not found: ${sourceDir}`);
-        return;
+        return {};
       }
 
       const files = await fs.readdir(sourceDir);
@@ -132,49 +97,22 @@ class ReportGenerator {
       
       if (screenshotFiles.length === 0) {
         console.log(`    ⚠️  No screenshot files found in: ${sourceDir}`);
-        return;
+        return {};
       }
 
+      const screenshotData = {};
       for (const file of screenshotFiles) {
-        const srcPath = path.join(sourceDir, file);
-        const destPath = path.join(assetsScreenshotsDir, file);
-        await fs.copy(srcPath, destPath, { overwrite: true });
+        const filePath = path.join(sourceDir, file);
+        const buffer = await fs.readFile(filePath);
+        const base64 = buffer.toString('base64');
+        screenshotData[file] = `data:image/png;base64,${base64}`;
       }
       
-      console.log(`    ✅ ${screenshotFiles.length} screenshots copied to: ${assetsScreenshotsDir}`);
+      console.log(`    ✅ ${screenshotFiles.length} screenshots encoded to base64`);
+      return screenshotData;
     } catch (error) {
-      console.error(`    ❌ Error copying screenshots: ${error.message}`);
-    }
-  }
-
-  async updateManifest(reportId, analysisData) {
-    console.log('  📋 Updating manifest file...');
-    
-    try {
-      const manifestPath = path.join(this.nextJsPublicDir, 'all_analysis_runs_manifest.json');
-      
-      // Read existing manifest or create new one
-      let manifest = [];
-      if (await fs.pathExists(manifestPath)) {
-        manifest = await fs.readJson(manifestPath);
-      }
-
-      // Add new report to manifest
-      const newEntry = {
-        id: reportId,
-        name: `${analysisData.metadata.organization_name || 'Analysis'} (${new Date().toISOString().split('T')[0]})`,
-        date: new Date().toISOString(),
-        description: `Analysis report for ${analysisData.metadata.organization_name || 'organization'} generated on ${new Date().toLocaleDateString()}.`
-      };
-
-      // Add to beginning of list (most recent first)
-      manifest.unshift(newEntry);
-
-      // Write updated manifest
-      await fs.writeJson(manifestPath, manifest, { spaces: 2 });
-      console.log(`    ✅ Manifest updated with new report: ${reportId}`);
-    } catch (error) {
-      console.error(`    ❌ Error updating manifest: ${error.message}`);
+      console.error(`    ❌ Error collecting screenshot data: ${error.message}`);
+      return {};
     }
   }
 

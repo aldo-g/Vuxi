@@ -6,13 +6,11 @@ class HTMLReportService {
   constructor(options = {}) {
     this.outputDir = options.outputDir || './data/reports';
     this.screenshotsDir = options.screenshotsDir || './data/screenshots';
-    this.nextJsPublicDir = options.nextJsPublicDir || path.join(__dirname, '../../../next-app/public');
   }
 
-  async generate(analysisData) {
-    console.log('📄 HTML Report Service Starting (Next.js Integration)...');
+  async generateTemporary(analysisData) {
+    console.log('📄 HTML Report Service Starting (Temporary Report)...');
     console.log(`📸 Screenshots: ${this.screenshotsDir}`);
-    console.log(`🌐 Next.js public dir: ${this.nextJsPublicDir}`);
     
     const startTime = Date.now();
     
@@ -22,32 +20,30 @@ class HTMLReportService {
         throw new Error('No analysis data provided');
       }
       
-      // Initialize report generator for Next.js integration
+      // Initialize report generator for temporary report
       const generator = new ReportGenerator({
         outputDir: this.outputDir,
-        screenshotsDir: this.screenshotsDir,
-        nextJsPublicDir: this.nextJsPublicDir
+        screenshotsDir: this.screenshotsDir
       });
       
-      // Generate reports for Next.js app
-      console.log('\n🎨 Generating reports for Next.js app...');
-      const success = await generator.generateAllReports(analysisData);
+      // Generate temporary report
+      console.log('\n🎨 Generating temporary report...');
+      const result = await generator.generateTemporaryReport(analysisData);
       
-      if (!success) {
-        throw new Error('HTML report generation failed');
+      if (!result.success) {
+        throw new Error('Temporary report generation failed');
       }
       
       const duration = (Date.now() - startTime) / 1000;
       
-      console.log('\n🎉 Next.js reports generated successfully');
+      console.log('\n🎉 Temporary report generated successfully');
       console.log(`⏱️  Duration: ${duration.toFixed(2)} seconds`);
-      console.log(`🌐 Access reports at: http://localhost:3000/reports`);
       
       return {
         success: true,
         duration: duration,
-        outputDir: this.nextJsPublicDir,
-        message: 'Reports generated for Next.js app'
+        reportData: result.reportData,
+        reportId: result.reportId
       };
       
     } catch (error) {
@@ -61,11 +57,10 @@ class HTMLReportService {
     }
   }
 
-  async generateFromFile(analysisFilePath) {
-    console.log('📄 HTML Report Service Starting (Next.js Integration)...');
+  async generateTemporaryFromFile(analysisFilePath) {
+    console.log('📄 HTML Report Service Starting (Temporary Report)...');
     console.log(`📥 Input: ${analysisFilePath}`);
     console.log(`📸 Screenshots: ${this.screenshotsDir}`);
-    console.log(`🌐 Next.js public dir: ${this.nextJsPublicDir}`);
     
     try {
       // Check if analysis file exists
@@ -77,8 +72,8 @@ class HTMLReportService {
       console.log('\n📥 Reading analysis data...');
       const analysisData = await fs.readJson(analysisFilePath);
       
-      // Generate reports using the main method
-      return await this.generate(analysisData);
+      // Generate temporary report using the main method
+      return await this.generateTemporary(analysisData);
       
     } catch (error) {
       console.error('❌ Failed to load analysis file:', error);

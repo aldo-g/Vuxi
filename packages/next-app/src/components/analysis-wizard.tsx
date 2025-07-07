@@ -82,6 +82,7 @@ interface AnalysisJob {
     llmAnalysis?: any;
     formatting?: any;
     htmlReport?: any;
+    reportData?: any; // Added for temporary report data
   };
   error?: string;
 }
@@ -623,47 +624,89 @@ export function AnalysisWizard() {
     }
   }, [captureJob?.id]);
 
-  // Poll for analysis job status
+  // Poll for analysis job status - Updated for temporary reports with better debugging
   const pollAnalysisJobStatus = useCallback(async () => {
     if (!analysisJob?.id || isAnalysisPollingRef.current) return;
     
     isAnalysisPollingRef.current = true;
     
     try {
+      console.log(`🔍 Polling analysis job ${analysisJob.id}...`);
       const response = await fetch(`/api/start-analysis?jobId=${analysisJob.id}`);
       if (response.ok) {
         const jobData = await response.json();
+        console.log('📊 Analysis job data received:', {
+          id: jobData.id,
+          status: jobData.status,
+          hasResults: !!jobData.results,
+          hasReportData: !!jobData.results?.reportData,
+          progress: jobData.progress
+        });
+        
         setAnalysisJob(jobData);
         
         if (jobData.status === 'completed') {
           setIsAnalyzing(false);
-          setCurrentStep(7); // Analysis results step
+          
+          // Check if we have report data to display
+          if (jobData.results?.reportData) {
+            console.log('✅ Found report data, redirecting to live report');
+            console.log('📋 Report data keys:', Object.keys(jobData.results.reportData));
+            
+            // Store the report data in sessionStorage for the live report page
+            sessionStorage.setItem('liveReportData', JSON.stringify(jobData.results.reportData));
+            
+            // Small delay to ensure sessionStorage is written
+            setTimeout(() => {
+              console.log('🔄 Redirecting to /report/live');
+              window.location.href = '/report/live';
+            }, 100);
+          } else {
+            console.log('⚠️ No report data found, falling back to step 7');
+            console.log('📊 Available results:', jobData.results ? Object.keys(jobData.results) : 'none');
+            // Fallback to step 7 if no report data
+            setCurrentStep(7);
+          }
+          
           if (analysisPollingRef.current) {
             clearInterval(analysisPollingRef.current);
             analysisPollingRef.current = null;
           }
         } else if (jobData.status === 'failed') {
+          console.error('❌ Analysis job failed:', jobData.error);
           setError(jobData.error || 'Analysis failed');
           setIsAnalyzing(false);
           if (analysisPollingRef.current) {
             clearInterval(analysisPollingRef.current);
             analysisPollingRef.current = null;
           }
+        } else {
+          console.log(`⏳ Analysis job still running - Status: ${jobData.status}, Progress: ${jobData.progress?.percentage || 0}%`);
         }
+      } else {
+        console.error('❌ Failed to fetch analysis job status:', response.status, response.statusText);
       }
     } catch (err) {
-      console.error('Error polling analysis status:', err);
+      console.error('❌ Error polling analysis status:', err);
     } finally {
       isAnalysisPollingRef.current = false;
     }
   }, [analysisJob?.id]);
 
-  // Start analysis function
+  // Start analysis function - Updated for temporary reports with better debugging
   const startAnalysis = async () => {
     if (!analysisData.captureJobId || !analysisData.screenshots?.length) {
       setError('No screenshots available for analysis');
       return;
     }
+
+    console.log('🚀 Starting analysis with data:', {
+      websiteUrl: analysisData.websiteUrl,
+      organizationName: analysisData.organizationName,
+      sitePurpose: analysisData.sitePurpose,
+      captureJobId: analysisData.captureJobId,
+      screenshotCount: analysisData.screenshots.length
+    });
 
     setIsAnalyzing(true);
     setError(null);
@@ -681,21 +724,27 @@ export function AnalysisWizard() {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('❌ Failed to start analysis:', response.status, errorText);
         throw new Error(`Failed to start analysis: ${errorText}`);
       }
 
       const result = await response.json();
+      console.log('✅ Analysis started successfully:', result);
+      
       setAnalysisJob({
         id: result.analysisJobId,
         status: result.status,
-        progress: { stage: 'starting', percentage: 0, message: 'Starting analysis...' }
+        progress: { stage: 'starting', percentage: 0, message: 'Starting analysis...' },
+        results: result.reportData ? { reportData: result.reportData } : undefined
       });
 
       // Start polling for analysis progress
+      console.log('⏰ Starting analysis polling...');
       analysisPollingRef.current = setInterval(pollAnalysisJobStatus, 2000);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start analysis';
+      console.error('❌ Analysis start error:', errorMessage);
       setError(errorMessage);
       setIsAnalyzing(false);
       setCurrentStep(5); // Back to review step
@@ -1658,7 +1707,7 @@ export function AnalysisWizard() {
     </Card>
   );
 
-  // Analysis Results Step Component
+  // Analysis Results Step Component - Updated for temporary reports
   const AnalysisResultsStep = () => (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader className="text-center pb-6">
@@ -1667,54 +1716,50 @@ export function AnalysisWizard() {
         </div>
         <CardTitle className="text-2xl text-slate-900 mb-2">Analysis Complete!</CardTitle>
         <p className="text-slate-600">
-          Your website analysis has been completed successfully. View your comprehensive report below.
+          Your website analysis has been completed successfully. 
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {analysisJob?.results && (
-          <div className="space-y-4">
-            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-              <h4 className="font-medium text-green-900 mb-2">✅ Analysis Summary</h4>
-              <div className="text-sm text-green-800 space-y-1">
-                <p><strong>Website:</strong> {analysisData.websiteUrl}</p>
-                <p><strong>Organization:</strong> {analysisData.organizationName}</p>
-                <p><strong>Pages Analyzed:</strong> {analysisData.screenshots?.length || 0}</p>
-                <p><strong>Report Generated:</strong> {new Date().toLocaleDateString()}</p>
-              </div>
-            </div>
-
-            {analysisJob.results.reportPath && (
-              <div className="text-center">
-                <Button 
-                  onClick={() => {
-                    // Open the HTML report
-                    const reportUrl = analysisJob.results!.reportPath!.replace(/\\/g, '/');
-                    window.open(`file://${reportUrl}`, '_blank');
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  View Complete Report
-                </Button>
-              </div>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="bg-slate-50 rounded-lg p-4">
-                <h5 className="font-medium text-slate-900 mb-2">Lighthouse Audit</h5>
-                <p className="text-sm text-slate-600">
-                  {analysisJob.results.lighthouse?.success ? '✅ Completed' : '❌ Failed'}
-                </p>
-              </div>
-              <div className="bg-slate-50 rounded-lg p-4">
-                <h5 className="font-medium text-slate-900 mb-2">AI Analysis</h5>
-                <p className="text-sm text-slate-600">
-                  {analysisJob.results.llmAnalysis?.success ? '✅ Completed' : '❌ Failed'}
-                </p>
-              </div>
+        <div className="space-y-4">
+          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+            <h4 className="font-medium text-green-900 mb-2">✅ Analysis Summary</h4>
+            <div className="text-sm text-green-800 space-y-1">
+              <p><strong>Website:</strong> {analysisData.websiteUrl}</p>
+              <p><strong>Organization:</strong> {analysisData.organizationName}</p>
+              <p><strong>Pages Analyzed:</strong> {analysisData.screenshots?.length || 0}</p>
+              <p><strong>Report Generated:</strong> {new Date().toLocaleDateString()}</p>
             </div>
           </div>
-        )}
+
+          <div className="text-center">
+            <Button 
+              onClick={() => {
+                console.log('🔄 Manual redirect to live report page');
+                // Redirect to live report page
+                window.location.href = '/report/live';
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              View Your Report
+            </Button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="bg-slate-50 rounded-lg p-4">
+              <h5 className="font-medium text-slate-900 mb-2">Lighthouse Audit</h5>
+              <p className="text-sm text-slate-600">
+                {analysisJob?.results?.lighthouse?.success ? '✅ Completed' : '❌ Failed'}
+              </p>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-4">
+              <h5 className="font-medium text-slate-900 mb-2">AI Analysis</h5>
+              <p className="text-sm text-slate-600">
+                {analysisJob?.results?.llmAnalysis?.success ? '✅ Completed' : '❌ Failed'}
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div className="flex gap-3">
           <Button 

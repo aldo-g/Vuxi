@@ -54,14 +54,12 @@ async function analysis(data) {
     return { success: false, error: formattingResult.error, lighthouse: lighthouseResult, llmAnalysis: llmResult };
   }
   
-  // Generate Next.js integrated report
-  const nextJsPublicDir = path.join(rootDir, 'packages', 'next-app', 'public');
+  // Generate TEMPORARY report (no saving to disk)
   const htmlService = new HTMLReportService({
     outputDir: path.join(dataDir, 'reports'),
-    screenshotsDir: path.join(dataDir, 'screenshots'),
-    nextJsPublicDir: nextJsPublicDir
+    screenshotsDir: path.join(dataDir, 'screenshots')
   });
-  const htmlResult = await htmlService.generateFromFile(path.join(dataDir, 'analysis', 'structured-analysis.json'));
+  const htmlResult = await htmlService.generateTemporaryFromFile(path.join(dataDir, 'analysis', 'structured-analysis.json'));
   
   return {
     success: htmlResult.success,
@@ -69,7 +67,9 @@ async function analysis(data) {
     llmAnalysis: llmResult,
     formatting: formattingResult,
     htmlReport: htmlResult,
-    reportUrl: htmlResult.success ? 'http://localhost:3000/reports' : null
+    // Return the report data for immediate display
+    reportData: htmlResult.reportData,
+    reportId: htmlResult.reportId
   };
 }
 
