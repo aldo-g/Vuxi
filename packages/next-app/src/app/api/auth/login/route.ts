@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/database';  // Updated import
 import bcrypt from 'bcryptjs';
 import * as jose from 'jose';
 

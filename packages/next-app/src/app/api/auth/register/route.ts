@@ -1,6 +1,5 @@
-// packages/next-app/src/app/api/auth/register/route.ts
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/database';
 import bcrypt from 'bcryptjs';
 import * as jose from 'jose';
 

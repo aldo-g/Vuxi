@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { FileText, Eye, TrendingUp, Zap, ArrowRight, Plus } from 'lucide-react';
-import { FormattedDate } from './formatted-date';
+import { FormattedDate } from '@/components/common/formatted-date';  // Updated import
 
 interface Project {
   id: number;

@@ -4,14 +4,8 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { List, ChevronRight, FileText, AlertCircle } from "lucide-react";
-import { FormattedDate } from "@/components/formatted-date"; // Import our safe date component
-
-interface ReportManifestItem {
-  id: string;
-  name: string;
-  date: string;
-  description?: string;
-}
+import { FormattedDate } from "@/components/common"; // Updated import
+import type { ReportManifestItem } from "@/types"; // Added type import
 
 const fetchReportManifest = async (): Promise<ReportManifestItem[]> => {
   const response = await fetch("/all_analysis_runs_manifest.json");
@@ -87,7 +81,6 @@ export default function ReportListPage() {
                   <CardHeader className="p-6 sm:p-8">
                     <CardTitle className="text-2xl font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">{report.name}</CardTitle>
                     <CardDescription className="text-sm text-slate-500 pt-2">
-                      {/* Using our safe component to prevent hydration errors */}
                       Generated on: <FormattedDate dateString={report.date} />
                     </CardDescription>
                   </CardHeader>
@@ -108,4 +101,4 @@ export default function ReportListPage() {
       </div>
     </div>
   );
-};
+}

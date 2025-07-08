@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExternalLink, FileText, Target as TargetIcon, CheckCircle2, AlertTriangleIcon, Info, Home, ImageOff, MessageSquareHeart } from "lucide-react";
-import { FormattedDate } from "@/components/formatted-date";
+import { FormattedDate } from "@/components/common/formatted-date";
 
 // --- Interfaces and Helper Functions ---
 interface PageIssue {

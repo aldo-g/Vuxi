@@ -1,6 +1,5 @@
-// packages/next-app/src/app/api/auth/me/route.ts
 import { NextResponse, NextRequest } from 'next/server';
-import prisma from '@repo/db';
+import prisma from '@/lib/database';
 import * as jose from 'jose';
 
 export async function GET(request: NextRequest) {
@@ -22,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { Name: true, email: true }, // Select only the fields you need
+      select: { Name: true, email: true },
     });
 
     if (!user) {

@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { UserNav } from "@/components/user-nav";
+import { UserNav } from "@/components/layout/user-nav";
 import { DashboardClient } from "@/components/dashboard-client";
 
 // Simple auth check function

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import * as jose from 'jose';
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/database';
 
 // This function handles GET requests to /api/projects
 export async function GET() {
