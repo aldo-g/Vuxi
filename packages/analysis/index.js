@@ -10,6 +10,7 @@ async function analysis(data) {
   const { urls, organizationName, organizationType, organizationPurpose } = data;
   
   console.log(`🔬 Starting analysis for: ${organizationName}`);
+  console.log(`🎯 URLs to analyze: ${urls.length} - ${urls.join(', ')}`);
   
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error('❌ ANTHROPIC_API_KEY environment variable is not set');
@@ -22,20 +23,21 @@ async function analysis(data) {
   
   console.log(`📁 Using data directory: ${dataDir}`);
   
-  // Run Lighthouse audits
+  // Run Lighthouse audits ONLY for the specified URLs
   const lighthouseService = new LighthouseService({
     outputDir: path.join(dataDir, 'lighthouse')
   });
-  const lighthouseResult = await lighthouseService.auditAll(urls);
+  const lighthouseResult = await lighthouseService.auditAll(urls); // Pass specific URLs
   
-  // Run LLM analysis with correct paths
+  // Run LLM analysis with correct paths and SPECIFIC URLs
   const llmService = new LLMAnalysisService({
     screenshotsDir: path.join(dataDir, 'screenshots', 'desktop'),
     lighthouseDir: path.join(dataDir, 'lighthouse', 'trimmed'),
     outputDir: path.join(dataDir, 'analysis'),
     org_name: organizationName,
     org_type: organizationType || 'organization',
-    org_purpose: organizationPurpose
+    org_purpose: organizationPurpose,
+    specificUrls: urls // PASS THE SPECIFIC URLs HERE
   });
   const llmResult = await llmService.analyze();
   

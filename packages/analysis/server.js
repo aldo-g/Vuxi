@@ -116,9 +116,12 @@ app.post('/api/analysis', async (req, res) => {
 
     analysisJobs.set(jobId, job);
 
+    console.log(`🚀 Starting analysis job ${jobId.slice(0,8)} for ${analysisData.organizationName}`);
+    console.log(`📊 Screenshots to analyze: ${analysisData.screenshots?.length || 0}`);
+
     // Start processing (don't await)
     processAnalysis(jobId).catch(error => {
-      console.error(`Analysis job ${jobId} failed:`, error);
+      console.error(`❌ Analysis job ${jobId} failed:`, error);
       updateJobStatus(jobId, JOB_STATUS.FAILED, {
         error: error.message,
         progress: {
@@ -175,7 +178,8 @@ app.get('/api/jobs', (req, res) => {
     progress: job.progress,
     analysisData: {
       websiteUrl: job.analysisData?.websiteUrl,
-      organizationName: job.analysisData?.organizationName
+      organizationName: job.analysisData?.organizationName,
+      screenshotCount: job.analysisData?.screenshots?.length || 0
     }
   }));
   
@@ -199,24 +203,34 @@ async function processAnalysis(jobId) {
       }
     });
 
-    // Extract URLs from screenshots
+    // Extract URLs ONLY from the selected screenshots
     const { analysisData } = job;
     const screenshots = analysisData.screenshots || [];
+    
+    console.log(`📸 Screenshots received: ${screenshots.length}`);
+    console.log(`📸 Screenshot details:`, screenshots.map(s => ({
+      url: s.url,
+      success: s.success,
+      hasData: !!s.data
+    })));
+
+    // IMPORTANT: Only process URLs from the screenshots array, not all files in directory
     const urls = screenshots
       .filter(s => s.success && s.url && s.url.startsWith('http'))
       .map(s => s.url);
 
     if (urls.length === 0) {
+      console.log(`⚠️ No valid screenshot URLs found, using websiteUrl as fallback`);
       urls.push(analysisData.websiteUrl);
     }
 
-    console.log(`🔍 Analyzing URLs: ${urls.join(', ')}`);
+    console.log(`🎯 URLs to analyze (${urls.length}):`, urls);
 
     updateJobStatus(jobId, JOB_STATUS.LIGHTHOUSE, {
       progress: {
         stage: 'lighthouse',
         percentage: 25,
-        message: 'Running Lighthouse audits...'
+        message: `Running Lighthouse audits for ${urls.length} page${urls.length === 1 ? '' : 's'}...`
       }
     });
 
@@ -224,7 +238,7 @@ async function processAnalysis(jobId) {
       progress: {
         stage: 'llm_analysis',
         percentage: 50,
-        message: 'Analyzing with AI...'
+        message: `Analyzing ${urls.length} page${urls.length === 1 ? '' : 's'} with AI...`
       }
     });
 
@@ -244,16 +258,29 @@ async function processAnalysis(jobId) {
       }
     });
 
-    // Run the actual analysis
+    // Run the actual analysis with ONLY the selected URLs
     const analysisInput = {
-      urls: urls,
+      urls: urls, // This now contains ONLY the selected screenshot URLs
       organizationName: analysisData.organizationName,
       organizationType: 'organization',
       organizationPurpose: analysisData.sitePurpose
     };
 
-    console.log('🔬 Running analysis with:', analysisInput);
+    console.log('🔬 Running analysis with input:', {
+      urlCount: analysisInput.urls.length,
+      urls: analysisInput.urls,
+      organizationName: analysisInput.organizationName
+    });
+    
     const result = await analysis(analysisInput);
+
+    console.log('📋 Analysis completed:', {
+      success: result.success,
+      hasReportData: !!result.reportData,
+      hasLighthouse: !!result.lighthouse,
+      hasLLMAnalysis: !!result.llmAnalysis,
+      error: result.error
+    });
 
     if (result.success) {
       updateJobStatus(jobId, JOB_STATUS.COMPLETED, {
@@ -262,14 +289,17 @@ async function processAnalysis(jobId) {
           lighthouse: result.lighthouse,
           llmAnalysis: result.llmAnalysis,
           formatting: result.formatting,
-          htmlReport: result.htmlReport
+          htmlReport: result.htmlReport,
+          reportData: result.reportData // IMPORTANT: Include reportData
         },
         progress: {
           stage: 'completed',
           percentage: 100,
-          message: 'Analysis completed successfully!'
+          message: `Analysis completed successfully for ${urls.length} page${urls.length === 1 ? '' : 's'}!`
         }
       });
+
+      console.log(`✅ Analysis job ${jobId.slice(0,8)} completed successfully with report data`);
     } else {
       throw new Error(result.error || 'Analysis failed');
     }
