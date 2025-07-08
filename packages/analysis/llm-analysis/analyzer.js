@@ -19,12 +19,29 @@ class LLMAnalyzer {
     this.screenshotsDir = options.screenshotsDir;
     this.lighthouseDir = options.lighthouseDir;
     
-    // Organization context
-    this.orgContext = options.orgContext || {
+    // Organization context - ensure it has the proper structure
+    const defaultOrgContext = {
       org_name: 'the organization',
       org_type: 'organization',
       org_purpose: 'to achieve its business goals and serve its users effectively'
     };
+    
+    // Merge provided orgContext with defaults
+    this.orgContext = {
+      ...defaultOrgContext,
+      ...options.orgContext
+    };
+    
+    // Ensure all required properties exist and are strings
+    this.orgContext.org_name = this.orgContext.org_name || defaultOrgContext.org_name;
+    this.orgContext.org_type = this.orgContext.org_type || defaultOrgContext.org_type;
+    this.orgContext.org_purpose = this.orgContext.org_purpose || defaultOrgContext.org_purpose;
+    
+    console.log(`🏢 LLMAnalyzer initialized with org context:`, this.orgContext);
+    
+    // Properties for storing filtered data
+    this.screenshots = null;
+    this.lighthouseData = null;
     
     // Initialize LLM client
     this.initializeClient();
@@ -138,8 +155,11 @@ class LLMAnalyzer {
   }
   
   async analyzeWebsite() {
-    const screenshots = await this.loadScreenshots();
-    const lighthouseData = await this.loadLighthouseData();
+    // Use filtered data if available, otherwise load fresh data
+    const screenshots = this.screenshots || await this.loadScreenshots();
+    const lighthouseData = this.lighthouseData || await this.loadLighthouseData();
+    
+    console.log(`📄 Analyzing ${screenshots.length} pages concurrently (${this.concurrency} at a time)...`);
     
     // Prepare data for analysis
     const analysisData = [];
@@ -168,218 +188,275 @@ class LLMAnalyzer {
     };
     
     try {
-      // 1. Analyze pages CONCURRENTLY
+      // 1. Analyze individual pages with concurrency control
       console.log(`📄 Analyzing ${analysisData.length} pages concurrently (${this.concurrency} at a time)...`);
-      const pageAnalyses = await this.analyzePagesConcurrently(analysisData);
-      analysis.pageAnalyses = pageAnalyses;
       
-      // 2. Generate technical summary (depends on all pages)
-      console.log('🔧 Generating technical summary...');
-      analysis.technicalSummary = await this.generateTechnicalSummary(analysisData);
+      const pageAnalyses = [];
+      const batchSize = this.concurrency;
       
-      // 3. Generate comprehensive overview (depends on everything)
-      console.log('📊 Generating comprehensive overview...');
-      analysis.overview = await this.generateComprehensiveOverview(analysisData, analysis);
-      
-    } catch (error) {
-      console.error('Error during analysis:', error);
-      throw error;
-    }
-    
-    return analysis;
-  }
-  
-  async analyzePagesConcurrently(analysisData) {
-    const allResults = [];
-    const batchSize = this.concurrency;
-    
-    // Process pages in concurrent batches
-    for (let i = 0; i < analysisData.length; i += batchSize) {
-      const batch = analysisData.slice(i, i + batchSize);
-      const batchNum = Math.floor(i / batchSize) + 1;
-      const totalBatches = Math.ceil(analysisData.length / batchSize);
-      
-      console.log(`   Batch ${batchNum}/${totalBatches}: Analyzing ${batch.length} pages concurrently...`);
-      
-      const batchStartTime = Date.now();
-      
-      // Create promises for concurrent analysis
-      const promises = batch.map((pageData, index) => 
-        this.analyzeIndividualPageWithRetry(pageData, i + index)
-      );
-      
-      // Wait for all analyses in this batch to complete
-      const batchResults = await Promise.allSettled(promises);
-      
-      // Process results
-      batchResults.forEach((result, index) => {
-        const pageData = batch[index];
-        if (result.status === 'fulfilled') {
-          allResults.push({
-            url: pageData.url,
-            analysis: result.value
-          });
-        } else {
-          console.error(`   ❌ Failed to analyze ${pageData.url}: ${result.reason.message}`);
-          allResults.push({
-            url: pageData.url,
-            analysis: `Analysis failed: ${result.reason.message}`
-          });
-        }
-      });
-      
-      const batchDuration = (Date.now() - batchStartTime) / 1000;
-      console.log(`   ⚡ Batch ${batchNum} completed in ${batchDuration.toFixed(2)}s`);
-    }
-    
-    return allResults;
-  }
-  
-  async analyzeIndividualPageWithRetry(pageData, index, maxRetries = 2) {
-    let lastError = null;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`     📄 [${index}] Analyzing: ${pageData.url} (attempt ${attempt})`);
-        return await this.analyzeIndividualPage(pageData);
-      } catch (error) {
-        lastError = error;
-        console.log(`     ⚠️  [${index}] Attempt ${attempt} failed: ${error.message}`);
+      for (let i = 0; i < analysisData.length; i += batchSize) {
+        const batch = analysisData.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(analysisData.length / batchSize);
         
-        if (attempt < maxRetries) {
-          // Wait before retry with exponential backoff
-          const waitTime = 1000 * attempt;
-          console.log(`     ⏳ Waiting ${waitTime}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-      }
-    }
-    
-    throw lastError;
-  }
-  
-  async analyzeIndividualPage(pageData) {
-    const prompt = getAnalysisPrompt('page', {
-      url: pageData.url,
-      lighthouse: pageData.lighthouse,
-      page_type: pageData.page_type || 'webpage',
-      context: this.orgContext
-    });
-    
-    // Include screenshot for page analysis
-    const screenshots = pageData.screenshot ? [pageData.screenshot] : [];
-    
-    return await this.callLLM(prompt, screenshots, `page analysis for ${pageData.url}`);
-  }
-  
-  async generateTechnicalSummary(analysisData) {
-    const prompt = getTechnicalPrompt('summary', {
-      lighthouseData: analysisData.map(page => ({
-        url: page.url,
-        lighthouse: page.lighthouse
-      }))
-    });
-    
-    return await this.callLLM(prompt, null, 'technical summary');
-  }
-  
-  async generateComprehensiveOverview(analysisData, previousAnalysis) {
-    // Prepare comprehensive context
-    const overviewData = {
-      pages: analysisData.map(page => ({
-        url: page.url,
-        lighthouseScores: page.lighthouse ? {
-          performance: page.lighthouse.scores.performance?.score,
-          accessibility: page.lighthouse.scores.accessibility?.score,
-          bestPractices: page.lighthouse.scores['best-practices']?.score,
-          seo: page.lighthouse.scores.seo?.score
-        } : null
-      })),
-      pageAnalyses: previousAnalysis.pageAnalyses,
-      technicalSummary: previousAnalysis.technicalSummary,
-      context: this.orgContext
-    };
-    
-    const prompt = getAnalysisPrompt('comprehensive_overview', overviewData);
-    
-    // Include all screenshots for comprehensive overview
-    const screenshots = analysisData
-      .filter(page => page.screenshot)
-      .map(page => page.screenshot);
-    
-    return await this.callLLM(prompt, screenshots, 'comprehensive overview');
-  }
-  
-  async callLLM(prompt, screenshots = null, analysisType = 'analysis') {
-    console.log(`   🧠 Calling LLM for ${analysisType}...`);
-    
-    try {
-      if (this.provider === 'anthropic') {
-        const content = [];
+        console.log(`   Batch ${batchNumber}/${totalBatches}: Analyzing ${batch.length} pages concurrently...`);
         
-        // Add text content
-        content.push({
-          type: 'text',
-          text: prompt
+        const batchPromises = batch.map(async (data, index) => {
+          const globalIndex = i + index;
+          const retryCount = 1;
+          
+          for (let attempt = 1; attempt <= retryCount; attempt++) {
+            try {
+              console.log(`     📄 [${globalIndex}] Analyzing: ${data.url} (attempt ${attempt})`);
+              const pageAnalysis = await this.analyzePageWithLLM(data.screenshot, data.lighthouse, data.url);
+              console.log(`     ✅ [${globalIndex}] Completed: ${data.url}`);
+              return pageAnalysis;
+            } catch (error) {
+              if (attempt === retryCount) {
+                console.error(`     ❌ [${globalIndex}] Failed after ${retryCount} attempts: ${data.url}`, error);
+                return {
+                  url: data.url,
+                  error: error.message,
+                  analysis: 'Analysis failed due to an error',
+                  timestamp: new Date().toISOString()
+                };
+              } else {
+                console.warn(`     ⚠️  [${globalIndex}] Attempt ${attempt} failed for ${data.url}, retrying...`);
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+              }
+            }
+          }
         });
         
-        // Add images if provided
-        if (screenshots && screenshots.length > 0) {
-          for (const screenshot of screenshots) {
-            content.push({
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: screenshot.imageData.mediaType,
-                data: screenshot.imageData.data
-              }
-            });
-          }
-        }
+        const batchResults = await Promise.all(batchPromises);
+        pageAnalyses.push(...batchResults);
         
+        // Add a small delay between batches to be respectful to the API
+        if (i + batchSize < analysisData.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      analysis.pageAnalyses = pageAnalyses;
+      
+      // 2. Generate technical summary
+      console.log('🔧 Generating technical summary...');
+      try {
+        analysis.technicalSummary = await this.generateTechnicalSummary(pageAnalyses, lighthouseData);
+      } catch (error) {
+        console.error('Error generating technical summary:', error);
+        analysis.technicalSummary = 'Technical summary generation failed';
+      }
+      
+      // 3. Generate overview
+      console.log('📊 Generating overview...');
+      try {
+        analysis.overview = await this.generateOverview(pageAnalyses, analysis.technicalSummary);
+      } catch (error) {
+        console.error('Error generating overview:', error);
+        analysis.overview = 'Overview generation failed';
+      }
+      
+      return analysis;
+      
+    } catch (error) {
+      console.error('Error in website analysis:', error);
+      throw error;
+    }
+  }
+  
+  async analyzePageWithLLM(screenshot, lighthouseData, url) {
+    console.log(`🧠 Calling LLM for page analysis for ${url}...`);
+    
+    // Prepare the prompt with orgContext
+    const prompt = getAnalysisPrompt('page', {
+      url: url,
+      lighthouse: lighthouseData,
+      context: this.orgContext
+    });
+    
+    if (this.provider === 'anthropic') {
+      try {
         const response = await this.client.messages.create({
           model: this.model,
           max_tokens: 4000,
-          messages: [{
-            role: 'user',
-            content: content
-          }]
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: prompt
+                },
+                {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: screenshot.imageData.mediaType,
+                    data: screenshot.imageData.data
+                  }
+                }
+              ]
+            }
+          ]
         });
         
-        return response.content[0].text;
+        const analysisText = response.content[0].text;
         
-      } else if (this.provider === 'openai') {
-        const messages = [{
-          role: 'user',
-          content: prompt
-        }];
+        return {
+          url: url,
+          analysis: analysisText,
+          screenshot: screenshot.filename,
+          lighthouse: lighthouseData ? 'included' : 'not_available',
+          timestamp: new Date().toISOString(),
+          provider: this.provider,
+          model: this.model
+        };
         
+      } catch (error) {
+        console.error(`Error analyzing page ${url}:`, error);
+        throw error;
+      }
+    } else if (this.provider === 'openai') {
+      // OpenAI implementation
+      try {
         const response = await this.client.chat.completions.create({
           model: this.model,
-          messages: messages,
-          max_tokens: 4000
+          max_tokens: 4000,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: prompt
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${screenshot.imageData.mediaType};base64,${screenshot.imageData.data}`
+                  }
+                }
+              ]
+            }
+          ]
         });
         
-        return response.choices[0].message.content;
+        const analysisText = response.choices[0].message.content;
+        
+        return {
+          url: url,
+          analysis: analysisText,
+          screenshot: screenshot.filename,
+          lighthouse: lighthouseData ? 'included' : 'not_available',
+          timestamp: new Date().toISOString(),
+          provider: this.provider,
+          model: this.model
+        };
+        
+      } catch (error) {
+        console.error(`Error analyzing page ${url}:`, error);
+        throw error;
       }
+    }
+  }
+  
+  async generateTechnicalSummary(pageAnalyses, lighthouseData) {
+    const prompt = getTechnicalPrompt(this.orgContext, pageAnalyses, lighthouseData);
+    
+    if (this.provider === 'anthropic') {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 3000,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      });
       
-    } catch (error) {
-      console.error(`Error calling LLM for ${analysisType}:`, error);
-      throw error;
+      return response.content[0].text;
+    } else if (this.provider === 'openai') {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        max_tokens: 3000,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      });
+      
+      return response.choices[0].message.content;
+    }
+  }
+  
+  async generateOverview(pageAnalyses, technicalSummary) {
+    const prompt = `Based on the following page analyses and technical summary, provide a high-level overview of the website for ${this.orgContext.org_name}:
+
+TECHNICAL SUMMARY:
+${technicalSummary}
+
+PAGE ANALYSES:
+${pageAnalyses.map((analysis, i) => `
+PAGE ${i + 1}: ${analysis.url}
+${analysis.analysis}
+`).join('\n')}
+
+Please provide a comprehensive overview that synthesizes all findings into key insights and actionable recommendations for ${this.orgContext.org_name} ${this.orgContext.org_purpose}.`;
+
+    if (this.provider === 'anthropic') {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      });
+      
+      return response.content[0].text;
+    } else if (this.provider === 'openai') {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      });
+      
+      return response.choices[0].message.content;
     }
   }
   
   extractUrlFromFilename(filename) {
-    // Extract URL from filename pattern: 000_domain_path.png
-    const match = filename.match(/^\d+_(.+)\.png$/);
-    if (!match) return filename;
+    // Extract URL from filename like "000_domain.com_path.png"
+    const nameWithoutExtension = filename.replace(/\.(png|jpg|jpeg)$/, '');
+    const parts = nameWithoutExtension.split('_');
     
-    const urlPart = match[1];
-    // Convert underscores back to slashes and add https://
-    const url = urlPart.replace(/_/g, '/');
+    if (parts.length >= 2) {
+      // Remove the numeric prefix
+      const urlParts = parts.slice(1);
+      const domain = urlParts[0];
+      const pathParts = urlParts.slice(1);
+      
+      // Reconstruct URL
+      let url = `https://${domain}`;
+      if (pathParts.length > 0 && pathParts[0] !== 'index') {
+        url += '/' + pathParts.join('/');
+      }
+      
+      return url;
+    }
     
-    // Try to reconstruct the full URL
-    return `https://${url}`;
+    return null;
   }
 }
 
