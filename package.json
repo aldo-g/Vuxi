@@ -5,7 +5,11 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "npm run dev -w next-app"
+    "dev": "npm run dev -w next-app",
+    "db:generate": "npm run db:generate -w @repo/db",
+    "db:push": "npm run db:push -w @repo/db",
+    "db:migrate": "npm run db:migrate -w @repo/db",
+    "db:studio": "npm run db:studio -w @repo/db"
   },
   "keywords": [],
   "author": "",

@@ -9,6 +9,7 @@
         "lint": "next lint"
     },
     "dependencies": {
+        "@repo/db": "file:../db",
         "@prisma/client": "^6.9.0",
         "@radix-ui/react-accordion": "^1.2.1",
         "@radix-ui/react-alert-dialog": "^1.1.3",
@@ -66,7 +67,6 @@
         "eslint": "^8",
         "eslint-config-next": "14.2.3",
         "postcss": "^8",
-        "prisma": "^6.9.0",
         "tailwindcss": "^3.4.1",
         "tailwindcss-animate": "^1.0.7",
         "typescript": "^5"
