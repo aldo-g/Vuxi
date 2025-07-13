@@ -1,0 +1,1 @@
+export { PageAnalysisCard } from './page-analysis-card';

@@ -2,8 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { AnalysisWizard } from '@/components/analysis-wizard';
 import { ArrowLeft, TestTube } from 'lucide-react';
+import { AnalysisWizard } from '@/features/analysis';
 
 export default function TestAnalysisPage() {
   return (

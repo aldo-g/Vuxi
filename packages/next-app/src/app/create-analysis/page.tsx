@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { AnalysisWizard } from '@/components/analysis-wizard';
 import { ArrowLeft } from 'lucide-react';
+import { AnalysisWizard } from '@/features/analysis';
 
 export default function CreateAnalysisPage() {
   return (

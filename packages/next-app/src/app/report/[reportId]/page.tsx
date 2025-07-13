@@ -12,8 +12,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ExternalLink, ChevronRight, Zap, Lightbulb, ListChecks, MapIcon, Palette, Trophy, Route, FileText, TrendingUp, ShieldCheck, MessageSquareHeart, Target as TargetIcon, CheckCircle2, AlertTriangleIcon, Info, Home, AlertCircle } from "lucide-react";
 
 // Migrated Components
-import { ExecutiveSummary } from "@/components/overview/executive-summary";
-import { FormattedDate } from "@/components/common/formatted-date";
+import { ExecutiveSummary } from "@/features/reports";
+import { FormattedDate } from "@/components/common";
 
 // --- Interfaces from original Index.tsx ---
 interface PageIssue {

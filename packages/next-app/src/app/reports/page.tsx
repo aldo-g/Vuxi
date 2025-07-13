@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { List, ChevronRight, FileText, AlertCircle } from "lucide-react";
-import { FormattedDate } from "@/components/common"; // Updated import
+import { FormattedDate } from "@/components/common";
 import type { ReportManifestItem } from "@/types"; // Added type import
 
 const fetchReportManifest = async (): Promise<ReportManifestItem[]> => {
