@@ -1,3 +1,19 @@
+/**
+ * Wizard State Hook - Analysis Workflow Management
+ * 
+ * Complex state management hook that orchestrates the multi-step
+ * analysis wizard including website capture, analysis polling,
+ * and progress tracking.
+ * 
+ * @responsibilities
+ * - Manages multi-step wizard state and navigation
+ * - Handles website capture job initiation and polling
+ * - Manages analysis job creation and progress tracking
+ * - Coordinates polling intervals for job status updates
+ * - Provides error handling and recovery mechanisms
+ * - Maintains analysis data throughout the workflow
+ */
+
 "use client";
 
 import { useState, useRef, useCallback } from 'react';

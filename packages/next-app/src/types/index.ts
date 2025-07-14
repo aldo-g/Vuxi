@@ -1,3 +1,18 @@
+/**
+ * Type Definitions - Application-Wide TypeScript Types
+ * 
+ * Centralized TypeScript type definitions for the entire
+ * application including API responses, component props,
+ * data models, and interface contracts.
+ * 
+ * @responsibilities
+ * - Defines data models for reports, analyses, and jobs
+ * - Specifies API response and request types
+ * - Provides component prop type definitions
+ * - Ensures type safety across the application
+ * - Documents data structure contracts
+ */
+
 // User and Authentication Types
 export interface User {
   id: string;

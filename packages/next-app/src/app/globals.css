@@ -1,3 +1,18 @@
+/**
+ * Global CSS Styles and Design System Variables
+ * 
+ * Establishes the application's design system using CSS custom properties
+ * and Tailwind CSS classes. Defines color schemes, spacing, and theming
+ * for both light and dark modes.
+ * 
+ * @responsibilities
+ * - Defines CSS custom properties for consistent theming
+ * - Sets up light/dark mode color schemes
+ * - Configures sidebar styling variables
+ * - Establishes base styling for HTML elements
+ * - Provides design system foundation for component styling
+ */
+ 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -1,4 +1,17 @@
-// packages/next-app/src/middleware.ts
+/**
+ * Next.js Middleware - Authentication Guard
+ * 
+ * Provides JWT-based authentication protection for protected routes.
+ * Automatically redirects unauthenticated users to the login page and 
+ * validates JWT tokens for dashboard access.
+ * 
+ * @responsibilities
+ * - Intercepts requests to protected routes (/dashboard/*)
+ * - Validates JWT tokens from cookies
+ * - Redirects unauthorized users to /login
+ * - Allows authenticated users to proceed to requested pages
+ */
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';

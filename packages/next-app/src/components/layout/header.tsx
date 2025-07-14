@@ -1,3 +1,18 @@
+/**
+ * User Navigation Component - Account Management Menu
+ * 
+ * Dropdown navigation menu for authenticated users providing
+ * access to account settings, profile management, and logout
+ * functionality.
+ * 
+ * @responsibilities
+ * - Displays user account dropdown menu
+ * - Provides logout functionality
+ * - Shows user profile information
+ * - Handles user account navigation
+ * - Manages authentication state transitions
+ */
+
 "use client";
 
 import Link from "next/link";

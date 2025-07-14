@@ -1,3 +1,18 @@
+/**
+ * Page Error Component - Error State Display
+ * 
+ * Full-page error component that displays when pages fail to load
+ * or encounter critical errors. Provides user-friendly error messages
+ * and recovery options.
+ * 
+ * @responsibilities
+ * - Displays user-friendly error messages
+ * - Provides error recovery actions (retry, go back)
+ * - Maintains layout during error states
+ * - Logs errors for debugging purposes
+ * - Offers navigation alternatives when errors occur
+ */
+
 import Link from "next/link";
 import { AlertTriangle, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -1,3 +1,18 @@
+/**
+ * Error Boundary Component - Application Crash Protection
+ * 
+ * React error boundary that catches JavaScript errors anywhere in
+ * the component tree and displays fallback UI instead of crashing
+ * the entire application.
+ * 
+ * @responsibilities
+ * - Catches and handles React component errors
+ * - Displays user-friendly error messages
+ * - Provides error recovery mechanisms
+ * - Logs errors for debugging and monitoring
+ * - Prevents application crashes from propagating
+ */
+
 "use client";
 
 import { Component, ReactNode } from 'react';

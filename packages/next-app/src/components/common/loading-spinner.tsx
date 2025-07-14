@@ -1,3 +1,18 @@
+/**
+ * Loading Spinner Component - Visual Loading Indicator
+ * 
+ * Reusable loading spinner component that provides consistent
+ * loading states across the application with customizable
+ * sizing and styling options.
+ * 
+ * @responsibilities
+ * - Displays animated loading indicator
+ * - Provides consistent loading state visuals
+ * - Supports size and styling customization
+ * - Ensures accessibility for screen readers
+ * - Maintains design system consistency
+ */
+
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

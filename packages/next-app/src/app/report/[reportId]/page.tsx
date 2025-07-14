@@ -1,3 +1,19 @@
+/**
+ * Report Overview Page - Analysis Results Dashboard
+ * 
+ * Dynamic page component that displays comprehensive UX analysis
+ * results for a specific report. Shows executive summary, page analyses,
+ * and detailed insights with interactive visualizations.
+ * 
+ * @responsibilities
+ * - Fetches and displays report data by ID
+ * - Renders executive summary and overall scores
+ * - Shows paginated list of analyzed pages
+ * - Provides navigation to individual page analyses
+ * - Handles data loading states and error conditions
+ * - Displays screenshots and performance metrics
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";

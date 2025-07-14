@@ -1,3 +1,18 @@
+/**
+ * Validation Utilities - Input Validation and Normalization
+ * 
+ * Collection of validation functions for user inputs including
+ * URL normalization, email validation, and password strength
+ * checking with detailed error messaging.
+ * 
+ * @responsibilities
+ * - Validates and normalizes website URLs
+ * - Provides email format validation
+ * - Implements password strength requirements
+ * - Returns detailed validation error messages
+ * - Ensures consistent input validation across forms
+ */
+
 // URL validation and normalization
 export const validateAndNormalizeUrl = (url: string): { 
   isValid: boolean; 

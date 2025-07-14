@@ -1,3 +1,19 @@
+/**
+ * Authentication Hook - User Authentication Logic
+ * 
+ * Custom React hook that encapsulates authentication logic
+ * including login, registration, and error handling. Provides
+ * a clean interface for authentication operations.
+ * 
+ * @responsibilities
+ * - Handles login and registration API calls
+ * - Manages authentication loading states
+ * - Validates form data before submission
+ * - Handles authentication errors and success states
+ * - Manages navigation after authentication
+ * - Provides error clearing functionality
+ */
+
 "use client";
 
 import { useState } from 'react';

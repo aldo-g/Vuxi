@@ -1,3 +1,19 @@
+/**
+ * Individual Page Analysis View - Detailed Page Insights
+ * 
+ * Dynamic page component that displays detailed UX analysis for a 
+ * specific page within a report. Shows section-by-section scoring,
+ * issues, recommendations, and visual evidence.
+ * 
+ * @responsibilities
+ * - Displays detailed analysis for individual pages
+ * - Shows section scores and explanations
+ * - Lists identified issues and improvement recommendations
+ * - Displays page screenshots and visual evidence
+ * - Provides navigation back to report overview
+ * - Handles page-specific data loading and error states
+ */
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";

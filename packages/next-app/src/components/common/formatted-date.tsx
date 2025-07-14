@@ -1,3 +1,18 @@
+/**
+ * Formatted Date Component - Consistent Date Display
+ * 
+ * Utility component for displaying dates in a consistent format
+ * across the application. Handles timezone conversion and
+ * locale-specific formatting.
+ * 
+ * @responsibilities
+ * - Formats dates consistently across the application
+ * - Handles timezone and locale considerations
+ * - Provides relative date formatting options
+ * - Ensures accessibility for date information
+ * - Supports various date format options
+ */
+
 "use client";
 
 import { useState, useEffect } from 'react';

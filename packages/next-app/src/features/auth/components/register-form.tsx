@@ -1,3 +1,19 @@
+/**
+ * Register Form Component - New User Registration Interface
+ * 
+ * Registration form component for new user account creation.
+ * Handles form validation, password requirements, and account
+ * creation workflow.
+ * 
+ * @responsibilities
+ * - Renders registration form with name/email/password fields
+ * - Validates password strength and requirements
+ * - Handles user registration and account creation
+ * - Manages registration errors and success states
+ * - Provides loading states during registration
+ * - Redirects users after successful registration
+ */
+
 'use client';
 
 import React, { useState } from 'react';

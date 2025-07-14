@@ -1,3 +1,19 @@
+/**
+ * Login Form Component - User Authentication Interface
+ * 
+ * Authentication form component that handles user login with
+ * email and password. Provides form validation, error handling,
+ * and integration with authentication system.
+ * 
+ * @responsibilities
+ * - Renders login form with email/password fields
+ * - Handles form validation and submission
+ * - Manages authentication state and errors
+ * - Provides loading states during authentication
+ * - Redirects users after successful login
+ * - Offers navigation to registration
+ */
+
 'use client';
 
 import React, { useState } from 'react';

@@ -1,3 +1,18 @@
+/**
+ * Application Constants - Configuration and API Endpoints
+ * 
+ * Centralized configuration file containing API endpoints,
+ * polling intervals, wizard steps, and other application
+ * constants used throughout the codebase.
+ * 
+ * @responsibilities
+ * - Defines API endpoint URLs for all services
+ * - Sets polling intervals for job status checking
+ * - Configures wizard step definitions
+ * - Provides timeout and retry configurations
+ * - Centralizes environment-dependent settings
+ */
+
 import { 
   Globe, 
   Building2, 

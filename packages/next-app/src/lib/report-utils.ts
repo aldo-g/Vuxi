@@ -1,3 +1,18 @@
+/**
+ * Report Utilities - Data Processing and Display Helpers
+ * 
+ * Utility functions for processing and displaying report data
+ * including score calculations, styling classes, screenshot
+ * URL generation, and text formatting.
+ * 
+ * @responsibilities
+ * - Generates score-based styling classes and colors
+ * - Calculates progress indicators and status text
+ * - Constructs screenshot URLs from job data
+ * - Formats section names and page display names
+ * - Provides consistent data presentation helpers
+ */
+
 import type { Screenshot, CaptureJob } from '@/types';
 
 // Score-related utilities

@@ -1,3 +1,18 @@
+/**
+ * Page Loading Component - Full Page Loading State
+ * 
+ * Full-page loading component that displays during page transitions
+ * and initial data loading. Provides user feedback during longer
+ * loading operations.
+ * 
+ * @responsibilities
+ * - Shows full-page loading overlay
+ * - Provides loading text and progress indication
+ * - Maintains layout during loading states
+ * - Ensures smooth loading transitions
+ * - Handles accessibility during loading
+ */
+
 import { Loader2 } from "lucide-react";
 
 interface PageLoadingProps {
