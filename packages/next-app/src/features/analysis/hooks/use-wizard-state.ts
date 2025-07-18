@@ -277,9 +277,16 @@ export function useWizardState() {
   }, [updateAnalysisData, setCaptureJob, setCaptureStarted, setLoading, setError]);
 
   // Start analysis
+  // Start analysis
   const startAnalysis = useCallback(async (): Promise<void> => {
     if (!state.analysisData.captureJobId || !state.analysisData.screenshots?.length) {
       setError('No screenshots available for analysis');
+      return;
+    }
+
+    // Make sure we have the user ID for database saving
+    if (!user?.id) {
+      setError('User authentication required');
       return;
     }
 
@@ -292,7 +299,10 @@ export function useWizardState() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          analysisData: state.analysisData,
+          analysisData: {
+            ...state.analysisData,
+            userId: user.id // Add user ID for database saving
+          },
           captureJobId: state.analysisData.captureJobId
         })
       });
@@ -303,6 +313,14 @@ export function useWizardState() {
       }
 
       const result = await response.json();
+      
+      // Log successful database save
+      console.log('✅ Analysis started with database save:', {
+        analysisJobId: result.analysisJobId,
+        analysisRunId: result.analysisRunId,
+        projectId: result.projectId
+      });
+
       setAnalysisJob({
         id: result.analysisJobId,
         status: result.status,
@@ -317,10 +335,9 @@ export function useWizardState() {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start analysis';
       setError(errorMessage);
       setAnalyzing(false);
-      setCurrentStep(5);
     }
-  }, [state.analysisData, setAnalyzing, setError, setCurrentStep, setAnalysisJob, pollAnalysisJobStatus]);
-
+  }, [state.analysisData, user?.id, setAnalyzing, setError, setCurrentStep, setAnalysisJob]);
+  
   // Start polling when needed
   const startCapturePolling = useCallback(() => {
     if (capturePollingRef.current) return; // Already polling

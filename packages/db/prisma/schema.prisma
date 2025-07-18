@@ -33,6 +33,7 @@ model Project {
 model AnalysisRun {
   id            Int      @id @default(autoincrement())
   projectId     Int
+  captureJobId  String?  // NEW: Store the capture job ID from the payload
   status        String
   progress      Json?
   finalReport   Json?
@@ -52,13 +53,18 @@ model AnalyzedPage {
   screenshots Screenshot[] // This now links to the new Screenshot table
 }
 
-// NEW: This table stores all screenshots for analyzed pages
+// UPDATED: Enhanced Screenshot model to capture payload data
 model Screenshot {
   id             Int      @id @default(autoincrement())
   analyzedPageId Int
-  storageUrl     String   // The URL to the screenshot file in cloud storage
-  viewport       String?  // e.g., "desktop", "mobile", or "1920x1080"
-  label          String?  // e.g., "Initial Load", "After Cookie Banner"
+  url            String   // The original page URL
+  filename       String?  // The screenshot filename
+  storageUrl     String   // The URL/path to the screenshot file in storage
+  success        Boolean  @default(true) // Whether the capture was successful
+  viewport       String?  // Viewport info (e.g., "desktop", "mobile", "1440x900")
+  duration_ms    Int?     // Time taken to capture the screenshot
+  timestamp      DateTime? // When the screenshot was taken
+  error          String?  // Any error that occurred during capture
   createdAt      DateTime @default(now())
   analyzedPage   AnalyzedPage @relation(fields: [analyzedPageId], references: [id])
 }

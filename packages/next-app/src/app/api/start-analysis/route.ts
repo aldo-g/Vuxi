@@ -1,118 +1,114 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// In-memory storage for analysis jobs
-const analysisJobs = new Map();
+import { CaptureService } from '@/lib/capture-service';
+import { SaveCaptureRequest } from '@/types';
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 POST /api/start-analysis called');
+  
   try {
-    const { analysisData, captureJobId } = await request.json();
+    const body = await request.json();
+    console.log('📊 Request body received:', {
+      hasAnalysisData: !!body.analysisData,
+      hasCaptureJobId: !!body.captureJobId,
+      websiteUrl: body.analysisData?.websiteUrl,
+      userId: body.analysisData?.userId,
+      screenshotCount: body.analysisData?.screenshots?.length || 0
+    });
+
+    const { analysisData, captureJobId } = body;
     
     if (!analysisData || !captureJobId) {
-      return NextResponse.json({ error: 'Missing analysis data or capture job ID' }, { status: 400 });
+      console.error('❌ Missing required fields:', {
+        hasAnalysisData: !!analysisData,
+        hasCaptureJobId: !!captureJobId
+      });
+      return NextResponse.json({ 
+        error: 'Missing analysis data or capture job ID' 
+      }, { status: 400 });
     }
 
-    console.log(`🚀 Starting analysis for ${analysisData.organizationName}`);
-
-    // Call the analysis server to start the job
-    const response = await fetch('http://localhost:3002/api/analysis', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        analysisData,
-        captureJobId
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Analysis server responded with ${response.status}: ${errorData}`);
+    if (!analysisData.userId) {
+      console.error('❌ Missing userId in analysisData');
+      return NextResponse.json({ 
+        error: 'User ID is required in analysis data' 
+      }, { status: 400 });
     }
 
-    const result = await response.json();
+    console.log(`🔍 Starting database save for ${analysisData.organizationName}`);
+
+    // ONLY SAVE TO DATABASE - NO EXTERNAL ANALYSIS SERVICE
+    const saveRequest: SaveCaptureRequest = {
+      analysisData,
+      captureJobId
+    };
+
+    const saveResult = await CaptureService.saveCaptureData(saveRequest);
     
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to start analysis');
+    if (!saveResult.success) {
+      console.error('❌ Failed to save capture data:', saveResult.error);
+      return NextResponse.json({ 
+        error: `Failed to save capture data: ${saveResult.error}` 
+      }, { status: 500 });
     }
 
-    // Store job mapping in Next.js
-    const analysisJobId = `nextjs_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    analysisJobs.set(analysisJobId, {
-      id: analysisJobId,
-      analysisServerJobId: result.jobId, // Store the actual analysis server job ID
-      status: 'pending',
-      progress: { stage: 'starting', percentage: 0, message: 'Starting analysis...' },
-      createdAt: new Date().toISOString()
+    console.log(`✅ SUCCESS! Data saved to database:`, {
+      projectId: saveResult.projectId,
+      analysisRunId: saveResult.analysisRunId,
+      pages: saveResult.analyzedPageIds.length,
+      screenshots: saveResult.screenshotIds.length
     });
 
-    console.log(`✅ Analysis job created: ${analysisJobId} -> ${result.jobId}`);
-
+    // Return success response (skip external analysis service)
     return NextResponse.json({
-      analysisJobId,
-      status: 'pending'
+      success: true,
+      message: 'Data saved to database successfully',
+      analysisJobId: `db_save_${saveResult.analysisRunId}`, // Fake analysis job ID
+      status: 'completed', // Mark as completed since we're not doing analysis
+      analysisRunId: saveResult.analysisRunId,
+      projectId: saveResult.projectId,
+      // Mock some analysis result
+      results: {
+        reportData: {
+          message: 'Data saved successfully! External analysis service is disabled.',
+          savedData: {
+            projectId: saveResult.projectId,
+            analysisRunId: saveResult.analysisRunId,
+            pagesAnalyzed: saveResult.analyzedPageIds.length,
+            screenshotsSaved: saveResult.screenshotIds.length
+          }
+        }
+      }
     });
 
   } catch (error) {
-    console.error('❌ Error starting analysis:', error);
-    return NextResponse.json({ error: 'Failed to start analysis' }, { status: 500 });
+    console.error('❌ FATAL ERROR in /api/start-analysis:', error);
+    console.error('Error stack:', error.stack);
+    return NextResponse.json({ 
+      error: `Server error: ${error.message}` 
+    }, { status: 500 });
   }
 }
 
+// Keep the GET method for polling (though it won't be needed now)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const jobId = searchParams.get('jobId');
+
+  console.log('📊 GET /api/start-analysis called with jobId:', jobId);
 
   if (!jobId) {
     return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
   }
 
-  const job = analysisJobs.get(jobId);
-  if (!job) {
-    return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-  }
-
-  try {
-    // Get the latest status from the analysis server
-    const response = await fetch(`http://localhost:3002/api/analysis/${job.analysisServerJobId}`);
-    
-    if (!response.ok) {
-      throw new Error(`Analysis server responded with ${response.status}`);
+  // Since we're not using external service, just return completed status
+  return NextResponse.json({
+    id: jobId,
+    status: 'completed',
+    progress: { stage: 'completed', percentage: 100, message: 'Database save completed' },
+    results: {
+      reportData: {
+        message: 'Data was saved to database successfully!'
+      }
     }
-
-    const serverJobData = await response.json();
-    
-    console.log(`📊 Analysis job ${jobId} status:`, {
-      status: serverJobData.status,
-      stage: serverJobData.progress?.stage,
-      percentage: serverJobData.progress?.percentage,
-      hasResults: !!serverJobData.results,
-      hasReportData: !!serverJobData.results?.reportData
-    });
-
-    // Update our local job with server data
-    const updatedJob = {
-      ...job,
-      status: serverJobData.status,
-      progress: serverJobData.progress,
-      results: serverJobData.results,
-      error: serverJobData.error,
-      updatedAt: new Date().toISOString()
-    };
-
-    analysisJobs.set(jobId, updatedJob);
-
-    return NextResponse.json(updatedJob);
-
-  } catch (error) {
-    console.error(`❌ Error fetching analysis status for job ${jobId}:`, error);
-    
-    // Return last known status with error
-    const errorJob = {
-      ...job,
-      status: 'failed',
-      error: 'Failed to get status from analysis server',
-      updatedAt: new Date().toISOString()
-    };
-
-    return NextResponse.json(errorJob);
-  }
+  });
 }

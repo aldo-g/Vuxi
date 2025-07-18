@@ -177,3 +177,74 @@ export interface ReportMetadata {
   total_pages_analyzed: number;
   analysis_version: string;
 }
+
+export interface SaveCaptureRequest {
+  analysisData: AnalysisData;
+  captureJobId: string;
+}
+
+export interface SaveCaptureResponse {
+  success: boolean;
+  projectId: number;
+  analysisRunId: number;
+  analyzedPageIds: number[];
+  screenshotIds: number[];
+  error?: string;
+}
+
+// Database entity types
+export interface DbProject {
+  id: number;
+  userId: number;
+  name: string;
+  baseUrl: string;
+  orgName: string | null;
+  orgPurpose: string | null;
+  createdAt: Date;
+}
+
+export interface DbAnalysisRun {
+  id: number;
+  projectId: number;
+  captureJobId: string | null;
+  status: string;
+  progress: any;
+  finalReport: any;
+  overallScore: number | null;
+  createdAt: Date;
+}
+
+export interface DbAnalyzedPage {
+  id: number;
+  runId: number;
+  url: string;
+  pageAim: string | null;
+}
+
+export interface DbScreenshot {
+  id: number;
+  analyzedPageId: number;
+  url: string;
+  filename: string | null;
+  storageUrl: string;
+  success: boolean;
+  viewport: string | null;
+  duration_ms: number | null;
+  timestamp: Date | null;
+  error: string | null;
+  createdAt: Date;
+}
+
+export interface SaveCaptureRequest {
+  analysisData: AnalysisData;
+  captureJobId: string;
+}
+
+export interface SaveCaptureResponse {
+  success: boolean;
+  projectId: number;
+  analysisRunId: number;
+  analyzedPageIds: number[];
+  screenshotIds: number[];
+  error?: string;
+}
