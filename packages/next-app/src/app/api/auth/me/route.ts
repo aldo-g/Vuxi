@@ -13,15 +13,19 @@ export async function GET(request: NextRequest) {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jose.jwtVerify(token, secret);
 
-    const userId = payload.userId as string;
+    const userId = payload.userId as number; // Change to number
 
     if (!userId) {
       return NextResponse.json({ error: 'Invalid token payload' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { Name: true, email: true },
+      where: { id: userId }, // This should work now since userId is a number
+      select: { 
+        id: true,    // Include the id in the response
+        Name: true, 
+        email: true 
+      },
     });
 
     if (!user) {

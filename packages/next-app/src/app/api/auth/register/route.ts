@@ -26,13 +26,16 @@ export async function POST(request: Request) {
       data: {
         Name,
         email,
-        passwordHash: hashedPassword, // Ensure your prisma schema uses `password`
+        passwordHash: hashedPassword,
       },
     });
 
-    // Create the JWT token to log the user in immediately
+    // Create the JWT token with number ID
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const token = await new jose.SignJWT({ userId: user.id, email: user.email })
+    const token = await new jose.SignJWT({ 
+      userId: user.id,        // user.id is already a number
+      email: user.email 
+    })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('24h')
       .setIssuedAt()

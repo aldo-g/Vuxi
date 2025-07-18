@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/database';  // Updated import
+import prisma from '@/lib/database';
 import bcrypt from 'bcryptjs';
 import * as jose from 'jose';
 
@@ -17,9 +17,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    // Create the JWT token
+    // Create the JWT token with number ID
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const token = await new jose.SignJWT({ userId: user.id, email: user.email })
+    const token = await new jose.SignJWT({ 
+      userId: user.id,        // user.id is already a number
+      email: user.email 
+    })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('24h')
       .setIssuedAt()

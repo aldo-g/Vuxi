@@ -13,9 +13,8 @@
  * - Documents data structure contracts
  */
 
-// User and Authentication Types
 export interface User {
-  id: string;
+  id: number;
   Name: string;
   email: string;
 }
@@ -34,6 +33,7 @@ export interface AnalysisData {
   sitePurpose: string;
   captureJobId?: string;
   screenshots?: Screenshot[];
+  userId?: number; // Added userId field
 }
 
 export interface Screenshot {
@@ -100,6 +100,20 @@ export interface AnalysisJob {
   error?: string;
 }
 
+// New types for saving capture data
+export interface SaveCaptureRequest {
+  analysisData: AnalysisData;
+  captureJobId: string;
+  userId: number;
+}
+
+export interface SaveCaptureResponse {
+  success: boolean;
+  projectId: number;
+  analysisRunId: number;
+  error?: string;
+}
+
 // Report Types
 export interface PageIssue {
   issue: string;
@@ -143,61 +157,23 @@ export interface OverallSummary {
   executive_summary: string;
   overall_score: number;
   site_score_explanation?: string;
-  total_pages_analyzed: number;
-  most_critical_issues: string[];
-  top_recommendations: string[];
   key_strengths: string[];
-  performance_summary: string;
-  detailed_markdown_content: string;
-}
-
-export interface ReportMetadata {
-  organization_name?: string;
-  generated_at?: string;
-  total_pages?: number;
+  priority_improvements: string[];
+  recommendations: PageRecommendation[];
 }
 
 export interface ReportData {
-  organization?: string;
-  analysis_date?: string;
-  timestamp?: string;
   overall_summary: OverallSummary;
   page_analyses: PageAnalysisDetail[];
-  metadata?: ReportMetadata;
+  metadata: ReportMetadata;
   screenshots?: { [key: string]: string };
 }
 
-export interface ReportManifestItem {
-  id: string;
-  name: string;
-  date: string;
-  description?: string;
-}
-
-// Common UI Types
-export interface WizardStep {
-  id: number;
-  title: string;
-  icon: string;
-}
-
-// API Response Types
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-// Form Types
-export interface AuthFormData {
-  email: string;
-  password: string;
-  name?: string;
-}
-
-export interface ValidationResult {
-  isValid: boolean;
-  normalizedUrl?: string;
-  error?: string;
-  errors?: string[];
+export interface ReportMetadata {
+  analysis_timestamp: string;
+  website_url: string;
+  organization_name: string;
+  site_purpose: string;
+  total_pages_analyzed: number;
+  analysis_version: string;
 }

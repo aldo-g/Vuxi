@@ -16,10 +16,17 @@
 
 "use client";
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { WIZARD_STEPS, API_ENDPOINTS, POLLING_INTERVALS } from '@/lib/constants';
 import { validateAndNormalizeUrl } from '@/lib/validations';
-import type { WizardState, AnalysisData, CaptureJob, AnalysisJob } from '../types';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import type { 
+  WizardState, 
+  AnalysisData, 
+  CaptureJob, 
+  AnalysisJob, 
+  SaveCaptureRequest 
+} from '../types';
 
 const initialAnalysisData: AnalysisData = {
   websiteUrl: '',
@@ -40,6 +47,7 @@ const initialState: WizardState = {
 
 export function useWizardState() {
   const [state, setState] = useState<WizardState>(initialState);
+  const { user } = useCurrentUser();
   
   // Refs for polling intervals
   const capturePollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,20 +67,20 @@ export function useWizardState() {
     setState(prev => ({ ...prev, currentStep: step }));
   }, []);
 
-  const setLoading = useCallback((isLoading: boolean) => {
-    setState(prev => ({ ...prev, isLoading }));
-  }, []);
-
-  const setError = useCallback((error: string | null) => {
-    setState(prev => ({ ...prev, error }));
-  }, []);
-
   const setCaptureJob = useCallback((job: CaptureJob | null) => {
     setState(prev => ({ ...prev, captureJob: job }));
   }, []);
 
   const setAnalysisJob = useCallback((job: AnalysisJob | null) => {
     setState(prev => ({ ...prev, analysisJob: job }));
+  }, []);
+
+  const setLoading = useCallback((loading: boolean) => {
+    setState(prev => ({ ...prev, isLoading: loading }));
+  }, []);
+
+  const setError = useCallback((error: string | null) => {
+    setState(prev => ({ ...prev, error }));
   }, []);
 
   const setCaptureStarted = useCallback((started: boolean) => {
@@ -83,7 +91,53 @@ export function useWizardState() {
     setState(prev => ({ ...prev, isAnalyzing: analyzing }));
   }, []);
 
-  // Capture job polling
+  // Add user ID to analysis data when user is loaded
+  useEffect(() => {
+    if (user?.id) {
+      updateAnalysisData({ userId: user.id });
+    }
+  }, [user?.id, updateAnalysisData]);
+
+  // Manual save function for capture data
+  const saveCaptureData = useCallback(async (analysisData: AnalysisData, captureJobId: string): Promise<boolean> => {
+    if (!user?.id) {
+      setError('User not authenticated');
+      return false;
+    }
+
+    try {
+      const saveRequest: SaveCaptureRequest = {
+        analysisData: {
+          ...analysisData,
+          userId: user.id
+        },
+        captureJobId,
+        userId: user.id
+      };
+
+      const response = await fetch(API_ENDPOINTS.CAPTURE_SAVE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saveRequest)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save capture data');
+      }
+
+      const result = await response.json();
+      console.log('Capture data saved successfully:', result);
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save capture data';
+      setError(errorMessage);
+      console.error('Error saving capture data:', err);
+      return false;
+    }
+  }, [user?.id, setError]);
+
+  // Capture job polling - NO automatic saving
   const pollCaptureJobStatus = useCallback(async () => {
     if (!state.captureJob?.id || isCapturePollingRef.current) return;
     
@@ -96,14 +150,20 @@ export function useWizardState() {
         setCaptureJob(jobData);
         
         if (jobData.status === 'completed') {
-          updateAnalysisData({ screenshots: jobData.results?.screenshots || [] });
-          setCurrentStep(5);
+          // Update analysis data with screenshots
+          updateAnalysisData({ 
+            screenshots: jobData.results?.screenshots || []
+          });
+          
+          // Stop polling
           if (capturePollingRef.current) {
             clearInterval(capturePollingRef.current);
             capturePollingRef.current = null;
           }
         } else if (jobData.status === 'failed') {
-          setError(jobData.error || 'Capture process failed');
+          setError(jobData.error || 'Capture failed');
+          
+          // Stop polling
           if (capturePollingRef.current) {
             clearInterval(capturePollingRef.current);
             capturePollingRef.current = null;
@@ -115,7 +175,7 @@ export function useWizardState() {
     } finally {
       isCapturePollingRef.current = false;
     }
-  }, [state.captureJob?.id, setCaptureJob, updateAnalysisData, setCurrentStep, setError]);
+  }, [state.captureJob?.id, setCaptureJob, updateAnalysisData, setError]);
 
   // Analysis job polling
   const pollAnalysisJobStatus = useCallback(async () => {
@@ -205,6 +265,7 @@ export function useWizardState() {
         progress: { stage: 'starting', percentage: 0, message: 'Starting capture...' }
       });
       setCaptureStarted(true);
+      
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start capture';
@@ -262,31 +323,63 @@ export function useWizardState() {
 
   // Start polling when needed
   const startCapturePolling = useCallback(() => {
-    if (capturePollingRef.current) return;
+    if (capturePollingRef.current) return; // Already polling
     capturePollingRef.current = setInterval(pollCaptureJobStatus, POLLING_INTERVALS.CAPTURE_JOB);
   }, [pollCaptureJobStatus]);
 
-  // Reset wizard
-  const resetWizard = useCallback(() => {
-    // Clear intervals
+  // Stop polling functions
+  const stopCapturePolling = useCallback(() => {
     if (capturePollingRef.current) {
       clearInterval(capturePollingRef.current);
       capturePollingRef.current = null;
     }
+  }, []);
+
+  const stopAnalysisPolling = useCallback(() => {
     if (analysisPollingRef.current) {
       clearInterval(analysisPollingRef.current);
       analysisPollingRef.current = null;
     }
+  }, []);
+
+  // Reset wizard
+  const resetWizard = useCallback(() => {
+    // Clear intervals
+    stopCapturePolling();
+    stopAnalysisPolling();
     
     // Reset state
     setState(initialState);
-  }, []);
+  }, [stopCapturePolling, stopAnalysisPolling]);
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      stopCapturePolling();
+      stopAnalysisPolling();
+    };
+  }, [stopCapturePolling, stopAnalysisPolling]);
+
+  // Navigation helpers
+  const nextStep = useCallback(() => {
+    setCurrentStep(Math.min(state.currentStep + 1, WIZARD_STEPS.length));
+  }, [state.currentStep, setCurrentStep]);
+
+  const previousStep = useCallback(() => {
+    setCurrentStep(Math.max(state.currentStep - 1, 1));
+  }, [state.currentStep, setCurrentStep]);
+
+  const goToStep = useCallback((step: number) => {
+    if (step >= 1 && step <= WIZARD_STEPS.length) {
+      setCurrentStep(step);
+    }
+  }, [setCurrentStep]);
 
   return {
     // State
     ...state,
     
-    // Actions
+    // State updaters
     updateAnalysisData,
     setCurrentStep,
     setLoading,
@@ -299,11 +392,24 @@ export function useWizardState() {
     // Async actions
     startCapture,
     startAnalysis,
-    startCapturePolling,
-    resetWizard,
+    saveCaptureData, // Manual save function
     
     // Polling functions
+    startCapturePolling,
+    stopCapturePolling,
+    stopAnalysisPolling,
     pollCaptureJobStatus,
-    pollAnalysisJobStatus
+    pollAnalysisJobStatus,
+    
+    // Navigation
+    nextStep,
+    previousStep,
+    goToStep,
+    resetWizard,
+    
+    // Computed
+    canGoNext: state.currentStep < WIZARD_STEPS.length,
+    canGoPrevious: state.currentStep > 1,
+    totalSteps: WIZARD_STEPS.length
   };
 }
