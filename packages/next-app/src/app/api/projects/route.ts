@@ -22,10 +22,23 @@ export async function GET() {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
     
-    // Fetch projects for the authenticated user
+    // Fetch projects for the authenticated user with their analysis runs
     const projects = await prisma.project.findMany({
       where: {
         userId: payload.userId as number,
+      },
+      include: {
+        analysisRuns: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          select: {
+            id: true,
+            status: true,
+            overallScore: true,
+            createdAt: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',

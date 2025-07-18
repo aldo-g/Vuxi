@@ -30,4 +30,4 @@ export * from './dashboard';
 export * from './ui';
 
 // Legacy exports (will be removed after migration)
-export { DashboardClient } from './dashboard-client';
+export { DashboardClient } from './dashboard/dashboard-client';
