@@ -103,6 +103,8 @@ export function AnalysisWizard() {
             onBack={handleBack}
             captureJob={captureJob}
             captureStarted={captureStarted}
+            isLoading={isLoading}
+            error={error}
           />
         );
 
@@ -115,6 +117,8 @@ export function AnalysisWizard() {
             onBack={handleBack}
             captureJob={captureJob}
             captureStarted={captureStarted}
+            isLoading={isLoading}
+            error={error}
           />
         );
 
@@ -124,6 +128,8 @@ export function AnalysisWizard() {
             captureJob={captureJob}
             onNext={handleProcessingNext}
             onBack={handleBack}
+            isLoading={isLoading}
+            error={error}
           />
         );
 
@@ -131,10 +137,11 @@ export function AnalysisWizard() {
         return (
           <ScreenshotReview
             screenshots={analysisData.screenshots || []}
-            captureJobId={analysisData.captureJobId || ''}
+            captureJobId={captureJob?.id || ''}
             onStartAnalysis={handleStartAnalysis}
             onBack={handleBack}
             isAnalyzing={isAnalyzing}
+            updateAnalysisData={updateAnalysisData} // Pass the updateAnalysisData function
           />
         );
 
@@ -142,13 +149,20 @@ export function AnalysisWizard() {
         return (
           <AnalysisProgress
             analysisJob={analysisJob}
+            onBack={handleBack}
+            isLoading={isLoading}
+            error={error}
           />
         );
 
       case 7:
         return (
           <AnalysisComplete
+            analysisJob={analysisJob}
             onRestart={handleRestart}
+            onBack={handleBack}
+            isLoading={isLoading}
+            error={error}
           />
         );
 
@@ -158,81 +172,71 @@ export function AnalysisWizard() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Progress Steps */}
-      <div className="mb-12">
-        <div className="flex items-center justify-between">
-          {WIZARD_STEPS.map((step, index) => {
-            const StepIcon = step.icon;
-            const isActive = currentStep === step.id;
-            const isCompleted = currentStep > step.id;
-            const isAccessible = currentStep >= step.id;
-
-            return (
-              <div key={step.id} className="flex items-center flex-1">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`
-                      w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all duration-300
-                      ${isCompleted 
-                        ? 'bg-green-500 text-white shadow-lg shadow-green-200' 
-                        : isActive 
-                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-200 scale-110' 
-                        : isAccessible
-                        ? 'bg-slate-200 text-slate-600'
-                        : 'bg-slate-100 text-slate-400'
-                      }
-                    `}
-                  >
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Progress Steps */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            {WIZARD_STEPS.map((step, index) => {
+              const StepIcon = step.icon;
+              const isActive = currentStep === step.id;
+              const isCompleted = currentStep > step.id;
+              
+              return (
+                <div key={step.id} className="flex flex-col items-center">
+                  <div className={`
+                    w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all
+                    ${isActive 
+                      ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg' 
+                      : isCompleted 
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-white text-slate-400 border-2 border-slate-200'
+                    }
+                  `}>
                     {isCompleted ? (
                       <CheckCircle2 className="w-6 h-6" />
                     ) : (
-                      <StepIcon className={`w-6 h-6 ${isActive ? 'animate-pulse' : ''}`} />
+                      <StepIcon className="w-6 h-6" />
                     )}
                   </div>
-                  <Badge 
-                    variant={isActive ? 'default' : isCompleted ? 'secondary' : 'outline'}
-                    className="text-xs font-medium px-2 py-1"
-                  >
+                  <span className={`
+                    text-sm font-medium text-center max-w-20
+                    ${isActive ? 'text-green-600' : isCompleted ? 'text-green-500' : 'text-slate-400'}
+                  `}>
                     {step.title}
-                  </Badge>
+                  </span>
+                  {index < WIZARD_STEPS.length - 1 && (
+                    <div className={`
+                      absolute h-0.5 w-20 mt-6 translate-x-16
+                      ${isCompleted ? 'bg-green-500' : 'bg-slate-200'}
+                    `} />
+                  )}
                 </div>
-                {index < WIZARD_STEPS.length - 1 && (
-                  <div className="flex-1 h-0.5 mx-4 mb-6">
-                    <div 
-                      className={`
-                        h-full transition-all duration-500
-                        ${currentStep > step.id 
-                          ? 'bg-green-500' 
-                          : 'bg-slate-200'
-                        }
-                      `}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+          
+          <div className="text-center">
+            <Badge variant="outline" className="bg-white border-slate-200">
+              Step {currentStep} of {WIZARD_STEPS.length}
+            </Badge>
+          </div>
         </div>
-      </div>
 
-      {/* Current Step Content */}
-      <div className="min-h-[600px]">
-        {renderCurrentStep()}
-      </div>
+        {/* Current Step Content */}
+        <div className="mb-8">
+          {renderCurrentStep()}
+        </div>
 
-      {/* Error Display */}
-      {error && (
-        <Card className="mt-6 border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-red-700">
-              <Circle className="w-4 h-4 fill-current" />
-              <span className="font-medium">Error:</span>
-              <span>{error}</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        {/* Global Error Display */}
+        {error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <p className="text-red-600 text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

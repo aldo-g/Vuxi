@@ -52,7 +52,7 @@ function getProjectStatus(project: Project): {
         iconColor: 'text-green-500'
       };
     case 'running':
-    case 'processing':
+    case 'pending':
       return { 
         status: 'Pending',
         icon: <div className="h-3 w-3 rounded-full bg-orange-500"></div>,

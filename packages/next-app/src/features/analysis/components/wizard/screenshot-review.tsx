@@ -7,13 +7,15 @@ import { CheckCircle2, ArrowLeft, Zap } from 'lucide-react';
 import { ScreenshotGrid } from '../screenshots';
 import { AnalysisSummary } from '../analysis-summary';
 import type { ScreenshotReviewProps } from '../../types';
+import type { Screenshot } from '@/types';
 
 export function ScreenshotReview({
   screenshots,
   captureJobId,
   onStartAnalysis,
   onBack,
-  isAnalyzing
+  isAnalyzing,
+  updateAnalysisData
 }: ScreenshotReviewProps) {
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState<number | null>(null);
 
@@ -25,16 +27,63 @@ export function ScreenshotReview({
   const handleEditClick = (index: number) => {
     // Implement screenshot editing functionality
     console.log('Edit screenshot at index:', index);
+    // TODO: Implement edit functionality - could open a modal to edit screenshot details
   };
 
   const handleDeleteClick = (index: number) => {
-    // Implement screenshot deletion functionality
-    console.log('Delete screenshot at index:', index);
+    // Create a new array without the screenshot at the specified index
+    const updatedScreenshots = screenshots.filter((_, i) => i !== index);
+    
+    // Update the analysis data with the new screenshots array
+    updateAnalysisData({ screenshots: updatedScreenshots });
+    
+    // Reset selected index if it was the deleted one
+    if (selectedScreenshotIndex === index) {
+      setSelectedScreenshotIndex(null);
+    } else if (selectedScreenshotIndex !== null && selectedScreenshotIndex > index) {
+      setSelectedScreenshotIndex(selectedScreenshotIndex - 1);
+    }
+    
+    console.log(`Deleted screenshot at index ${index}. Remaining screenshots: ${updatedScreenshots.length}`);
   };
 
   const handleAddClick = () => {
     // Implement add screenshot functionality
     console.log('Add new screenshot');
+    // TODO: Implement add functionality - could open a modal to add custom screenshot URL
+  };
+
+  const handleViewFullSize = (index: number) => {
+    // Implement full size view functionality
+    const screenshot = screenshots[index];
+    if (screenshot?.success && screenshot.data?.dataUrl) {
+      // Open in a new tab/window
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(`
+          <html>
+            <head>
+              <title>Screenshot - ${screenshot.url}</title>
+              <style>
+                body { margin: 0; padding: 20px; background: #f5f5f5; text-align: center; }
+                img { max-width: 100%; height: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+                .info { margin-bottom: 20px; font-family: Arial, sans-serif; color: #333; }
+              </style>
+            </head>
+            <body>
+              <div class="info">
+                <h2>Screenshot Preview</h2>
+                <p><strong>URL:</strong> ${screenshot.url}</p>
+              </div>
+              <img src="${screenshot.data.dataUrl}" alt="Screenshot of ${screenshot.url}" />
+            </body>
+          </html>
+        `);
+        newWindow.document.close();
+      }
+    } else {
+      console.log('No image data available for full size view');
+    }
   };
 
   return (
@@ -55,7 +104,7 @@ export function ScreenshotReview({
           <ScreenshotGrid
             screenshots={screenshots}
             captureJobId={captureJobId}
-            onScreenshotClick={handleScreenshotClick}
+            onScreenshotClick={handleViewFullSize}
             onEditClick={handleEditClick}
             onDeleteClick={handleDeleteClick}
             onAddClick={handleAddClick}

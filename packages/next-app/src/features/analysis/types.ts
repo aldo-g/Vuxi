@@ -1,3 +1,4 @@
+
 // Re-export common types that are used across features
 export type {
   AnalysisData,
@@ -52,4 +53,5 @@ export interface ScreenshotReviewProps {
   onStartAnalysis: () => void;
   onBack: () => void;
   isAnalyzing: boolean;
+  updateAnalysisData: (updates: Partial<AnalysisData>) => void; // Added this line
 }
